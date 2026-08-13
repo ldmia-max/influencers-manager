@@ -1,0 +1,425 @@
+# Influencer Manager
+
+Plataforma de gestión de perfiles de influencers y creadores UGC. Permite centralizar creadores de contenido, sus cuentas en redes sociales, las métricas de cada cuenta y las tarifas por tipo de servicio, además de administrar la cartera de clientes de la agencia.
+
+Las métricas de Instagram y TikTok se obtienen automáticamente mediante scraping con Apify, de modo que los seguidores, publicaciones y foto de perfil se mantienen actualizados sin captura manual.
+
+---
+
+## Índice
+
+- [Stack tecnológico](#stack-tecnológico)
+- [Requisitos previos](#requisitos-previos)
+- [Puesta en marcha local](#puesta-en-marcha-local)
+- [Variables de entorno](#variables-de-entorno)
+- [Scripts disponibles](#scripts-disponibles)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Modelo de datos](#modelo-de-datos)
+- [Funcionalidades](#funcionalidades)
+- [Arquitectura](#arquitectura)
+- [Convenciones de desarrollo](#convenciones-de-desarrollo)
+- [Estado actual y pendientes](#estado-actual-y-pendientes)
+- [Despliegue](#despliegue)
+
+---
+
+## Stack tecnológico
+
+| Capa | Tecnología |
+|---|---|
+| Framework | Next.js 16 (App Router) con React 19 |
+| Lenguaje | TypeScript |
+| Base de datos | PostgreSQL |
+| ORM | Prisma 6 |
+| Autenticación | NextAuth.js v5 (beta) con credenciales y JWT |
+| Estilos | Tailwind CSS v4 |
+| Componentes | Shadcn/ui (estilo New York) sobre Radix UI |
+| Iconos | Lucide React |
+| Scraping | Apify (`apify-client`) |
+| Hashing | bcryptjs |
+
+El compilador usado es **webpack**, no Turbopack: tanto `npm run dev` como `npm run build` incluyen el flag `--webpack`.
+
+La interfaz está íntegramente en español.
+
+---
+
+## Requisitos previos
+
+- **Node.js 20 o superior** (el proyecto se ha probado con Node 25)
+- **PostgreSQL 16** instalado localmente, o accesible en red
+- Un cliente de base de datos para inspeccionar los datos: **DBeaver**, **pgAdmin** o el propio `npm run db:studio`
+- Opcional: una cuenta de **Apify** con token de API, si se quiere probar la sincronización de métricas
+
+---
+
+## Puesta en marcha local
+
+### 1. Clonar e instalar dependencias
+
+```bash
+git clone https://github.com/LDMRepository/influencer-manager.git
+cd influencer-manager
+npm install
+```
+
+### 2. Crear la base de datos
+
+Crea una base de datos vacía en tu PostgreSQL local. Desde pgAdmin o DBeaver: clic derecho sobre *Databases* → *Create* → *Database…*, con el nombre `influencer-manager`.
+
+O desde la terminal:
+
+```bash
+createdb -U postgres influencer-manager
+```
+
+No hace falta crear ninguna tabla: de eso se encarga Prisma en el paso 4.
+
+### 3. Configurar las variables de entorno
+
+```bash
+cp .env.example .env
+```
+
+Edita el `.env` y rellena como mínimo estos tres valores:
+
+```bash
+DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/influencer-manager
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=<genera uno con el comando de abajo>
+```
+
+Para generar el secreto:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+> **Importante:** todas las variables van en `.env`, no en `.env.local`. Next.js lee ambos archivos, pero **el CLI de Prisma solo lee `.env`**. Si pusieras la URL de la base en `.env.local`, los comandos `db:push`, `db:seed` y `db:studio` seguirían usando la de `.env` y acabarías tocando una base que no esperabas.
+
+> Si tu contraseña contiene caracteres especiales (`@ : / ? # & %`) debes codificarlos en formato URL. Por ejemplo, `Mi@Pass#1` se escribe `Mi%40Pass%231`.
+
+### 4. Crear las tablas y cargar datos de prueba
+
+```bash
+npm run db:push    # crea las 11 tablas a partir de prisma/schema.prisma
+npm run db:seed    # carga el usuario admin, plataformas, servicios y categorías
+```
+
+El seed deja preparado:
+
+- Usuario administrador: **`admin@example.com`** / **`admin123`**
+- Plataformas: Instagram y TikTok
+- 11 tipos de servicio (Reel, Post, Story, Carrusel, Video UGC, Foto UGC, Live, etc.)
+- 8 categorías (Foodie, Tecnología, Moda, Fitness, Viajes, Belleza, Gaming, Lifestyle)
+
+### 5. Arrancar el servidor
+
+```bash
+npm run dev
+```
+
+La aplicación queda disponible en `http://localhost:3000`. Entra con las credenciales del administrador.
+
+### Verificar que todo está bien
+
+Al arrancar, Next.js debe imprimir `Environments: .env`. Si entras a `/profiles` y la lista aparece vacía, la conexión a tu base local es correcta.
+
+---
+
+## Variables de entorno
+
+| Variable | Obligatoria | Descripción |
+|---|:---:|---|
+| `DATABASE_URL` | Sí | Cadena de conexión a PostgreSQL. La lee Prisma. |
+| `NEXTAUTH_URL` | Sí | URL pública de la app. En local `http://localhost:3000`, **sin barra final**. |
+| `NEXTAUTH_SECRET` | Sí | Clave con la que se firman los JWT de sesión. Debe ser distinta entre local y producción. |
+| `APIFY_API_TOKEN` | No | Token de Apify. Sin él, la sincronización de métricas devuelve `null` y falla en silencio. |
+| `AUTH_TRUST_HOST` | No | Solo en producción tras un proxy inverso (Nginx, Traefik, Caddy). Ponlo en `true` o NextAuth construirá mal las URLs de callback. |
+
+Estas otras están declaradas pero **ningún archivo del proyecto las lee todavía**; corresponden a funcionalidades planeadas: `ENABLE_EMAILS`, `RESEND_FROM_EMAIL`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY`.
+
+El archivo [.env.example](.env.example) documenta cada variable con su valor esperado en local y en producción. El `.env` real está ignorado por git y nunca debe subirse.
+
+---
+
+## Scripts disponibles
+
+```bash
+npm run dev              # Servidor de desarrollo (webpack) en el puerto 3000
+npm run build            # Compilación de producción
+npm run start            # Sirve la compilación de producción
+npm run lint             # ESLint
+
+npm run db:push          # Sincroniza el esquema con la base, sin historial de migraciones
+npm run db:migrate       # Crea y aplica migraciones (prisma migrate dev)
+npm run db:generate      # Regenera el Prisma Client tras cambiar el esquema
+npm run db:seed          # Carga los datos iniciales
+npm run db:studio        # Interfaz web de Prisma para explorar los datos
+```
+
+El proyecto **no tiene suite de pruebas** por el momento.
+
+### Scripts puntuales
+
+En [scripts/](scripts/) hay utilidades de mantenimiento que se ejecutan a mano:
+
+```bash
+npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/update-currency.ts
+```
+
+`update-currency.ts` convierte a COP todas las tarifas que estén registradas en USD.
+
+---
+
+## Estructura del proyecto
+
+```
+prisma/
+  schema.prisma          Definición del modelo de datos
+  seed.ts                Datos iniciales
+
+scripts/                 Utilidades de mantenimiento puntuales
+
+src/
+  app/
+    (auth)/              Login y registro
+    (dashboard)/         Área privada: dashboard, perfiles, categorías, clientes
+    admin/               Panel de administración (solo rol ADMIN)
+    client-login/        Portal de clientes: acceso
+    client-dashboard/    Portal de clientes: bienvenida
+    api/                 Route handlers
+  components/
+    ui/                  Componentes base de Shadcn/ui
+    forms/               Formularios de alta y edición
+    profiles/            Acciones sobre perfiles: ver, sincronizar, eliminar
+    clients/             Gestión de clientes y sus accesos
+    admin/               Controles del panel de administración
+    filters/             Filtros del listado de perfiles
+    layout/              Cabecera y menú lateral
+  lib/
+    auth.ts              Configuración de NextAuth
+    prisma.ts            Cliente de Prisma (singleton)
+    cache.ts             Consultas cacheadas
+    apify.ts             Integración con Apify
+    format.ts            Formato de números y precios
+  types/                 Tipos compartidos
+  middleware.ts          Protección de rutas
+```
+
+Los paréntesis en `(auth)` y `(dashboard)` indican **grupos de rutas** de Next.js: sirven para compartir un layout sin añadir segmento a la URL. Por eso las páginas dentro de `(dashboard)` se sirven en `/profiles`, `/clients` o `/categories`, y no en `/dashboard/profiles`.
+
+---
+
+## Modelo de datos
+
+```mermaid
+erDiagram
+    User ||--o{ Profile : crea
+    User ||--o{ Category : crea
+    User ||--o{ Client : crea
+
+    Profile ||--o{ SocialAccount : tiene
+    Profile }o--o{ Category : "ProfileCategory"
+
+    SocialPlatform ||--o{ SocialAccount : "aloja"
+    SocialPlatform ||--o{ ServiceType : define
+
+    SocialAccount ||--o{ ProfileService : "tarifas"
+    ServiceType   ||--o{ ProfileService : "tipo de"
+
+    Client ||--o{ ClientContact : tiene
+    Client ||--o| ClientUser : "acceso web"
+```
+
+### Entidades principales
+
+**`Profile`** — El creador de contenido. Su campo `type` puede ser `INFLUENCER`, `UGC` o `BOTH`, e incluye país y ciudad.
+
+**`SocialAccount`** — La cuenta del creador en una plataforma concreta. Un perfil solo puede tener una cuenta por plataforma. Aquí se guardan las métricas que trae Apify: seguidores, seguidos, publicaciones, likes promedio, tasa de interacción, biografía, verificación y la ruta de la foto de perfil.
+
+**`SocialPlatform`** — Instagram, TikTok, etc. Es una tabla de datos, no un enum, precisamente para poder añadir plataformas sin tocar el esquema.
+
+**`ServiceType`** — Un servicio ofertable, como «Reel» o «Video UGC». Está acotado por plataforma y además por un array `profileTypes` que indica a qué tipos de perfil aplica.
+
+**`ProfileService`** — La tarifa. El precio se almacena como `Decimal(10,2)` para evitar errores de redondeo de coma flotante, y la moneda por defecto es `COP`.
+
+**`Client`, `ClientContact`, `ClientUser`** — La empresa cliente, sus personas de contacto y, opcionalmente, sus credenciales para el portal de clientes.
+
+### Dos detalles del modelo que conviene tener claros
+
+**Las tarifas cuelgan de la cuenta social, no del perfil.** Un `ProfileService` es único por combinación de `socialAccountId` y `serviceTypeId`. Esto significa que un mismo servicio en Instagram y en TikTok son dos registros distintos, con precios independientes. Cualquier consulta que involucre precios tiene que atravesar `socialAccounts.services`.
+
+**Un perfil de tipo `BOTH` no hereda los servicios de `INFLUENCER` y `UGC`.** El array `profileTypes` de cada `ServiceType` debe incluir `BOTH` explícitamente. Por eso [prisma/seed.ts](prisma/seed.ts) registra combinaciones como `[INFLUENCER, BOTH]` o `[UGC, BOTH]`.
+
+### Borrados en cascada
+
+Al eliminar un `Profile` se borran sus `SocialAccount` y, con ellas, sus `ProfileService`. Al eliminar un `Client` se borran sus `ClientContact` y su `ClientUser`.
+
+En cambio `SocialPlatform`, `ServiceType` y `Category` nunca se borran en cascada: para eliminarlos hay que limpiar antes las referencias que apunten a ellos.
+
+---
+
+## Funcionalidades
+
+### Área privada (todos los usuarios autenticados)
+
+**Dashboard** (`/dashboard`) — Totales de perfiles, categorías y plataformas activas, más un listado de los perfiles añadidos recientemente.
+
+**Perfiles** (`/profiles`) — El núcleo de la aplicación. Listado paginado con filtros por texto, país, ciudad, tipo de perfil, plataforma, categoría, tipo de servicio y rango de precios. Desde el menú de cada fila se puede ver el detalle en un panel lateral, editar, sincronizar métricas con Apify o eliminar (esto último solo administradores).
+
+**Categorías** (`/categories`) — Alta, edición y borrado de las categorías temáticas que se asignan a los perfiles.
+
+**Clientes** (`/clients`) — Cartera de empresas cliente, con NIT, email, contactos asociados y contacto principal. La columna «Estado Login» indica si esa empresa tiene credenciales activas para el portal de clientes.
+
+### Panel de administración (solo rol `ADMIN`)
+
+**Usuarios** (`/admin/users`) — Alta, edición y borrado de usuarios del sistema, con asignación de rol.
+
+**Plataformas** (`/admin/platforms`) — Gestión de las redes sociales disponibles y su activación.
+
+**Tipos de servicio** (`/admin/service-types`) — Gestión de los servicios ofertables por plataforma y tipo de perfil.
+
+### Portal de clientes
+
+Área independiente (`/client-login`, `/client-dashboard`) pensada para que las empresas cliente accedan a su propia información. Los administradores generan las credenciales desde la ficha de cada cliente.
+
+Está **a medio implementar**: ver [Estado actual y pendientes](#estado-actual-y-pendientes).
+
+---
+
+## Arquitectura
+
+### Autenticación y roles
+
+La autenticación del personal se configura en [src/lib/auth.ts](src/lib/auth.ts) mediante el proveedor de credenciales de NextAuth, con sesiones JWT. Los callbacks `jwt` y `session` inyectan el `id` y el `role` del usuario en la sesión, de forma que `session.user.role` está disponible tanto en servidor como en cliente.
+
+Existen dos roles: `ADMIN` y `USER`. Los administradores acceden al panel de administración, pueden eliminar perfiles y gestionar los accesos de los clientes.
+
+### Protección de rutas
+
+La protección opera en **dos capas que no cubren las mismas rutas**:
+
+1. [src/middleware.ts](src/middleware.ts) intercepta `/dashboard`, `/admin`, `/login` y `/register`.
+2. El layout [src/app/(dashboard)/layout.tsx](src/app/(dashboard)/layout.tsx) ejecuta `await auth()` y redirige a `/login` si no hay sesión.
+
+Como el grupo de rutas `(dashboard)` no añade segmento a la URL, páginas como `/profiles` o `/clients` **no pasan por el middleware** y dependen únicamente de la comprobación del layout. Una página nueva dentro de `(dashboard)` hereda esa protección; una página nueva en la raíz de `app/` no hereda ninguna.
+
+El panel de administración comprueba el rol dos veces: en el middleware y en [src/app/admin/layout.tsx](src/app/admin/layout.tsx).
+
+### Caché de consultas
+
+[src/lib/cache.ts](src/lib/cache.ts) envuelve las consultas de lectura más frecuentes en `unstable_cache`, con una revalidación de 2 horas y etiquetas: `platforms`, `categories`, `service-types`, `profiles` y `profile`. Las páginas de servidor llaman a estas funciones en lugar de a Prisma directamente.
+
+Las rutas que modifican datos invalidan la caché con `revalidateTag`. **Al añadir una consulta cacheada nueva hay que añadir su `revalidateTag` correspondiente en todas las rutas que escriban sobre esos datos**, o los cambios tardarán hasta 2 horas en verse.
+
+### Integración con Apify
+
+[src/lib/apify.ts](src/lib/apify.ts) usa los actores `apify/instagram-profile-scraper` y `clockworks/tiktok-profile-scraper`. La función `syncSocialAccountMetrics(plataforma, usuario)` normaliza las respuestas de ambos a los nombres de campo de `SocialAccount`.
+
+Además de las métricas, **descarga la foto de perfil** y la guarda en `public/uploads/profiles/`, almacenando la ruta relativa en el campo `profilePicUrl`.
+
+La sincronización se dispara en dos momentos: automáticamente al crear un perfil (`POST /api/profiles`, capturando los errores para que el alta no falle) y bajo demanda desde el botón de sincronizar (`POST /api/profiles/[id]/sync`).
+
+El reparto por plataforma se hace comparando `platform.name` en minúsculas: una plataforma cuyo nombre no sea `instagram` o `tiktok` se omite silenciosamente.
+
+### Patrón de las rutas de API
+
+Todas siguen la misma secuencia: `await auth()` primero, `401` si no hay sesión, `403` si falla la comprobación de rol o propiedad, la operación, `revalidateTag` y la respuesta JSON.
+
+En Next.js 16 los parámetros dinámicos son promesas, así que hay que esperarlos:
+
+```ts
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  // ...
+}
+```
+
+### Cliente de Prisma
+
+[src/lib/prisma.ts](src/lib/prisma.ts) exporta una instancia única guardada en el objeto global, para que la recarga en caliente del servidor de desarrollo no agote el pool de conexiones creando clientes nuevos en cada cambio.
+
+En [next.config.ts](next.config.ts), `@prisma/client` y `bcryptjs` están declarados como `serverExternalPackages` porque son paquetes nativos que no deben empaquetarse.
+
+---
+
+## Convenciones de desarrollo
+
+### Formularios
+
+Aunque `react-hook-form` y `zod` figuran en las dependencias y existe el componente [src/components/ui/form.tsx](src/components/ui/form.tsx), **ningún formulario del proyecto los utiliza**. Todos están construidos con `useState`, una llamada a `fetch` y `router.refresh()`. Conviene mantener ese estilo salvo que se decida migrar todos a la vez.
+
+### Precios
+
+Los precios circulan por los formularios como **cadenas de solo dígitos**. El componente [src/components/ui/price-input.tsx](src/components/ui/price-input.tsx) muestra el valor formateado (`1.000.000`, con punto como separador de miles según la convención colombiana) mediante `formatNumber` de [src/lib/format.ts](src/lib/format.ts), pero hacia el estado del formulario emite solo los dígitos. La conversión a número se hace al enviar.
+
+### Estado en la URL
+
+Los filtros, la paginación y el panel de detalle del listado de perfiles **guardan su estado en los parámetros de la URL**, no en estado local. El botón «Ver» añade `?view=<id>` y el componente `ProfileDetailSheet`, montado una sola vez en la página, lee ese parámetro y consulta `/api/profiles/[id]`.
+
+Gracias a eso la página es un componente de servidor que lee `await searchParams`, y cualquier vista filtrada se puede compartir por enlace.
+
+### Añadir una plataforma nueva
+
+El sistema es dirigido por datos y no requiere cambios en el esquema:
+
+1. Añadir la plataforma al array `platforms` de [prisma/seed.ts](prisma/seed.ts).
+2. Añadir sus `ServiceType` en el mismo archivo, recordando incluir `BOTH` en `profileTypes` cuando corresponda.
+3. Añadir el actor y su normalizador en [src/lib/apify.ts](src/lib/apify.ts), y la plataforma a las comprobaciones `platformName === ...` de las rutas de creación y sincronización.
+
+---
+
+## Estado actual y pendientes
+
+Puntos que conviene conocer antes de trabajar sobre el código:
+
+**El portal de clientes no crea sesión.** `POST /api/client-auth/login` verifica el email y la contraseña correctamente, pero termina con un `TODO` en lugar de emitir un token: devuelve los datos del cliente y nada más. Por su parte `/client-dashboard` es una página de bienvenida sin ninguna comprobación de acceso y sin cobertura del middleware. Esa mitad está sin terminar.
+
+**La visibilidad de perfiles es incoherente entre la página y la API.** `getCachedProfiles()` en [src/lib/cache.ts](src/lib/cache.ts) devuelve deliberadamente **todos** los perfiles a cualquier usuario, y es la función que alimenta la página `/profiles`. En cambio `GET /api/profiles` filtra por `createdById` cuando el usuario no es administrador. Si se cambian las reglas de visibilidad hay que tocar ambos sitios o quedarán en desacuerdo.
+
+**Las rutas de administración no invalidan su caché.** Los endpoints de plataformas y tipos de servicio no llaman a `revalidateTag`, así que un cambio hecho desde el panel puede tardar hasta 2 horas en reflejarse en los formularios y filtros. Reiniciar el servidor lo fuerza.
+
+**No hay migraciones de Prisma.** No existe el directorio `prisma/migrations`: el esquema se ha venido sincronizando con `db push`. Es cómodo en desarrollo, pero contra una base de producción es arriesgado, porque `db push` altera el esquema sin historial ni marcha atrás y puede descartar columnas con datos. Antes del despliegue conviene generar una migración inicial y pasar a `prisma migrate deploy`.
+
+**Las imágenes se guardan en el sistema de archivos.** `public/uploads/profiles/` está en el `.gitignore` y no viaja en el repositorio. En un despliegue con contenedores hay que montar un volumen en esa ruta, o las fotos se perderán en cada reconstrucción.
+
+---
+
+## Despliegue
+
+El destino previsto es un **servidor privado en OVH-Cloud**, con un contenedor para la aplicación Next.js y otro para PostgreSQL.
+
+### Variables a cambiar respecto al entorno local
+
+| Variable | Local | Producción |
+|---|---|---|
+| `NEXTAUTH_URL` | `http://localhost:3000` | `https://tudominio.com` |
+| `DATABASE_URL` | `…@localhost:5432/influencer-manager` | `…@db:5432/influencer_prod` (el host es el nombre del servicio en `docker-compose`) |
+| `NEXTAUTH_SECRET` | uno cualquiera | **otro distinto**, generado aleatoriamente |
+| `AUTH_TRUST_HOST` | sin definir | `true` si hay proxy inverso delante |
+| `APIFY_API_TOKEN` | el mismo en ambos entornos | |
+
+El contenedor de PostgreSQL necesita además `POSTGRES_USER`, `POSTGRES_PASSWORD` y `POSTGRES_DB`, que deben ser coherentes con lo que indique `DATABASE_URL`.
+
+### Trabajo pendiente de infraestructura
+
+Cambiar las variables de entorno **no es suficiente** para desplegar. Falta:
+
+1. `Dockerfile`, `docker-compose.yml` y `.dockerignore`.
+2. Añadir `output: "standalone"` a [next.config.ts](next.config.ts), para que la imagen no tenga que incluir todo `node_modules`.
+3. Un volumen montado en `public/uploads` que preserve las fotos de perfil entre reconstrucciones.
+4. La migración inicial de Prisma, para desplegar con `prisma migrate deploy` en lugar de `db push`.
+5. Un mecanismo de despliegue: a diferencia de un PaaS, **un `git push` no despliega nada por sí solo en un servidor propio**. Hay que configurar un workflow de GitHub Actions que se conecte por SSH, o ejecutar manualmente `git pull && docker compose up -d --build` en el servidor.
+
+### Flujo de trabajo con git
+
+La rama principal es `master`. El desarrollo se hace en ramas aparte y se integra en `master` cuando está probado en local.
+
+```bash
+git checkout -b mi-funcionalidad
+# ... cambios y pruebas en local ...
+git add .
+git commit -m "feat: descripción del cambio"
+git push -u origin mi-funcionalidad
+```

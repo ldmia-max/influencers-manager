@@ -1,0 +1,40 @@
+# PostgreSQL para desarrollo local.
+#
+# Se usa la imagen pgvector/pgvector, que es PostgreSQL 16 con las
+# extensiones que exige prisma/schema.prisma:
+#   - vector   (pgvector, para la columna embedding de busqueda semantica)
+#   - pg_trgm  (viene incluido en PostgreSQL)
+#
+# Escucha en el puerto 5433 del host para NO chocar con el PostgreSQL
+# que ya tienes instalado en el 5432 (con las bases ads_platform y
+# gen_image_db). Ambos pueden convivir sin problema.
+#
+# Comandos:
+#   docker compose -f docker-compose.dev.yml up -d      arrancar
+#   docker compose -f docker-compose.dev.yml down       detener
+#   docker compose -f docker-compose.dev.yml down -v    detener y BORRAR los datos
+#   docker compose -f docker-compose.dev.yml logs -f    ver los logs
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: influencer-manager-db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: influencer-manager
+    volumes:
+      # Los datos sobreviven a "down" y a los reinicios del equipo.
+      # Solo se borran con "down -v".
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d influencer-manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

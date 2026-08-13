@@ -1,0 +1,586 @@
+-- ==========================================
+-- Script de limpieza y reimportación de datos
+-- Adapta el export viejo (country/city texto) al schema actual (countryId/departmentId/cityId FK)
+-- Fecha: 2026-02-10
+-- ==========================================
+
+-- Desactivar restricciones de foreign key
+SET session_replication_role = 'replica';
+
+-- ==========================================
+-- FASE 1: Limpiar todas las tablas
+-- ==========================================
+TRUNCATE TABLE "CampaignService" CASCADE;
+TRUNCATE TABLE "CampaignProfilePlatform" CASCADE;
+TRUNCATE TABLE "CampaignProfile" CASCADE;
+TRUNCATE TABLE "CampaignApprovalToken" CASCADE;
+TRUNCATE TABLE "Campaign" CASCADE;
+TRUNCATE TABLE "ProfileService" CASCADE;
+TRUNCATE TABLE "ProfileCategory" CASCADE;
+TRUNCATE TABLE "SocialAccount" CASCADE;
+TRUNCATE TABLE "Profile" CASCADE;
+TRUNCATE TABLE "ClientContact" CASCADE;
+TRUNCATE TABLE "ClientUser" CASCADE;
+TRUNCATE TABLE "Client" CASCADE;
+TRUNCATE TABLE "ServiceType" CASCADE;
+TRUNCATE TABLE "Category" CASCADE;
+TRUNCATE TABLE "City" CASCADE;
+TRUNCATE TABLE "Department" CASCADE;
+TRUNCATE TABLE "Country" CASCADE;
+TRUNCATE TABLE "ReachRange" CASCADE;
+TRUNCATE TABLE "SocialPlatform" CASCADE;
+TRUNCATE TABLE "Gender" CASCADE;
+TRUNCATE TABLE "User" CASCADE;
+
+-- ==========================================
+-- FASE 2: Datos de referencia
+-- ==========================================
+
+-- User
+INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmklwofft0000eo5808ibwebc', 'admin@example.com', '$2b$10$l92viSk2hlV7DOmg0gg4NObOyoKR4ouER8.G5nCiZ/vPWbdFr1bXS', 'Administrador', 'ADMIN', '2026-01-20T01:18:53.994Z', '2026-01-20T01:18:53.994Z');
+INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmkmzcnbe000nvojg1jw6h2h5', 'desarrollo@losdemarketing.com', '$2b$10$He4gl1o1cEJzg7Eq4Qt5geAYZVmVXre6zY0dlLbWRqzBHu5.yBWwe', 'minijuegosz', 'USER', '2026-01-20T19:21:29.354Z', '2026-01-20T19:21:29.354Z');
+INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmkr7rfmu0000jo04n3gfw9ms', 'alejo.martinez@losdemarketing.com', '$2b$10$gaIAaxrU.0xfkc2K..hqSurCKS83pgKGC0qfglH4S.EsZE7sHHck2', 'Alejandro', 'USER', '2026-01-23T18:28:00.871Z', '2026-01-23T18:28:00.871Z');
+
+-- Gender
+INSERT INTO "Gender" ("id", "name", "displayName", "isActive", "createdAt") VALUES ('cmkpzaz670000voloafbtghap', 'masculino', 'Masculino', TRUE, '2026-01-22T21:43:29.935Z');
+INSERT INTO "Gender" ("id", "name", "displayName", "isActive", "createdAt") VALUES ('cmkpzb5bi0001voloxhykk113', 'femenino', 'Femenino', TRUE, '2026-01-22T21:43:37.903Z');
+
+-- SocialPlatform
+INSERT INTO "SocialPlatform" ("id", "name", "displayName", "icon", "isActive", "createdAt") VALUES ('cmklwoghl0001eo58wecgoul2', 'instagram', 'Instagram', 'instagram', TRUE, '2026-01-20T01:18:55.354Z');
+INSERT INTO "SocialPlatform" ("id", "name", "displayName", "icon", "isActive", "createdAt") VALUES ('cmklwohj80002eo58i2ik3ziw', 'tiktok', 'TikTok', 'tiktok', TRUE, '2026-01-20T01:18:56.709Z');
+
+-- Country
+INSERT INTO "Country" ("id", "name", "code", "isActive", "createdAt") VALUES
+  ('country_co', 'Colombia', 'CO', TRUE, NOW()),
+  ('country_mx', 'México', 'MX', TRUE, NOW()),
+  ('country_ar', 'Argentina', 'AR', TRUE, NOW()),
+  ('country_cl', 'Chile', 'CL', TRUE, NOW()),
+  ('country_pe', 'Perú', 'PE', TRUE, NOW()),
+  ('country_ec', 'Ecuador', 'EC', TRUE, NOW()),
+  ('country_es', 'España', 'ES', TRUE, NOW()),
+  ('country_us', 'Estados Unidos', 'US', TRUE, NOW());
+
+-- Department (33 departamentos de Colombia)
+INSERT INTO "Department" ("id", "name", "code", "isActive", "createdAt", "countryId") VALUES
+  ('dep_ama', 'Amazonas', 'AMA', TRUE, NOW(), 'country_co'),
+  ('dep_ant', 'Antioquia', 'ANT', TRUE, NOW(), 'country_co'),
+  ('dep_ara', 'Arauca', 'ARA', TRUE, NOW(), 'country_co'),
+  ('dep_atl', 'Atlántico', 'ATL', TRUE, NOW(), 'country_co'),
+  ('dep_dc', 'Bogotá D.C.', 'DC', TRUE, NOW(), 'country_co'),
+  ('dep_bol', 'Bolívar', 'BOL', TRUE, NOW(), 'country_co'),
+  ('dep_boy', 'Boyacá', 'BOY', TRUE, NOW(), 'country_co'),
+  ('dep_cal', 'Caldas', 'CAL', TRUE, NOW(), 'country_co'),
+  ('dep_caq', 'Caquetá', 'CAQ', TRUE, NOW(), 'country_co'),
+  ('dep_cas', 'Casanare', 'CAS', TRUE, NOW(), 'country_co'),
+  ('dep_cau', 'Cauca', 'CAU', TRUE, NOW(), 'country_co'),
+  ('dep_ces', 'Cesar', 'CES', TRUE, NOW(), 'country_co'),
+  ('dep_cho', 'Chocó', 'CHO', TRUE, NOW(), 'country_co'),
+  ('dep_cor', 'Córdoba', 'COR', TRUE, NOW(), 'country_co'),
+  ('dep_cun', 'Cundinamarca', 'CUN', TRUE, NOW(), 'country_co'),
+  ('dep_gua', 'Guainía', 'GUA', TRUE, NOW(), 'country_co'),
+  ('dep_guv', 'Guaviare', 'GUV', TRUE, NOW(), 'country_co'),
+  ('dep_hui', 'Huila', 'HUI', TRUE, NOW(), 'country_co'),
+  ('dep_lag', 'La Guajira', 'LAG', TRUE, NOW(), 'country_co'),
+  ('dep_mag', 'Magdalena', 'MAG', TRUE, NOW(), 'country_co'),
+  ('dep_met', 'Meta', 'MET', TRUE, NOW(), 'country_co'),
+  ('dep_nar', 'Nariño', 'NAR', TRUE, NOW(), 'country_co'),
+  ('dep_nsa', 'Norte de Santander', 'NSA', TRUE, NOW(), 'country_co'),
+  ('dep_put', 'Putumayo', 'PUT', TRUE, NOW(), 'country_co'),
+  ('dep_qui', 'Quindío', 'QUI', TRUE, NOW(), 'country_co'),
+  ('dep_ris', 'Risaralda', 'RIS', TRUE, NOW(), 'country_co'),
+  ('dep_sap', 'San Andrés y Providencia', 'SAP', TRUE, NOW(), 'country_co'),
+  ('dep_san', 'Santander', 'SAN', TRUE, NOW(), 'country_co'),
+  ('dep_suc', 'Sucre', 'SUC', TRUE, NOW(), 'country_co'),
+  ('dep_tol', 'Tolima', 'TOL', TRUE, NOW(), 'country_co'),
+  ('dep_vac', 'Valle del Cauca', 'VAC', TRUE, NOW(), 'country_co'),
+  ('dep_vau', 'Vaupés', 'VAU', TRUE, NOW(), 'country_co'),
+  ('dep_vic', 'Vichada', 'VIC', TRUE, NOW(), 'country_co');
+
+-- City (ciudades principales)
+INSERT INTO "City" ("id", "name", "isActive", "createdAt", "departmentId") VALUES
+  ('city_bogota', 'Bogotá', TRUE, NOW(), 'dep_dc'),
+  ('city_medellin', 'Medellín', TRUE, NOW(), 'dep_ant'),
+  ('city_envigado', 'Envigado', TRUE, NOW(), 'dep_ant'),
+  ('city_bello', 'Bello', TRUE, NOW(), 'dep_ant'),
+  ('city_itagui', 'Itagüí', TRUE, NOW(), 'dep_ant'),
+  ('city_rionegro', 'Rionegro', TRUE, NOW(), 'dep_ant'),
+  ('city_barranquilla', 'Barranquilla', TRUE, NOW(), 'dep_atl'),
+  ('city_soledad', 'Soledad', TRUE, NOW(), 'dep_atl'),
+  ('city_cali', 'Cali', TRUE, NOW(), 'dep_vac'),
+  ('city_palmira', 'Palmira', TRUE, NOW(), 'dep_vac'),
+  ('city_buenaventura', 'Buenaventura', TRUE, NOW(), 'dep_vac'),
+  ('city_bucaramanga', 'Bucaramanga', TRUE, NOW(), 'dep_san'),
+  ('city_floridablanca', 'Floridablanca', TRUE, NOW(), 'dep_san'),
+  ('city_giron', 'Girón', TRUE, NOW(), 'dep_san'),
+  ('city_cartagena', 'Cartagena', TRUE, NOW(), 'dep_bol'),
+  ('city_cucuta', 'Cúcuta', TRUE, NOW(), 'dep_nsa'),
+  ('city_soacha', 'Soacha', TRUE, NOW(), 'dep_cun'),
+  ('city_chia', 'Chía', TRUE, NOW(), 'dep_cun'),
+  ('city_zipaquira', 'Zipaquirá', TRUE, NOW(), 'dep_cun'),
+  ('city_pereira', 'Pereira', TRUE, NOW(), 'dep_ris'),
+  ('city_dosquebradas', 'Dosquebradas', TRUE, NOW(), 'dep_ris'),
+  ('city_ibague', 'Ibagué', TRUE, NOW(), 'dep_tol'),
+  ('city_neiva', 'Neiva', TRUE, NOW(), 'dep_hui'),
+  ('city_villavicencio', 'Villavicencio', TRUE, NOW(), 'dep_met'),
+  ('city_manizales', 'Manizales', TRUE, NOW(), 'dep_cal'),
+  ('city_santamarta', 'Santa Marta', TRUE, NOW(), 'dep_mag'),
+  ('city_pasto', 'Pasto', TRUE, NOW(), 'dep_nar'),
+  ('city_monteria', 'Montería', TRUE, NOW(), 'dep_cor'),
+  ('city_armenia', 'Armenia', TRUE, NOW(), 'dep_qui'),
+  ('city_valledupar', 'Valledupar', TRUE, NOW(), 'dep_ces'),
+  ('city_tunja', 'Tunja', TRUE, NOW(), 'dep_boy'),
+  ('city_popayan', 'Popayán', TRUE, NOW(), 'dep_cau'),
+  ('city_riohacha', 'Riohacha', TRUE, NOW(), 'dep_lag');
+
+-- ReachRange
+INSERT INTO "ReachRange" ("id", "name", "displayName", "minFollowers", "maxFollowers", "reachPercentage", "isActive", "createdAt") VALUES
+  ('rr_nano', 'nano', 'Nano Influencer', 1000, 10000, 50, TRUE, NOW()),
+  ('rr_micro', 'micro', 'Micro Influencer', 10001, 50000, 45, TRUE, NOW()),
+  ('rr_mid', 'mid', 'Mid-tier Influencer', 50001, 100000, 40, TRUE, NOW()),
+  ('rr_macro', 'macro', 'Macro Influencer', 100001, 500000, 30, TRUE, NOW()),
+  ('rr_mega', 'mega', 'Mega Influencer', 500001, NULL, 20, TRUE, NOW());
+
+-- Category (del export)
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwoprc000qeo58hf1wm8m2', 'Foodie', 'foodie', 'Contenido de comida y gastronomia', TRUE, '2026-01-20T01:19:07.369Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwoqsx000seo58ogcn57y7', 'Tecnologia', 'tecnologia', 'Contenido de tecnologia y gadgets', TRUE, '2026-01-20T01:19:08.722Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklworl3000ueo58x988p8n1', 'Moda', 'moda', 'Contenido de moda y estilo', TRUE, '2026-01-20T01:19:09.566Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwos8y000weo58vrkr5p77', 'Fitness', 'fitness', 'Contenido de ejercicio y vida saludable', TRUE, '2026-01-20T01:19:10.595Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwoswg000yeo58ls4yaevz', 'Viajes', 'viajes', 'Contenido de viajes y turismo', TRUE, '2026-01-20T01:19:11.440Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwotjx0010eo58zk646lti', 'Belleza', 'belleza', 'Contenido de maquillaje y cuidado personal', TRUE, '2026-01-20T01:19:12.286Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwou7e0012eo584yjqgi0h', 'Gaming', 'gaming', 'Contenido de videojuegos', TRUE, '2026-01-20T01:19:13.131Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmklwouux0014eo58s4eikjv4', 'Lifestyle', 'lifestyle', 'Contenido de estilo de vida', TRUE, '2026-01-20T01:19:13.977Z', 'cmklwofft0000eo5808ibwebc');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmkr9tz6k000fjr04yodvlfet', 'Motos', 'motos', 'Contenido sobre motocicletas', TRUE, '2026-01-23T19:25:58.749Z', 'cmkr7rfmu0000jo04n3gfw9ms');
+INSERT INTO "Category" ("id", "name", "slug", "description", "isActive", "createdAt", "createdById") VALUES ('cmkr9wpn3000hjr04cjye6n76', 'Humor y sketch', 'humor-y-sketch', 'Contenido humorístico', TRUE, '2026-01-23T19:28:06.351Z', 'cmkr7rfmu0000jo04n3gfw9ms');
+
+-- ServiceType (del export)
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq2hn60001vop4bgummgkj', 'reel', 'Reel', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:01:38.895Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq2xe50003vop47jf55wjo', 'reel_collab', 'Reel + Collab', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:01:59.309Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq38on0005vop4gsdy620g', 'reel_pauta', 'Reel + Pauta', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:02:13.943Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq433a0007vop4y833kj21', 'tiktok', 'TikTok', NULL, 'cmklwohj80002eo58i2ik3ziw', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:02:53.350Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq5y0t000dvop487q61r5r', 'story', 'Story', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:04:20.093Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq6ull000fvop4km1v2g1r', 'tiktok_collab', 'TikTok + Collab', NULL, 'cmklwohj80002eo58i2ik3ziw', ARRAY['INFLUENCER']::"ProfileType"[], TRUE, '2026-01-20T15:05:02.313Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq7ilv000jvop405mgqih5', 'reel_ugc', 'Reel UGC', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['UGC']::"ProfileType"[], TRUE, '2026-01-20T15:05:33.428Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq7z2d000lvop4eftu2klk', 'reel_pauta_ugc', 'Reel + Pauta UGC', NULL, 'cmklwoghl0001eo58wecgoul2', ARRAY['UGC']::"ProfileType"[], TRUE, '2026-01-20T15:05:54.757Z');
+INSERT INTO "ServiceType" ("id", "name", "displayName", "description", "platformId", "profileTypes", "isActive", "createdAt") VALUES ('cmkmq8lkm000nvop4cuh3c67j', 'tiktok_ugc', 'TikTok UGC', NULL, 'cmklwohj80002eo58i2ik3ziw', ARRAY['UGC']::"ProfileType"[], TRUE, '2026-01-20T15:06:23.927Z');
+
+-- Client (del export)
+INSERT INTO "Client" ("id", "companyName", "nit", "email", "createdAt", "updatedAt", "createdById") VALUES ('cmkrde9ge0001kz04r42felfd', 'AUTECO TVS', '', 'vdominguez@auteco.com', '2026-01-23T21:05:44.030Z', '2026-01-23T21:05:44.030Z', 'cmkr7rfmu0000jo04n3gfw9ms');
+
+-- ClientContact (del export)
+INSERT INTO "ClientContact" ("id", "firstName", "lastName", "phone", "email", "position", "isPrimary", "createdAt", "updatedAt", "clientId") VALUES ('cmkrde9ge0002kz04ekseuhs3', 'Valeria', 'Dominguez', '301 5849217', 'vdominguez@auteco.com', 'Mercadeo', TRUE, '2026-01-23T21:05:44.030Z', '2026-01-23T21:05:44.030Z', 'cmkrde9ge0001kz04r42felfd');
+
+-- ==========================================
+-- FASE 3: Profile (TRANSFORMADO: country/city → countryId/departmentId/cityId)
+-- Mapeo: antioquia→dep_ant, valle-del-cauca→dep_vac, bogota→dep_dc,
+--         cesar→dep_ces, atlantico→dep_atl, magdalena→dep_mag, santander→dep_san
+-- ==========================================
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkx0gi0j0001if044v24ai7k', 'Jenny Diosa', 'UGC', 'country_co', 'dep_ant', NULL, '2026-01-27T19:50:10.482Z', '2026-01-27T19:50:10.482Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkx4nkwa0001ic04eqmk7on2', 'Kevin Castro', 'INFLUENCER', 'country_co', 'dep_vac', NULL, '2026-01-27T21:47:39.273Z', '2026-01-27T21:47:39.273Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cml577as40001l8040s3o5rxl', 'Eliana Ospina', 'INFLUENCER', 'country_co', 'dep_ant', NULL, '2026-02-02T13:21:07.923Z', '2026-02-02T13:21:07.923Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cml9frzmi0001la0411pvi8yv', 'Tipico de la costa', 'INFLUENCER', 'country_co', 'dep_ces', NULL, '2026-02-05T12:32:14.873Z', '2026-02-05T12:32:14.873Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cml9g0qu60001ic04aujnsrh4', 'Juan Jose Cervantes', 'INFLUENCER', 'country_co', 'dep_ces', NULL, '2026-02-05T12:39:03.389Z', '2026-02-05T12:39:03.389Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cml9gb7ak0031ic04crb7efbe', 'Carlos Randón', 'INFLUENCER', 'country_co', 'dep_ant', NULL, '2026-02-05T12:47:10.809Z', '2026-02-05T12:47:10.809Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvmz97j0001l804r98kytcv', 'Danilo Zuluaga', 'INFLUENCER', 'country_co', 'dep_dc', NULL, '2026-01-26T20:45:04.734Z', '2026-02-05T19:27:55.342Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrbth4a0001js04h9lkql9s', 'Cristian Angulo Caicedo', 'INFLUENCER', 'country_co', 'dep_vac', NULL, '2026-01-23T20:21:34.569Z', '2026-01-23T20:21:34.569Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrcscfa0001lh04z5i4ecll', 'Santiago López', 'INFLUENCER', 'country_co', 'dep_dc', NULL, '2026-01-23T20:48:41.445Z', '2026-01-23T20:50:44.967Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrabr300001l704spwqnghf', 'Felipe Santos', 'INFLUENCER', 'country_co', 'dep_mag', NULL, '2026-01-23T19:39:48.059Z', '2026-01-23T21:21:24.944Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrb5con0001l204xtx449hc', 'Valentina Ángel', 'INFLUENCER', 'country_co', 'dep_vac', NULL, '2026-01-23T20:02:49.078Z', '2026-01-23T21:24:19.327Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrd9ly00001ld0476oewxa5', 'Luisa Pérez', 'INFLUENCER', 'country_co', 'dep_dc', NULL, '2026-01-23T21:02:06.935Z', '2026-01-23T21:34:33.373Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkr9r19z0008jr04kdi9v130', 'Yuri Bonilla', 'INFLUENCER', 'country_co', 'dep_vac', NULL, '2026-01-23T19:23:41.325Z', '2026-01-23T21:39:31.990Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkr9mlho0001jr04uc5yv17z', 'Daniela Ramírez García', 'INFLUENCER', 'country_co', 'dep_atl', NULL, '2026-01-23T19:20:14.412Z', '2026-01-23T21:42:12.237Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrc5pgg0001kz04rp60i5vd', 'Jonathan Jiménez', 'INFLUENCER', 'country_co', 'dep_ces', NULL, '2026-01-23T20:31:05.247Z', '2026-01-23T21:45:14.683Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrez50l001bl8041h7w3ipn', 'Kevin Peña', 'INFLUENCER', 'country_co', 'dep_san', NULL, '2026-01-23T21:49:57.490Z', '2026-01-23T21:49:57.490Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrcfjic0001ji04o4r8jzv6', 'Marlon Moss', 'INFLUENCER', 'country_co', 'dep_vac', NULL, '2026-01-23T20:38:44.099Z', '2026-01-23T22:06:31.103Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkrf7wgt001nl804is4cjt5v', 'Daniel Morales', 'INFLUENCER', 'country_co', 'dep_dc', NULL, '2026-01-23T21:56:46.029Z', '2026-01-26T15:23:41.126Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvcjyky0001jp04mbd5lk2j', 'Luisa Restrepo', 'INFLUENCER', 'country_co', 'dep_ant', NULL, '2026-01-26T15:53:14.961Z', '2026-01-26T15:53:14.961Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvpg8p20001jr04ttsxfqdb', 'Juandi Duque', 'INFLUENCER', 'country_co', 'dep_san', NULL, '2026-01-26T21:54:16.453Z', '2026-01-26T21:54:16.453Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvqf9od0007l804zdua9lny', 'Laura López', 'UGC', 'country_co', 'dep_dc', NULL, '2026-01-26T22:21:30.504Z', '2026-01-26T22:21:30.504Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvq95x00001l804nc6x8ijt', 'Camilo Barrios', 'UGC', 'country_co', 'dep_dc', NULL, '2026-01-26T22:16:45.875Z', '2026-01-26T22:25:23.043Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvqve990001ju04r0cm01fe', 'Manuela Castaño', 'UGC', 'country_co', 'dep_ant', NULL, '2026-01-26T22:34:03.116Z', '2026-01-26T22:34:03.116Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzb5bi0001voloxhykk113');
+INSERT INTO "Profile" ("id", "name", "type", "countryId", "departmentId", "cityId", "createdAt", "updatedAt", "createdById", "genderId") VALUES ('cmkvs1zm20001ju04zp8gsn6f', 'Sebastián Echeverri', 'UGC', 'country_co', 'dep_ant', NULL, '2026-01-26T23:07:10.345Z', '2026-01-26T23:07:10.345Z', 'cmkr7rfmu0000jo04n3gfw9ms', 'cmkpzaz670000voloafbtghap');
+
+-- ==========================================
+-- FASE 3b: ProfileCategory (del export, sin cambios)
+-- ==========================================
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrbth4a0001js04h9lkql9s', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrbth4a0001js04h9lkql9s', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrcscfa0001lh04z5i4ecll', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrabr300001l704spwqnghf', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrb5con0001l204xtx449hc', 'cmklwotjx0010eo58zk646lti');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrb5con0001l204xtx449hc', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrb5con0001l204xtx449hc', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrd9ly00001ld0476oewxa5', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkr9r19z0008jr04kdi9v130', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkr9r19z0008jr04kdi9v130', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkr9mlho0001jr04uc5yv17z', 'cmklwotjx0010eo58zk646lti');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkr9mlho0001jr04uc5yv17z', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrc5pgg0001kz04rp60i5vd', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrc5pgg0001kz04rp60i5vd', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrez50l001bl8041h7w3ipn', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrcfjic0001ji04o4r8jzv6', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkrf7wgt001nl804is4cjt5v', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvcjyky0001jp04mbd5lk2j', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvcjyky0001jp04mbd5lk2j', 'cmklwotjx0010eo58zk646lti');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvcjyky0001jp04mbd5lk2j', 'cmklwoswg000yeo58ls4yaevz');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvpg8p20001jr04ttsxfqdb', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvpg8p20001jr04ttsxfqdb', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvqf9od0007l804zdua9lny', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvqf9od0007l804zdua9lny', 'cmklwoswg000yeo58ls4yaevz');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvq95x00001l804nc6x8ijt', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvqve990001ju04r0cm01fe', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvqve990001ju04r0cm01fe', 'cmklwoswg000yeo58ls4yaevz');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvs1zm20001ju04zp8gsn6f', 'cmkr9tz6k000fjr04yodvlfet');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkx0gi0j0001if044v24ai7k', 'cmklwoswg000yeo58ls4yaevz');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkx0gi0j0001if044v24ai7k', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkx4nkwa0001ic04eqmk7on2', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml577as40001l8040s3o5rxl', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml577as40001l8040s3o5rxl', 'cmklwoswg000yeo58ls4yaevz');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml577as40001l8040s3o5rxl', 'cmklwoprc000qeo58hf1wm8m2');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml9frzmi0001la0411pvi8yv', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml9g0qu60001ic04aujnsrh4', 'cmkr9wpn3000hjr04cjye6n76');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml9gb7ak0031ic04crb7efbe', 'cmklwoprc000qeo58hf1wm8m2');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cml9gb7ak0031ic04crb7efbe', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvmz97j0001l804r98kytcv', 'cmklwouux0014eo58s4eikjv4');
+INSERT INTO "ProfileCategory" ("profileId", "categoryId") VALUES ('cmkvmz97j0001l804r98kytcv', 'cmkr9wpn3000hjr04cjye6n76');
+
+-- ==========================================
+-- FASE 3c: SocialAccount (del export, sin cambios)
+-- ==========================================
+-- SocialAccount
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkr9mlhq0003jr049nh8wil7', 'soyladanielaaa', NULL, 'Daniela Ramírez García', 'NUEVA CUENTA❤️‍🩹 
+✨emprendedora 💪🏻
+Cosmetóloga 🔜🌸✨
+Love Makeup💄💋
+Mom💙 @kyliams_babyfio 
+@ladanielastore.col @ladanielasalon @tomove.col', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/soyladanielaaa_1769204539038-3QULfFQzJEPxnvyw6dfV9L3jJQmvLM.jpg', 154328, 1753, 441, NULL, NULL, NULL, '2026-01-23T21:42:19.211Z', 'cmkr9mlho0001jr04uc5yv17z', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrd9ly10003ld043pldfcu0', 'lubikeride', NULL, 'bikeridelu', 'Tu motera de confianza 👩🏻‍🦰', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/lubikeride_1769204084845-JD9Ffkon4ZMd77huPggs8xGUNrKzY4.jpg', 46900, 29, 188, NULL, 509100, NULL, '2026-01-23T21:34:45.035Z', 'cmkrd9ly00001ld0476oewxa5', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkr9mlhq0006jr04xpxhqdp6', 'soyladanielaaa', NULL, 'Soy La Daniela', '✨🌸 Instagram @soyladanielara
+💌 lauraguerracordero@gmail.com
+Mamá - emprendedora
+🇨🇴', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/soyladanielaaa_1769204548913-jYbuZJIsfjfKiMX1iUKpHAA2bWJ1zl.jpg', 552700, 205, 2101, NULL, 21300000, NULL, '2026-01-23T21:42:28.979Z', 'cmkr9mlho0001jr04uc5yv17z', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrd9ly10004ld04s3gbdynr', 'luhperez', NULL, 'Luh perez', 'BIKE GIRL 🏍️|❤️|🔥 
+voge 300 rally 
+Embajadora:  @riffellatinoamerica @aktmotosoficial  @goprocol @kojumotos', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/luhperez_1769204091728-talqv4vDA7D3eynwTY1HiAMFZZJIhg.jpg', 212236, 1093, 901, NULL, NULL, NULL, '2026-01-23T21:34:51.818Z', 'cmkrd9ly00001ld0476oewxa5', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrbth4c0003js044an3b65j', 'miraakriipi', NULL, 'Mira a kriipi', 'Hola, cómo están? ❤️', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/miraakriipi_1769199764806-oxFchaTB2ZQuVnZUorpScML6r9i5hn.jpg', 1100000, 270, 1459, NULL, 21900000, NULL, '2026-01-23T20:22:44.969Z', 'cmkrbth4a0001js04h9lkql9s', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrbth4c0006js040ebn39yg', 'miraakriipi', NULL, 'Mira a Kriipi', 'Hola #Galaxias 
+SÍGUEME EN FACEBOOK 👇🏾
+Publicidad, al correo ❤️
+A.20.C-Cris@hotmail.com', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/miraakriipi_1769199771307-k8Nod8LvGcZE07VKxxgbXkSb20DTMJ.jpg', 1049727, 249, 940, NULL, NULL, NULL, '2026-01-23T20:22:51.444Z', 'cmkrbth4a0001js04h9lkql9s', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrb5cop0003l204415h6nke', 'valentinaangelofi', NULL, 'Valentina Ángel', 'Management: @linamarinc 
+@fedemanagement                                               
+Publicidad aquí ✨', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/valentinaangelofi_1769203469703-PWuCuzATLUfO1k5eCl9xnOxJEinpWt.jpg', 237852, 655, 181, NULL, NULL, NULL, '2026-01-23T21:24:29.779Z', 'cmkrb5con0001l204xtx449hc', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrb5cop0008l2041vqqzn5a', 'valentinaangelofi', NULL, 'valentinaangelofi', 'Déjame compartir contigo un poquito de mi.
+Recetas,Customizar , vlog y más 🌸✨', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/valentinaangelofi_1769203515386-Irm72oEvIa5YKRsLENp116F4598bqY.jpg', 506200, 666, 322, NULL, 9700000, NULL, '2026-01-23T21:25:15.635Z', 'cmkrb5con0001l204xtx449hc', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrabr310006l704j3ygiugs', 'pipesantos93', NULL, 'Pipe Santos', 'Profesional En el arte de contar historias 🎙️
+Conferencista/ Escritor / Empresario⚡ 
+Adquiere mi libro aquí 👇🏻
++57 323 9386709', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/pipesantos93_1769203329045-J9kDYzGZmNa59v10px4aD38TBpSX9j.jpg', 223700, 2, 102, NULL, 3800000, NULL, '2026-01-23T21:22:09.160Z', 'cmkrabr300001l704spwqnghf', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrabr310003l704q64v199f', 'pipesantos93', NULL, 'Pipe Santos', '𝑁𝑢𝑛𝑐𝑎 𝑜𝑙𝑣𝑖𝑑𝑜 𝑞𝑢𝑒 𝑐𝑎𝑚𝑖𝑛𝑎𝑛𝑡𝑒𝑠 𝑠𝑜𝑚𝑜𝑠 ⛅
+Conferencista / Escritor /Experto en Marketing
+Director creativo en @santosagenciacol
+Mi nuevo libro👇🏻📲323 9386709', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/pipesantos93_1769203335193-IRMQ5h35SLgxhAVaxvPdq8dPXvXMqL.jpg', 160254, 111, 565, NULL, NULL, NULL, '2026-01-23T21:22:15.266Z', 'cmkrabr300001l704spwqnghf', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkr9r19z000ajr044nmrnufd', 'yurisabor', NULL, 'Bonilla Yuri', '✨La Chikilujosa ✨
+Creadora De Contenido 📸📹 
+Facebook: 1.7Mill +
+TikTok: 1.9Mill+
+Bailarina 💃🏻 
+Modelo 👠
+musico 🎶', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/yurisabor_1769204380316-4ltRogM4FLyt98S3hQ4z43r7AJenTa.jpg', 286136, 1882, 206, NULL, NULL, NULL, '2026-01-23T21:39:40.415Z', 'cmkr9r19z0008jr04kdi9v130', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrc5pgi0003kz04hfn3vexb', 'eltreste', NULL, 'El Treste', 'Un loco es un loco, hasta que su idea triunfa.
+1 Millón🙌🏻
+Llega al Facebook 👇', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/eltreste_1769204739098-hVMS77SqeL0dhsMRXoAg4OipJIi22g.jpg', 426400, 104, 216, NULL, 6000000, NULL, '2026-01-23T21:45:39.235Z', 'cmkrc5pgg0001kz04rp60i5vd', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrc5pgi0004kz04mp2492mi', 'eltreste', NULL, 'El Treste.', '🟡Tiktok: +440k 
+🪄Jugador del @elvallefc_oficial ⚽️🔟
+💡Publicidad ⬇️', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/eltreste_1769204744535-iV4X9sUsqq3iXeyCK2NVMn9EEsp8Ma.jpg', 80151, 1486, 324, NULL, NULL, NULL, '2026-01-23T21:45:44.586Z', 'cmkrc5pgg0001kz04rp60i5vd', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkr9r1a0000djr04wwh8fklj', 'yurisabor', NULL, 'yurisabor', 'Bailarina, modelo y creadora de contenido 💃🥳', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/yurisabor_1769204389236-5ksKzi7CmL5KLak6NroWGi9JlOeZa1.jpg', 1900000, 688, 808, NULL, 33200000, NULL, '2026-01-23T21:39:49.360Z', 'cmkr9r19z0008jr04kdi9v130', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrcscfc0003lh04v00rkw1w', 'santiagolopezph', NULL, 'Santiago Lopez', '🔴YouTube SANTIAGO LOPEZ 
+🟠instagram @santiagolopezp
+📱Publicidad 314 2943920', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/santiagolopezph_1769201500927-aqSZGkOc0VUKFF4cf7LshptdP9eTWG.jpg', 113400, 57, 848, NULL, 1800000, NULL, '2026-01-23T20:51:41.096Z', 'cmkrcscfa0001lh04z5i4ecll', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrcscfd0006lh04oguq58rb', 'santiagolopezp', NULL, 'SANTIAGO LOPEZ | Fotógrafo| Creador de contenido | Motociclista', '🏍️ Soy el de los videos en moto 
+💎 YouTube|Tiktok|Facebook 💎  
+💸Publicidad 📱+57 314 2943920
+ @santiagolopezp2.0 @santiagolopezp2
+MIRA MI ULTIMO VIDEO', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/santiagolopezp_1769201506945-NhnZXQoVoTYDOumv8kpNgOYxlgHMgs.jpg', 88131, 912, 1697, NULL, NULL, NULL, '2026-01-23T20:51:47.008Z', 'cmkrcscfa0001lh04z5i4ecll', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrez50m001dl804s74x0r82', 'heykevinnn777', NULL, 'KEVIN PEÑA✨', 'Espero sacarte una sonrisa 🫶🏼', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/heykevinnn777_1769205007172-eqbVPHe4vu4qVKsGmU7xS8jZg74RlB.jpg', 449500, 112, 1146, NULL, 14600000, NULL, '2026-01-23T21:50:07.249Z', 'cmkrez50l001bl8041h7w3ipn', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrez50m001gl804qu87y0ju', 'heykevin__', NULL, 'KEVIN PEÑA⚡️', 'Humor real | 🎙️ Historias de vida
+•El humor también es terapia• ✨
+📲 Contacto publicidad: 311 549 8845', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/heykevin___1769205013247-X234VVWTzNyXHKiAoUAhA3lSyzxQpQ.jpg', 348809, 963, 590, NULL, NULL, NULL, '2026-01-23T21:50:13.329Z', 'cmkrez50l001bl8041h7w3ipn', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrcfjid0003ji049pmht9wu', 'marlonmoss', NULL, 'Marlon Moss', 'Solo le respondo a seguidores ✊💨', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/marlonmoss_1769206043332-1PEEJJ2mtVbFIufgrSZxjCgA5YReMn.jpg', 258600, 70, 2477, NULL, 5900000, NULL, '2026-01-23T22:07:23.561Z', 'cmkrcfjic0001ji04o4r8jzv6', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvpg8p40003jr04tdrcou4b', 'eljuandiduque', NULL, 'Juandi Duque', '🍫 @laduquessa 
+🦒Más en @duquestor 
+📍Bucaramanga, Colombia
+✉️Contacto y negocios👇🏻', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/eljuandiduque_1769464505357-KA6tT9irPXvF8cBCTudNlGTC4TH2Eq.jpg', 686936, 457, 594, NULL, NULL, NULL, '2026-01-26T21:55:05.546Z', 'cmkvpg8p20001jr04ttsxfqdb', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvpg8p40009jr04xy0jqhv9', 'eljuandiduque', NULL, 'eljuandiduque', 'Bucaramanga🐆', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/eljuandiduque_1769464516938-O7CFt5bUqR9jOrUI0twi6pDNkjo0mG.jpg', 7900000, 127, 553, NULL, 91200000, NULL, '2026-01-26T21:55:17.018Z', 'cmkvpg8p20001jr04ttsxfqdb', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrcfjid0006ji049ask29yt', 'marlon_moss_', NULL, 'Marlon Moss Motoexplorer', 'Profesional en ComEx
+Jugaba Rugby
+Corro Rallys amateur🥉2023/ 🥈2025
+Cofundador de  @motoexplorer_ 
+Mi marca @moss.garage
+Mi vida es un documental ✍️ 🎬🛵', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/marlon_moss__1769206051072-xp64epVxxjdpDNycBXmH1MvUwt1Jc5.jpg', 82445, 1111, 2011, NULL, NULL, NULL, '2026-01-23T22:07:31.126Z', 'cmkrcfjic0001ji04o4r8jzv6', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrf7wgu001pl804csopnpz8', 'danielmorales_08', NULL, 'DaniMorales', '💙 Gracias por seguirme 💙
+Deporte💪/Comedia🤣/Biker🏍️
+IG: danimorales_11 🫶', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/danielmorales_08_1769441032894-o7GJua1R5xKYpW88tY7YqTX8u7LXr0.jpg', 419900, 178, 225, NULL, 10900000, NULL, '2026-01-26T15:23:53.060Z', 'cmkrf7wgt001nl804is4cjt5v', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkrf7wgu001ql804jb01jis5', 'danimorales_11', NULL, 'Daniel Morales', 'Holiii😊
+Contenido Biker 🏍️ Deporte🤸‍♂️
+Publicidad al DM 🤝 
+Choco Aventuras/Risas/ Charlas y Ocurrencias✨
+Si me ven por ahí, me saludan 🫶♥️', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/danimorales_11_1769441038890-3KYvDUnxWJphWdjbzDvdajPWe2IS6H.jpg', 373256, 64, 157, NULL, NULL, NULL, '2026-01-26T15:23:58.993Z', 'cmkrf7wgt001nl804is4cjt5v', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvcjykz0003jp04ik3l3n42', 'luisalulu99', NULL, 'Lulu99', '𝕷𝖆 𝕷𝖚𝖑𝖚 ❤️‍🔥 
+💎30 MILLONES DE LULUTUBERS 🫶🏻
+Cyzone Squad 💕@cyzone_oficial
+@fashionnova ambassador
+ENTRA A MI ACADEMIA ONLINE ⬇️', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/luisalulu99_1769442803860-IeNhVVB5O5HtQ8OpbdrBs0fcqhcFbV.jpg', 4253323, 1925, 1083, NULL, NULL, NULL, '2026-01-26T15:53:24.140Z', 'cmkvcjyky0001jp04mbd5lk2j', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvcjyl00007jp0438ulw7az', '_lulu99', NULL, 'Lulu99', 'ACCEDE A MI ACADEMIA ONLINE ❤️👇', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/_lulu99_1769442838477-ZYHoUAmJaZnQYUOZmfHdUq4dBnFMck.jpg', 12600000, 737, 1288, NULL, 342000000, NULL, '2026-01-26T15:53:58.608Z', 'cmkvcjyky0001jp04mbd5lk2j', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvqf9oe0009l804zom2bhjg', 'lopeztronautaa', NULL, 'Laura López ✨', '📍bogotá
+soy abogada y hago parte de @3mas1pod 🎙️
+CFMOTO 450 SRS🔥
+subida en la vida, bajada por todo lo demás', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/lopeztronautaa_1769466098913-JA7ddiPVp2CmuHpBby7KiIRaGDeFMy.jpg', 33612, 500, 82, NULL, NULL, NULL, '2026-01-26T22:21:39.005Z', 'cmkvqf9od0007l804zdua9lny', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkx0gi0l0006if04twcs7s7w', ' jennydiosaescobar', NULL, 'Jenny Diosa Escobar', 'Tenemos los mejores planes en Instagram 
+Instagram principal @Viaja en Antioquia', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/jennydiosaescobar_1769543423102-DMrBcBHh4KF7DDsZqHJW9xaPooFK0Z.jpg', 2305, 229, 109, NULL, 32000, NULL, '2026-01-27T19:50:23.463Z', 'cmkx0gi0j0001if044v24ai7k', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkx0gi0l0003if04n72l1i79', 'diosa_jenny1', NULL, 'Jenny Diosa / UGC', 'Community Manager /Comunicadora social 💡
+Creadora de contenido 🧠 
+Viajes / Foodie / Livestyle
+CEO @viajaenantioquia @traveling_foodcol', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/diosa_jenny1_1769543430447-pF1nUqI7iHVoJH4p8vQ5avRxCizLGe.jpg', 4619, 1800, 134, NULL, NULL, NULL, '2026-01-27T19:50:30.578Z', 'cmkx0gi0j0001if044v24ai7k', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvq95x20003l804989ml1a8', 'scramblermilo', NULL, 'Camilo | Rider | Photographer 📸🛵', 'UGC creator
+Documentando la vida en dos ruedas 📸🛵
+Fotógrafo en @camilobfotografia
+#scrambler', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/scramblermilo_1769466331381-vj1TnLCdGU5DBIgLSfnyzs4x5fcjMP.jpg', 3773, 1698, 210, NULL, NULL, NULL, '2026-01-26T22:25:31.523Z', 'cmkvq95x00001l804nc6x8ijt', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvqve9a0003ju04l02hxztv', 'manuela_castao', NULL, 'Manuela Castaño', 'Amo Conocer el 🌎 en 🏍 #Moto
+La buena #Comida 🍽  El #Trekking 🏔👩‍🦯
+Consejos de #Beauty Práctica 💅
+Creo contenido UGC para tu marca 🤝✨️:', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/manuela_castao_1769466851634-vGuQFcv023gLdSEKmELdqeaCHXWyaq.jpg', 32914, 2456, 513, NULL, NULL, NULL, '2026-01-26T22:34:11.798Z', 'cmkvqve990001ju04r0cm01fe', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvs1zm40003ju04x6www9mx', 'zechamotos', NULL, 'Zecha Motos', 'Creador de contenido de motocicletas en Medellín 🇨🇴', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/zechamotos_1769468839020-6UmxRjjfEnRCQgjmvNZd9InvR98nxE.jpg', 6425, 155, 48, NULL, NULL, NULL, '2026-01-26T23:07:19.192Z', 'cmkvs1zm20001ju04zp8gsn6f', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkx4nkwc0003ic04dcxxb8m1', 'papi_keicy', NULL, 'KEICY', '𝑯𝒂𝒈𝒐 𝒗𝒊𝒅𝒆𝒊𝒕𝒐𝒔 𝒎𝒆𝒍𝒐𝒔 𝒎𝒆𝒍𝒐𝒔 𝒑𝒂 𝒒𝒖𝒆 𝒕𝒆 𝒓í𝒂𝒔 ❤️‍🔥
+@keicy_barber_club 
+Kevinkstro15@gmail.com
+𝑪𝒂𝒍𝒊/𝑪𝒐 🇨🇴', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/papi_keicy_1769550467804-Yp4HGFjCK2unKIE3ewYbniT3lEMijZ.jpg', 521793, 819, 401, NULL, NULL, NULL, '2026-01-27T21:47:47.954Z', 'cmkx4nkwa0001ic04eqmk7on2', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkx4nkwc0009ic04mdf5hac5', 'papi_keicy', NULL, 'KEICY', 'No me gusta trabajar por eso hago lo que amo 🪄 
+Ig: papi_keicy', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/papi_keicy_1769550482238-78Ac5hebvvi6rVR24FPr3yg6mh1CzM.jpg', 1600000, 797, 550, NULL, 70700000, NULL, '2026-01-27T21:48:02.333Z', 'cmkx4nkwa0001ic04eqmk7on2', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cml577as50003l8044246dbk6', 'elianaospina22', NULL, 'Eliana Ospina', 'Aquí verás donde comer , donde comprar  y 
+muchas Eli aventuras más 😋
+📍de Medellín 🇨🇴pa’l mundo 🌍 
+Contadora de historias', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/elianaospina22_1770038475733-jcqkbhRQbY9QDhHVcBcn2tjdidNfMT.jpg', 162428, 4376, 2328, NULL, NULL, NULL, '2026-02-02T13:21:15.954Z', 'cml577as40001l8040s3o5rxl', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cml9frzmk0003la04lrlghswf', 'tipicodelacosta', NULL, 'Tipico De La Costa', 'Valledupar - Bogotá 🚩
+Embajador @totalsport.col 
+Contacto⬇️', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/tipicodelacosta_1770294741137-N32MdNmtexYvwDo9qK7MNlfKeEJ2Ry.jpg', 194119, 1881, 798, NULL, NULL, NULL, '2026-02-05T12:32:21.431Z', 'cml9frzmi0001la0411pvi8yv', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cml9g0qu80003ic04nx6w5id6', 'juanjocanson', NULL, 'Juan José Cervantes', '𝑳𝒂 𝒆𝒙𝒊𝒔𝒕𝒆𝒏𝒄𝒊𝒂 𝒆𝒔 𝒖𝒏 𝒃𝒖𝒄𝒍𝒆🔄♾️✨
+Jugador de @elvallefc_oficial 💙🤍❤️
+Publicidad: +57 3161376230', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/juanjocanson_1770295150859-78jsfisEAOVOEyoaThurqummMrZEzz.jpg', 103776, 2095, 464, NULL, NULL, NULL, '2026-02-05T12:39:11.050Z', 'cml9g0qu60001ic04aujnsrh4', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cml9gb7al0033ic0422qduwdc', 'mimedellinsaborea', NULL, 'Carlos Rendón | foodie | viajero', 'Soy Carlos!!
+Amo comer, viajar y mostrarles mis experiencias 🌎
+Estoy seguro que se van antojar! 🤌🏻
+Síguenos en @fresenatta 
+📍Medellín', TRUE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/mimedellinsaborea_1770295638490-QMWU7MkfPb0edMBHkVqEK23dcfQ0tc.jpg', 187152, 968, 1236, NULL, NULL, NULL, '2026-02-05T12:47:18.676Z', 'cml9gb7ak0031ic04crb7efbe', 'cmklwoghl0001eo58wecgoul2');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cml9gb7al0038ic04r6dxuppm', 'mimedellinsaborea', NULL, 'mimedellinsaborea', 'Ven a vivir con nosotros los sabores de todo Medellín 🔍', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/mimedellinsaborea_1770295647015-5wdrydGsXbP59nsyfgusyy0EKPjrPA.jpg', 121600, 10, 506, NULL, 1900000, NULL, '2026-02-05T12:47:27.083Z', 'cml9gb7ak0031ic04crb7efbe', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvmz97k0009l8042kq5snpx', 'danilo_alejandrou', NULL, 'Habichuela', 'Contacto 👇
+hzuluagacontact@gmail.com
+
+Canal de Kick 👇', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/danilo_alejandrou_1770319708279-ODnqMoP421FHf917FOiCjJdrDUWk6P.jpg', 180900, 33, 251, NULL, 4900000, NULL, '2026-02-05T19:28:28.449Z', 'cmkvmz97j0001l804r98kytcv', 'cmklwohj80002eo58i2ik3ziw');
+INSERT INTO "SocialAccount" ("id", "username", "profileUrl", "fullName", "biography", "verified", "profilePicUrl", "followers", "following", "posts", "avgViews", "avgLikes", "engagementRate", "lastSyncAt", "profileId", "platformId") VALUES ('cmkvmz97k0003l8047t6rvxo0', 'habichuela_v', NULL, 'Danilo Zuluaga', 'Contacto: hzuluagacontact@gmail.com', FALSE, 'https://t4tnype5jubmdomt.public.blob.vercel-storage.com/profiles/habichuela_v_1770319713782-quyW1i2wCl2IGMB8KIDe2cclsWrMNK.jpg', 111929, 406, 51, NULL, NULL, NULL, '2026-02-05T19:28:33.844Z', 'cmkvmz97j0001l804r98kytcv', 'cmklwoghl0001eo58wecgoul2');
+
+-- ==========================================
+-- FASE 3d: ProfileService (del export, sin cambios)
+-- ==========================================
+-- ProfileService
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrez50m001fl8046dz78di5', '5355000', 'COP', NULL, 'cmkrez50m001dl804s74x0r82', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrez50m001il804g7hf3gze', '5355000', 'COP', NULL, 'cmkrez50m001gl804qu87y0ju', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrez50m001jl804wx97cfii', '5950000', 'COP', NULL, 'cmkrez50m001gl804qu87y0ju', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrez50m001kl804rt3sqbg6', '5950000', 'COP', NULL, 'cmkrez50m001gl804qu87y0ju', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrez50m001ll804uhuva7l4', '2380000', 'COP', NULL, 'cmkrez50m001gl804qu87y0ju', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcfjid0005ji04v2d96a81', '1320000', 'COP', NULL, 'cmkrcfjid0003ji049pmht9wu', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrbth4c0005js04owd714eu', '2500000', 'COP', NULL, 'cmkrbth4c0003js044an3b65j', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrbth4c0008js04euwx0l1c', '4500000', 'COP', NULL, 'cmkrbth4c0006js040ebn39yg', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrbth4c0009js049nkzlpjh', '4500000', 'COP', NULL, 'cmkrbth4c0006js040ebn39yg', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrbth4c000ajs04wyg836ze', '5500000', 'COP', NULL, 'cmkrbth4c0006js040ebn39yg', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrbth4c000bjs04a5tk4dtx', '1200000', 'COP', NULL, 'cmkrbth4c0006js040ebn39yg', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcscfd0005lh04xsvn4j6p', '1600000', 'COP', NULL, 'cmkrcscfc0003lh04v00rkw1w', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcscfd0008lh04y41f05qu', '1600000', 'COP', NULL, 'cmkrcscfd0006lh04oguq58rb', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcscfd0009lh04t850mtn4', '300000', 'COP', NULL, 'cmkrcscfd0006lh04oguq58rb', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrap6pv0009kw04cwsyflzq', '8330000', 'COP', NULL, 'cmkrabr310006l704j3ygiugs', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrabr310005l704o7n5sz5s', '4165000', 'COP', NULL, 'cmkrabr310003l704q64v199f', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrap6ha0003kw04ncdpf2rs', '4998000', 'COP', NULL, 'cmkrabr310003l704q64v199f', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrap6jf0005kw04sudblg1d', '4400000', 'COP', NULL, 'cmkrabr310003l704q64v199f', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrap6lm0007kw04uridg6lp', '1190000', 'COP', NULL, 'cmkrabr310003l704q64v199f', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrb5cop0005l204bwb2f86w', '1666000', 'COP', NULL, 'cmkrb5cop0003l204415h6nke', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrb5cop0006l204dd0vmc2v', '2023000', 'COP', NULL, 'cmkrb5cop0003l204415h6nke', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrb5cop0007l204nidn7wr3', '714000', 'COP', NULL, 'cmkrb5cop0003l204415h6nke', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrb5cop000al204pf669ttt', '1666000', 'COP', NULL, 'cmkrb5cop0008l2041vqqzn5a', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrd9ly10006ld04ayxljtrv', '3850000', 'COP', NULL, 'cmkrd9ly10004ld04s3gbdynr', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrefcph0003l804tor7zpuq', '4760000', 'COP', NULL, 'cmkrd9ly10004ld04s3gbdynr', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrd9ly10007ld04t359w6m3', '1100000', 'COP', NULL, 'cmkrd9ly10004ld04s3gbdynr', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcfjie0008ji04sh2q6zqe', '1760000', 'COP', NULL, 'cmkrcfjid0006ji049ask29yt', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkr9r1a0000cjr04uqsx7e34', '5355000', 'COP', NULL, 'cmkr9r19z000ajr044nmrnufd', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrelqno000jl804d02b69n1', '5950000', 'COP', NULL, 'cmkr9r19z000ajr044nmrnufd', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrelqpu000ll804aclufjxp', '5950000', 'COP', NULL, 'cmkr9r19z000ajr044nmrnufd', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrelqrz000nl804fi76t143', '2380000', 'COP', NULL, 'cmkr9r19z000ajr044nmrnufd', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrelqw9000pl804rtq57e2l', '5355000', 'COP', NULL, 'cmkr9r1a0000djr04wwh8fklj', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkr9mlhq0005jr04yyslvvx8', '4522000', 'COP', NULL, 'cmkr9mlhq0003jr049nh8wil7', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkreiroq0009l804464fq2sm', '5355000', 'COP', NULL, 'cmkr9mlhq0003jr049nh8wil7', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkreirqw000bl8046reoim0k', '5350005', 'COP', NULL, 'cmkr9mlhq0003jr049nh8wil7', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkreirt2000dl8042ey4akt9', '2380000', 'COP', NULL, 'cmkr9mlhq0003jr049nh8wil7', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkreirxc000fl8040didf847', '5355000', 'COP', NULL, 'cmkr9mlhq0006jr04xpxhqdp6', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkret3do0011l80473oez0n0', '4760000', 'COP', NULL, 'cmkrc5pgi0003kz04hfn3vexb', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkret3jz0013l804y7r3dqqp', '4165000', 'COP', NULL, 'cmkrc5pgi0004kz04mp2492mi', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkret3m40015l804rxbtj68g', '4760000', 'COP', NULL, 'cmkrc5pgi0004kz04mp2492mi', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkret3o90017l804e92tp99o', '4760000', 'COP', NULL, 'cmkrc5pgi0004kz04mp2492mi', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkret3qe0019l804fnaylrz5', '1785000', 'COP', NULL, 'cmkrc5pgi0004kz04mp2492mi', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkrcfjie0009ji04ul0wb0zb', '330000', 'COP', NULL, 'cmkrcfjid0006ji049ask29yt', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvbhyl70001jm04fwseousi', '1760000', 'COP', NULL, 'cmkrf7wgu001pl804csopnpz8', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvbhyrn0003jm04kiwvneqv', '825000', 'COP', NULL, 'cmkrf7wgu001ql804jb01jis5', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvbhyts0005jm04mce6sbqm', '990000', 'COP', NULL, 'cmkrf7wgu001ql804jb01jis5', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvbhyvw0007jm04ftcrhemx', '1540000', 'COP', NULL, 'cmkrf7wgu001ql804jb01jis5', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvbhyy20009jm040pftxtc5', '165000', 'COP', NULL, 'cmkrf7wgu001ql804jb01jis5', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvcjyl00005jp047yiyb5i3', '12971000', 'COP', NULL, 'cmkvcjykz0003jp04ik3l3n42', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvcjyl00006jp043jgah7xu', '6485000', 'COP', NULL, 'cmkvcjykz0003jp04ik3l3n42', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvcjyl00009jp04uj69dvq1', '12971000', 'COP', NULL, 'cmkvcjyl00007jp0438ulw7az', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvpg8p40005jr04bpr0c42i', '8925000', 'COP', NULL, 'cmkvpg8p40003jr04tdrcou4b', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvpg8p40006jr04ezjqf8x9', '9520000', 'COP', NULL, 'cmkvpg8p40003jr04tdrcou4b', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvpg8p40007jr04rj8fveth', '11925000', 'COP', NULL, 'cmkvpg8p40003jr04tdrcou4b', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvpg8p40008jr04x557jje5', '3570000', 'COP', NULL, 'cmkvpg8p40003jr04tdrcou4b', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvpg8p4000bjr04418lpw94', '9520000', 'COP', NULL, 'cmkvpg8p40009jr04xy0jqhv9', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvqf9oe000bl804e0ig7968', '660000', 'COP', NULL, 'cmkvqf9oe0009l804zom2bhjg', 'cmkmq7z2d000lvop4eftu2klk');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvqf9oe000cl804s62es5vu', '550000', 'COP', NULL, 'cmkvqf9oe0009l804zom2bhjg', 'cmkmq7ilv000jvop405mgqih5');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvqk9o9000el8049xd7xjac', '550000', 'COP', NULL, 'cmkvq95x20003l804989ml1a8', 'cmkmq7z2d000lvop4eftu2klk');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvq95x20005l804b5k80xso', '407000', 'COP', NULL, 'cmkvq95x20003l804989ml1a8', 'cmkmq7ilv000jvop405mgqih5');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvqve9a0005ju04mv5saor5', '440000', 'COP', NULL, 'cmkvqve9a0003ju04l02hxztv', 'cmkmq7z2d000lvop4eftu2klk');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvqve9b0006ju04a2ag92g7', '330000', 'COP', NULL, 'cmkvqve9a0003ju04l02hxztv', 'cmkmq7ilv000jvop405mgqih5');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvs1zm40005ju04p05nkl4i', '165000', 'COP', NULL, 'cmkvs1zm40003ju04x6www9mx', 'cmkmq7ilv000jvop405mgqih5');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx0gi0l0005if049s1u8uet', '275000', 'COP', NULL, 'cmkx0gi0l0003if04n72l1i79', 'cmkmq7ilv000jvop405mgqih5');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx0gi0l0008if04vrcheo42', '275000', 'COP', NULL, 'cmkx0gi0l0006if04twcs7s7w', 'cmkmq8lkm000nvop4cuh3c67j');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx4nkwc0005ic046b1lumb3', '7700000', 'COP', NULL, 'cmkx4nkwc0003ic04dcxxb8m1', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx4nkwc0006ic04xex44z4c', '8250000', 'COP', NULL, 'cmkx4nkwc0003ic04dcxxb8m1', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx4nkwc0007ic04316psdk2', '9350000', 'COP', NULL, 'cmkx4nkwc0003ic04dcxxb8m1', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx4nkwc0008ic04spmvbee6', '1760000', 'COP', NULL, 'cmkx4nkwc0003ic04dcxxb8m1', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkx4nkwc000bic04gawzhexp', '8000000', 'COP', NULL, 'cmkx4nkwc0009ic04mdf5hac5', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml577as50005l804vbfurn3n', '2640000', 'COP', NULL, 'cml577as50003l8044246dbk6', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9frzmk0005la04yhn4b4hs', '4165000', 'COP', NULL, 'cml9frzmk0003la04lrlghswf', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9g0qu80005ic04kxo8rn93', '1650000', 'COP', NULL, 'cml9g0qu80003ic04nx6w5id6', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9gb7al0035ic049mspiafh', '3080000', 'COP', NULL, 'cml9gb7al0033ic0422qduwdc', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9gb7al0036ic04apzntdn7', '660000', 'COP', NULL, 'cml9gb7al0033ic0422qduwdc', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9gb7al0037ic043v84yntm', '1980000', 'COP', NULL, 'cml9gb7al0033ic0422qduwdc', 'cmkmq5y0t000dvop487q61r5r');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cml9gb7al003aic041zz5z3gb', '2750000', 'COP', NULL, 'cml9gb7al0038ic04r6dxuppm', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvmz97k000bl804tcnhrpmi', '3300000', 'COP', NULL, 'cmkvmz97k0009l8042kq5snpx', 'cmkmq433a0007vop4y833kj21');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvmz97k0005l8042orqzme4', '3300000', 'COP', NULL, 'cmkvmz97k0003l8047t6rvxo0', 'cmkmq2hn60001vop4bgummgkj');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvmz97k0006l804nqzb1tyh', '3850000', 'COP', NULL, 'cmkvmz97k0003l8047t6rvxo0', 'cmkmq2xe50003vop47jf55wjo');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvmz97k0007l8040l3kle6q', '5500000', 'COP', NULL, 'cmkvmz97k0003l8047t6rvxo0', 'cmkmq38on0005vop4gsdy620g');
+INSERT INTO "ProfileService" ("id", "price", "currency", "notes", "socialAccountId", "serviceTypeId") VALUES ('cmkvmz97k0008l804f451dk8m', '880000', 'COP', NULL, 'cmkvmz97k0003l8047t6rvxo0', 'cmkmq5y0t000dvop487q61r5r');
+
+-- ==========================================
+-- FASE 4: Campañas (del export, sin cambios)
+-- ==========================================
+-- Campaign
+INSERT INTO "Campaign" ("id", "name", "description", "status", "budget", "currency", "startDate", "endDate", "activationReason", "activatedAt", "createdAt", "updatedAt", "clientId", "clientContactId", "createdById") VALUES ('cmkrdisjv0004kz04dy7m0hzs', 'CAMPAÑA FEBRERO', 'Bonos febrero', 'CANCELLED', '60000000', 'COP', '2026-02-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', NULL, NULL, '2026-01-23T21:09:15.404Z', '2026-01-23T21:14:21.655Z', 'cmkrde9ge0001kz04r42felfd', 'cmkrde9ge0002kz04ekseuhs3', 'cmkr7rfmu0000jo04n3gfw9ms');
+INSERT INTO "Campaign" ("id", "name", "description", "status", "budget", "currency", "startDate", "endDate", "activationReason", "activatedAt", "createdAt", "updatedAt", "clientId", "clientContactId", "createdById") VALUES ('cmkx5o3rf0001gz04j7042hta', 'INFLUENCERS FEBRERO 2026', 'Moto según zona del país', 'DRAFT', '60000000', 'COP', '2026-02-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', NULL, NULL, '2026-01-27T22:16:03.339Z', '2026-02-05T19:46:02.648Z', 'cmkrde9ge0001kz04r42felfd', 'cmkrde9ge0002kz04ekseuhs3', 'cmkr7rfmu0000jo04n3gfw9ms');
+INSERT INTO "Campaign" ("id", "name", "description", "status", "budget", "currency", "startDate", "endDate", "activationReason", "activatedAt", "createdAt", "updatedAt", "clientId", "clientContactId", "createdById") VALUES ('cmkvlpapo0001jp04k974cpkx', 'INFLUENCERS FEBRERO', 'Estrategia para el mes de febrero, se hablará como habitualmente moto x zona', 'DRAFT', '60000000', 'COP', '2026-02-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', NULL, NULL, '2026-01-26T20:09:20.508Z', '2026-01-27T22:02:21.709Z', 'cmkrde9ge0001kz04r42felfd', 'cmkrde9ge0002kz04ekseuhs3', 'cmkr7rfmu0000jo04n3gfw9ms');
+
+-- CampaignApprovalToken
+INSERT INTO "CampaignApprovalToken" ("id", "token", "expiresAt", "usedAt", "createdAt", "sentToEmail", "sentToName", "campaignId") VALUES ('cmkrdiwah000okz04gyxp30db', '5rjsFsJdbiD6IP-ofQqaZFHONtOZgwGV', '2026-01-30T21:09:20.248Z', '2026-01-23T21:12:40.551Z', '2026-01-23T21:09:20.249Z', 'vdominguez@auteco.com', 'Valeria Dominguez', 'cmkrdisjv0004kz04dy7m0hzs');
+
+-- CampaignProfile
+-- CampaignProfile
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkrditza0006kz04azresokl', '2026-01-23T21:09:17.255Z', '2026-01-23T21:12:40.627Z', 'REJECTED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrdisjv0004kz04dy7m0hzs', 'cmkrbth4a0001js04h9lkql9s');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkrdiuil000ckz04o7yhfbta', '2026-01-23T21:09:17.950Z', '2026-01-23T21:12:40.781Z', 'APPROVED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrdisjv0004kz04dy7m0hzs', 'cmkrabr300001l704spwqnghf');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkrdiut5000ikz04ubi63g5j', '2026-01-23T21:09:18.330Z', '2026-01-23T21:12:40.857Z', 'APPROVED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrdisjv0004kz04dy7m0hzs', 'cmkrb5con0001l204xtx449hc');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvlpc8n0003jp04mz5qbpg3', '2026-01-26T20:09:22.487Z', '2026-01-26T20:09:22.487Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkrf7wgt001nl804is4cjt5v');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvlpcrl0009jp04m1mrw8fa', '2026-01-26T20:09:23.170Z', '2026-01-26T20:09:23.170Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkr9mlho0001jr04uc5yv17z');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvlpd26000fjp04b5pczyjh', '2026-01-26T20:09:23.550Z', '2026-01-26T20:09:23.550Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvcjyky0001jp04mbd5lk2j');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvlpddc000ljp04nj7t9ff4', '2026-01-26T20:09:23.952Z', '2026-01-26T20:09:23.952Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkr9r19z0008jr04kdi9v130');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvn1iwn000tl804tnjzr1zy', '2026-01-26T20:46:50.615Z', '2026-01-26T20:46:50.615Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvmz97j0001l804r98kytcv');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvpkx2s000xjr04z8j838g3', '2026-01-26T21:57:54.677Z', '2026-01-26T21:57:54.677Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvpg8p20001jr04ttsxfqdb');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvqzciy000pky047it2fikx', '2026-01-26T22:37:07.498Z', '2026-01-26T22:37:07.498Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvq95x00001l804nc6x8ijt');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvqzcvk000vky04bvax4g6a', '2026-01-26T22:37:07.953Z', '2026-01-26T22:37:07.953Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvqf9od0007l804zdua9lny');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvqzd640011ky04foxw7jq7', '2026-01-26T22:37:08.333Z', '2026-01-26T22:37:08.333Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvqve990001ju04r0cm01fe');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkvs3hqi0011jm04v09gqxvn', '2026-01-26T23:08:20.491Z', '2026-01-26T23:08:20.491Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkvs1zm20001ju04zp8gsn6f');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx48x5g000xjo044ywpvxv1', '2026-01-27T21:36:15.316Z', '2026-01-27T21:36:15.316Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkrd9ly00001ld0476oewxa5');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx48xi60013jo04gkuulovi', '2026-01-27T21:36:15.775Z', '2026-01-27T21:36:15.775Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkrabr300001l704spwqnghf');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx4remg001hic04t41dtf4m', '2026-01-27T21:50:37.768Z', '2026-01-27T21:50:37.768Z', 'PENDING', NULL, NULL, 'cmkvlpapo0001jp04k974cpkx', 'cmkx4nkwa0001ic04eqmk7on2');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o58u0003gz04audww3fl', '2026-01-27T22:16:05.262Z', '2026-01-27T22:16:05.262Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkrf7wgt001nl804is4cjt5v');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o5rt0009gz0477052396', '2026-01-27T22:16:05.945Z', '2026-01-27T22:16:05.945Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvcjyky0001jp04mbd5lk2j');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o62g000fgz042z3y033c', '2026-01-27T22:16:06.329Z', '2026-01-27T22:16:06.329Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvmz97j0001l804r98kytcv');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o6d4000lgz04jkscpn4o', '2026-01-27T22:16:06.712Z', '2026-01-27T22:16:06.712Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvpg8p20001jr04ttsxfqdb');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o6nt000rgz04xp1sflfs', '2026-01-27T22:16:07.098Z', '2026-01-27T22:16:07.098Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvq95x00001l804nc6x8ijt');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o6ye000xgz046bb6j47j', '2026-01-27T22:16:07.479Z', '2026-01-27T22:16:07.479Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvqf9od0007l804zdua9lny');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o78z0013gz04n8ikykk9', '2026-01-27T22:16:07.860Z', '2026-01-27T22:16:07.860Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvqve990001ju04r0cm01fe');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o7jj0019gz04gohwfrjm', '2026-01-27T22:16:08.240Z', '2026-01-27T22:16:08.240Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkvs1zm20001ju04zp8gsn6f');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o7u3001fgz041nbv8cj5', '2026-01-27T22:16:08.620Z', '2026-01-27T22:16:08.620Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkrd9ly00001ld0476oewxa5');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o84o001lgz046of86rau', '2026-01-27T22:16:09.000Z', '2026-01-27T22:16:09.000Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkrabr300001l704spwqnghf');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cmkx5o8f9001rgz048yw57lw6', '2026-01-27T22:16:09.382Z', '2026-01-27T22:16:09.382Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cmkx4nkwa0001ic04eqmk7on2');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cml9g6lve002pic04o6agmzqu', '2026-02-05T12:43:36.891Z', '2026-02-05T12:43:36.891Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cml577as40001l8040s3o5rxl');
+INSERT INTO "CampaignProfile" ("id", "createdAt", "updatedAt", "status", "rejectionReason", "reviewedAt", "campaignId", "profileId") VALUES ('cml9g6m5z002vic049k2chuau', '2026-02-05T12:43:37.271Z', '2026-02-05T12:43:37.271Z', 'PENDING', NULL, NULL, 'cmkx5o3rf0001gz04j7042hta', 'cml9frzmi0001la0411pvi8yv');
+
+-- CampaignProfilePlatform
+-- CampaignProfilePlatform
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx5o5tx000bgz04p13uiowm', '2026-01-27T22:16:06.021Z', 'PENDING', NULL, NULL, 'cmkx5o5rt0009gz0477052396', 'cmkvcjykz0003jp04ik3l3n42');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkrdiu3n0008kz046ewiwy13', '2026-01-23T21:09:17.411Z', 'APPROVED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrditza0006kz04azresokl', 'cmkrbth4c0006js040ebn39yg');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkrdiukp000ekz04xjn559pb', '2026-01-23T21:09:18.026Z', 'APPROVED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrdiuil000ckz04o7yhfbta', 'cmkrabr310003l704q64v199f');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkrdiuv9000kkz04bjlg1zcw', '2026-01-23T21:09:18.406Z', 'APPROVED', NULL, '2026-01-23T21:12:40.551Z', 'cmkrdiut5000ikz04ubi63g5j', 'cmkrb5cop0003l204415h6nke');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6iz9001lic04b2cp3l6i', '2026-02-05T12:43:33.141Z', 'PENDING', NULL, NULL, 'cmkx5o58u0003gz04audww3fl', 'cmkrf7wgu001pl804csopnpz8');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6j9u001pic04awqk74fb', '2026-02-05T12:43:33.523Z', 'PENDING', NULL, NULL, 'cmkx5o62g000fgz042z3y033c', 'cmkvmz97k0003l8047t6rvxo0');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6jkh001tic04o1xet5pu', '2026-02-05T12:43:33.906Z', 'PENDING', NULL, NULL, 'cmkx5o6d4000lgz04jkscpn4o', 'cmkvpg8p40003jr04tdrcou4b');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6jv2001xic04nhntffe8', '2026-02-05T12:43:34.287Z', 'PENDING', NULL, NULL, 'cmkx5o6nt000rgz04xp1sflfs', 'cmkvq95x20003l804989ml1a8');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6k5n0021ic0437kyk980', '2026-02-05T12:43:34.667Z', 'PENDING', NULL, NULL, 'cmkx5o6ye000xgz046bb6j47j', 'cmkvqf9oe0009l804zom2bhjg');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6kg70025ic04hb41sy6n', '2026-02-05T12:43:35.047Z', 'PENDING', NULL, NULL, 'cmkx5o78z0013gz04n8ikykk9', 'cmkvqve9a0003ju04l02hxztv');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6kr60029ic043eijrxfk', '2026-02-05T12:43:35.443Z', 'PENDING', NULL, NULL, 'cmkx5o7jj0019gz04gohwfrjm', 'cmkvs1zm40003ju04x6www9mx');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6l1t002dic044k9ylwfu', '2026-02-05T12:43:35.826Z', 'PENDING', NULL, NULL, 'cmkx5o7u3001fgz041nbv8cj5', 'cmkrd9ly10004ld04s3gbdynr');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6lce002hic04f6d86z7x', '2026-02-05T12:43:36.206Z', 'PENDING', NULL, NULL, 'cmkx5o84o001lgz046of86rau', 'cmkrabr310003l704q64v199f');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6lmy002lic046qiy64xh', '2026-02-05T12:43:36.587Z', 'PENDING', NULL, NULL, 'cmkx5o8f9001rgz048yw57lw6', 'cmkx4nkwc0003ic04dcxxb8m1');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6lxi002ric04py3w797l', '2026-02-05T12:43:36.967Z', 'PENDING', NULL, NULL, 'cml9g6lve002pic04o6agmzqu', 'cml577as50003l8044246dbk6');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56iq0006jic04scxmdf8k', '2026-01-27T22:02:22.921Z', 'PENDING', NULL, NULL, 'cmkvlpc8n0003jp04mz5qbpg3', 'cmkrf7wgu001pl804csopnpz8');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56j0w006nic04h0x64kkm', '2026-01-27T22:02:23.313Z', 'PENDING', NULL, NULL, 'cmkvlpd26000fjp04b5pczyjh', 'cmkvcjykz0003jp04ik3l3n42');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56jbi006ric048vdwqhbs', '2026-01-27T22:02:23.694Z', 'PENDING', NULL, NULL, 'cmkvn1iwn000tl804tnjzr1zy', 'cmkvmz97k0003l8047t6rvxo0');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56jma006vic04jxtbsd03', '2026-01-27T22:02:24.082Z', 'PENDING', NULL, NULL, 'cmkvpkx2s000xjr04z8j838g3', 'cmkvpg8p40003jr04tdrcou4b');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkvs3fft0005jm04j0c8eyhd', '2026-01-26T23:08:17.514Z', 'PENDING', NULL, NULL, 'cmkvlpcrl0009jp04m1mrw8fa', 'cmkr9mlhq0003jr049nh8wil7');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56jwu006zic04r5jge0zn', '2026-01-27T22:02:24.463Z', 'PENDING', NULL, NULL, 'cmkvqzciy000pky047it2fikx', 'cmkvq95x20003l804989ml1a8');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkvs3g0y000djm04ri2exrvd', '2026-01-26T23:08:18.274Z', 'PENDING', NULL, NULL, 'cmkvlpddc000ljp04nj7t9ff4', 'cmkr9r19z000ajr044nmrnufd');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56k7g0073ic04gw8w2gmd', '2026-01-27T22:02:24.844Z', 'PENDING', NULL, NULL, 'cmkvqzcvk000vky04bvax4g6a', 'cmkvqf9oe0009l804zom2bhjg');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56khz0077ic04kkz41c1b', '2026-01-27T22:02:25.224Z', 'PENDING', NULL, NULL, 'cmkvqzd640011ky04foxw7jq7', 'cmkvqve9a0003ju04l02hxztv');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56ksl007bic04jb8p87qf', '2026-01-27T22:02:25.606Z', 'PENDING', NULL, NULL, 'cmkvs3hqi0011jm04v09gqxvn', 'cmkvs1zm40003ju04x6www9mx');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56l3h007fic04dgz8qokj', '2026-01-27T22:02:25.998Z', 'PENDING', NULL, NULL, 'cmkx48x5g000xjo044ywpvxv1', 'cmkrd9ly10004ld04s3gbdynr');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56le2007jic047v1h615s', '2026-01-27T22:02:26.378Z', 'PENDING', NULL, NULL, 'cmkx48xi60013jo04gkuulovi', 'cmkrabr310003l704q64v199f');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cmkx56lom007nic04shx2vmjt', '2026-01-27T22:02:26.759Z', 'PENDING', NULL, NULL, 'cmkx4remg001hic04t41dtf4m', 'cmkx4nkwc0003ic04dcxxb8m1');
+INSERT INTO "CampaignProfilePlatform" ("id", "createdAt", "status", "rejectionReason", "reviewedAt", "campaignProfileId", "socialAccountId") VALUES ('cml9g6m83002xic04ou5kblmy', '2026-02-05T12:43:37.348Z', 'PENDING', NULL, NULL, 'cml9g6m5z002vic049k2chuau', 'cml9frzmk0003la04lrlghswf');
+
+-- CampaignService
+-- CampaignService
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx5o5y8000dgz04mzhgb5wf', 1, '12971000', 'COP', '2026-01-27T22:16:06.177Z', TRUE, NULL, NULL, 'cmkx5o5tx000bgz04p13uiowm', 'cmkvcjyl00005jp047yiyb5i3');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkvs3g56000fjm04zk6obz5c', 1, '5950000', 'COP', '2026-01-26T23:08:18.426Z', TRUE, NULL, NULL, 'cmkvs3g0y000djm04ri2exrvd', 'cmkrelqno000jl804d02b69n1');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkrdiuc8000akz04jv8vapu0', 1, '4500000', 'COP', '2026-01-23T21:09:17.720Z', TRUE, NULL, '2026-01-23T21:12:40.551Z', 'cmkrdiu3n0008kz046ewiwy13', 'cmkrbth4c0009js049nkzlpjh');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkrdiuox000gkz04bkqosruz', 1, '4200000', 'COP', '2026-01-23T21:09:18.178Z', TRUE, NULL, '2026-01-23T21:12:40.551Z', 'cmkrdiukp000ekz04xjn559pb', 'cmkrap6ha0003kw04ncdpf2rs');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkrdiuzi000mkz04jw7cubcr', 1, '1700000', 'COP', '2026-01-23T21:09:18.558Z', TRUE, NULL, '2026-01-23T21:12:40.551Z', 'cmkrdiuv9000kkz04bjlg1zcw', 'cmkrb5cop0006l204dd0vmc2v');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6j3h001nic04lx45la79', 1, '1760000', 'COP', '2026-02-05T12:43:33.293Z', TRUE, NULL, NULL, 'cml9g6iz9001lic04b2cp3l6i', 'cmkvbhyl70001jm04fwseousi');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6je4001ric04fz681t23', 1, '3850000', 'COP', '2026-02-05T12:43:33.677Z', TRUE, NULL, NULL, 'cml9g6j9u001pic04awqk74fb', 'cmkvmz97k0006l804nqzb1tyh');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6joq001vic046dyxcnr3', 1, '9520000', 'COP', '2026-02-05T12:43:34.058Z', TRUE, NULL, NULL, 'cml9g6jkh001tic04o1xet5pu', 'cmkvpg8p40006jr04ezjqf8x9');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6jza001zic048ude4w7w', 1, '407000', 'COP', '2026-02-05T12:43:34.439Z', TRUE, NULL, NULL, 'cml9g6jv2001xic04nhntffe8', 'cmkvq95x20005l804b5k80xso');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6k9u0023ic04p4adhz5r', 1, '550000', 'COP', '2026-02-05T12:43:34.819Z', TRUE, NULL, NULL, 'cml9g6k5n0021ic0437kyk980', 'cmkvqf9oe000cl804s62es5vu');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6kku0027ic04o1nmzh6p', 1, '330000', 'COP', '2026-02-05T12:43:35.214Z', TRUE, NULL, NULL, 'cml9g6kg70025ic04hb41sy6n', 'cmkvqve9b0006ju04a2ag92g7');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6kvh002bic04xwxew6nv', 1, '165000', 'COP', '2026-02-05T12:43:35.597Z', TRUE, NULL, NULL, 'cml9g6kr60029ic043eijrxfk', 'cmkvs1zm40005ju04p05nkl4i');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6l61002fic04vym62dk8', 1, '4760000', 'COP', '2026-02-05T12:43:35.978Z', TRUE, NULL, NULL, 'cml9g6l1t002dic044k9ylwfu', 'cmkrefcph0003l804tor7zpuq');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6lgm002jic048gfanah9', 1, '4998000', 'COP', '2026-02-05T12:43:36.358Z', TRUE, NULL, NULL, 'cml9g6lce002hic04f6d86z7x', 'cmkrap6ha0003kw04ncdpf2rs');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6lr6002nic04jhlz9hcc', 1, '8250000', 'COP', '2026-02-05T12:43:36.739Z', TRUE, NULL, NULL, 'cml9g6lmy002lic046qiy64xh', 'cmkx4nkwc0006ic04xex44z4c');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6m1r002tic04g1vfut6z', 3, '2640000', 'COP', '2026-02-05T12:43:37.119Z', TRUE, NULL, NULL, 'cml9g6lxi002ric04py3w797l', 'cml577as50005l804vbfurn3n');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cml9g6mcc002zic04s2tj9re6', 1, '4165000', 'COP', '2026-02-05T12:43:37.500Z', TRUE, NULL, NULL, 'cml9g6m83002xic04ou5kblmy', 'cml9frzmk0005la04yhn4b4hs');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56iu9006lic04q4zv20s2', 1, '1760000', 'COP', '2026-01-27T22:02:23.073Z', TRUE, NULL, NULL, 'cmkx56iq0006jic04scxmdf8k', 'cmkvbhyl70001jm04fwseousi');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56j55006pic04l723f2rz', 1, '12971000', 'COP', '2026-01-27T22:02:23.465Z', TRUE, NULL, NULL, 'cmkx56j0w006nic04h0x64kkm', 'cmkvcjyl00005jp047yiyb5i3');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56jft006tic04mdh93mwv', 1, '3850000', 'COP', '2026-01-27T22:02:23.850Z', TRUE, NULL, NULL, 'cmkx56jbi006ric048vdwqhbs', 'cmkvmz97k0006l804nqzb1tyh');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56jqi006xic04auudaftz', 1, '9520000', 'COP', '2026-01-27T22:02:24.234Z', TRUE, NULL, NULL, 'cmkx56jma006vic04jxtbsd03', 'cmkvpg8p40006jr04ezjqf8x9');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56k130071ic04rdietaxx', 1, '407000', 'COP', '2026-01-27T22:02:24.615Z', TRUE, NULL, NULL, 'cmkx56jwu006zic04r5jge0zn', 'cmkvq95x20005l804b5k80xso');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56kbo0075ic04yyk6ndc0', 1, '550000', 'COP', '2026-01-27T22:02:24.996Z', TRUE, NULL, NULL, 'cmkx56k7g0073ic04gw8w2gmd', 'cmkvqf9oe000cl804s62es5vu');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkvs3fk20007jm04f8o9r0ao', 1, '5355000', 'COP', '2026-01-26T23:08:17.666Z', TRUE, NULL, NULL, 'cmkvs3fft0005jm04j0c8eyhd', 'cmkreiroq0009l804464fq2sm');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56km90079ic04m2cn4ur5', 1, '330000', 'COP', '2026-01-27T22:02:25.377Z', TRUE, NULL, NULL, 'cmkx56khz0077ic04kkz41c1b', 'cmkvqve9b0006ju04a2ag92g7');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56kx5007dic04gohis5f0', 1, '165000', 'COP', '2026-01-27T22:02:25.769Z', TRUE, NULL, NULL, 'cmkx56ksl007bic04jb8p87qf', 'cmkvs1zm40005ju04p05nkl4i');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56l7p007hic04q6l0nhmg', 1, '4760000', 'COP', '2026-01-27T22:02:26.150Z', TRUE, NULL, NULL, 'cmkx56l3h007fic04dgz8qokj', 'cmkrefcph0003l804tor7zpuq');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56lia007lic04hjy0glpj', 1, '4998000', 'COP', '2026-01-27T22:02:26.531Z', TRUE, NULL, NULL, 'cmkx56le2007jic047v1h615s', 'cmkrap6ha0003kw04ncdpf2rs');
+INSERT INTO "CampaignService" ("id", "quantity", "basePrice", "currency", "createdAt", "isApproved", "rejectionReason", "reviewedAt", "campaignProfilePlatformId", "profileServiceId") VALUES ('cmkx56lsv007pic04zhmjdw6k', 1, '8250000', 'COP', '2026-01-27T22:02:26.911Z', TRUE, NULL, NULL, 'cmkx56lom007nic04shx2vmjt', 'cmkx4nkwc0006ic04xex44z4c');
+
+-- ==========================================
+-- FASE 5: Reactivar FK y verificar integridad
+-- ==========================================
+SET session_replication_role = 'origin';
+
+SELECT 'Profiles sin country' AS check_name, COUNT(*) AS count FROM "Profile" WHERE "countryId" IS NULL;
+SELECT 'Profiles sin department' AS check_name, COUNT(*) AS count FROM "Profile" WHERE "departmentId" IS NULL;
+SELECT 'Total profiles' AS check_name, COUNT(*) AS count FROM "Profile";
+SELECT 'Total social accounts' AS check_name, COUNT(*) AS count FROM "SocialAccount";
+SELECT 'Total campaigns' AS check_name, COUNT(*) AS count FROM "Campaign";
+SELECT 'Total departments' AS check_name, COUNT(*) AS count FROM "Department";
+SELECT 'Total cities' AS check_name, COUNT(*) AS count FROM "City";

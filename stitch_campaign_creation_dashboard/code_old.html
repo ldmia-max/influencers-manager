@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Campaign Creation Wizard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#137fec",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101922",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }.step-content { display: none; }
+        .step-active { display: block; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white min-h-screen flex">
+<aside class="w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a2632] flex flex-col fixed inset-y-0 left-0 z-50">
+<div class="p-6 flex items-center gap-3">
+<div class="size-8 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">hub</span>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">InfluencerHub</h2>
+</div>
+<nav class="flex-1 px-4 py-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined text-[22px]">campaign</span>
+<span class="text-sm font-bold">Campaigns</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined text-[22px]">group</span>
+<span class="text-sm font-medium">Talent</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined text-[22px]">analytics</span>
+<span class="text-sm font-medium">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined text-[22px]">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-gray-200 dark:border-gray-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAJoJaQNDDM4HN51jlhbwNIJaXEBMB_tD_ExjsWzrFPKSB03KTMwBCd6tJwD6r9CW-I5ewt9C98_0l880e2mXxR-4bQr7s3lQxMWGgTTk_Rl4I71_-zE5UYQLZOHVp5nt7txYG26wa2mVq8SN-tXmxaoyMwwtHQ5xCLegSoXY2l6YOktI49t0RdLFxzkM2aHyJ2_ufiTPnMghevrRJa4W1B5RgtBM5MFx7-OYw67CENudBbdmtibXhpghC1eAemWNOIRLJwHfKb8nga");'></div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold truncate">Alex Morgan</p>
+<p class="text-xs text-gray-500 truncate">Admin Account</p>
+</div>
+<span class="material-symbols-outlined text-gray-400 text-sm">more_vert</span>
+</div>
+</div>
+</aside>
+<main class="flex-1 ml-64 flex flex-col min-h-screen">
+<header class="h-16 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#1a2632]/80 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="text-gray-400 text-sm">Campaigns</span>
+<span class="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+<span class="text-[#111418] dark:text-white text-sm font-bold">New Campaign Wizard</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-xs text-gray-400 italic">Autosaved at 10:42 AM</span>
+<button class="size-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-gray-500">notifications</span>
+</button>
+</div>
+</header>
+<div class="bg-white dark:bg-[#1a2632] px-8 py-6 border-b border-gray-100 dark:border-gray-800">
+<div class="max-w-4xl mx-auto flex items-center justify-between relative">
+<div class="absolute top-5 left-0 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -z-0"></div>
+<div class="absolute top-5 left-0 w-1/2 h-0.5 bg-primary -z-0 transition-all"></div>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="size-10 rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-lg shadow-primary/20">1</div>
+<span class="text-sm font-bold text-primary">Campaign Details</span>
+</div>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="size-10 rounded-full bg-primary text-white flex items-center justify-center font-bold">2</div>
+<span class="text-sm font-bold text-[#111418] dark:text-white">Select Influencers</span>
+</div>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="size-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 flex items-center justify-center font-bold">3</div>
+<span class="text-sm font-medium text-gray-400">Configure Services</span>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+<div class="max-w-[1400px] mx-auto space-y-8">
+<div>
+<h1 class="text-2xl font-black tracking-tight">Step 2: Select Influencers</h1>
+<p class="text-gray-500 dark:text-gray-400">Browse and add the perfect talent to your campaign roster.</p>
+</div>
+<div class="bg-white dark:bg-[#1a2632] rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm flex flex-wrap gap-4 items-center">
+<div class="flex-1 min-w-[300px] relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+<input class="w-full pl-10 pr-4 h-11 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-1 focus:ring-primary focus:border-primary" placeholder="Search by name, handle, or niche..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<select class="h-11 pl-4 pr-10 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium">
+<option>Category: Beauty &amp; Fashion</option>
+<option>Category: Lifestyle</option>
+<option>Category: Tech</option>
+</select>
+<select class="h-11 pl-4 pr-10 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium">
+<option>Followers: Any</option>
+<option>50k - 200k</option>
+<option>200k - 1M</option>
+<option>1M+</option>
+</select>
+<button class="h-11 px-4 flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium hover:bg-gray-50 transition-colors">
+<span class="material-symbols-outlined text-base">filter_list</span>
+                            Advanced Filters
+                        </button>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<div class="bg-white dark:bg-[#1a2632] rounded-2xl border-2 border-primary shadow-xl overflow-hidden transition-all">
+<div class="p-6 flex flex-col lg:flex-row gap-8 items-start">
+<div class="flex gap-6 flex-1">
+<div class="relative flex-shrink-0">
+<div class="size-24 rounded-2xl bg-cover bg-center border-2 border-white shadow-md" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDHgTqhsPlsjmAdPLTDpJijpIOgLL0mhlRPTm5oZkIcueMSRvu1QeXwwdSI3FqE3vbZcl5fVbstJkDyRAWe5nYEr11nXlE63qHbEJG4bIObzMMkfgf0BNtWbuCCOnvJWl6-PIKTdVAVP8AcoRs_pCbqwV1LnhNZJ0zSnZo7FvOtAf5RPS4TMnqINqbrRtHQwMeSKyYcwx59FyDf2Byfb2Q_zO7QVDNHeY53r_YPLx7f1RI_nFJHYOIkyNE27-5uGKNF8ZLu2bNNFFST");'></div>
+<div class="absolute -bottom-2 -right-2 bg-green-500 size-6 rounded-full border-4 border-white dark:border-[#1a2632]"></div>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-xl font-black text-[#111418] dark:text-white">Sarah Jenkins</h3>
+<p class="text-primary font-bold">@sarah.style</p>
+</div>
+<div class="flex items-center gap-2">
+<div class="bg-blue-100 dark:bg-blue-900/40 text-primary px-3 py-1 rounded-full text-xs font-black uppercase">Selected</div>
+<button class="size-9 rounded-full bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+<div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+<p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Followers</p>
+<p class="text-lg font-bold">850K</p>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+<p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Engagement</p>
+<p class="text-lg font-bold">4.2%</p>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+<p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Location</p>
+<p class="text-lg font-bold">USA</p>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+<p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Niche</p>
+<p class="text-lg font-bold">Beauty</p>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:w-64 w-full flex flex-col gap-3">
+<button class="w-full flex items-center justify-between px-4 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:translate-y-[-2px] transition-all">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">photo_camera</span>
+                                        Instagram
+                                    </div>
+<span class="material-symbols-outlined text-sm">check_circle</span>
+</button>
+<button class="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">movie</span>
+                                        TikTok
+                                    </div>
+<span class="material-symbols-outlined text-sm">add</span>
+</button>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-[#1a2632] rounded-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col lg:flex-row gap-8 items-center hover:border-primary/40 transition-all group">
+<div class="flex gap-6 flex-1 w-full">
+<div class="size-20 rounded-2xl bg-cover bg-center grayscale group-hover:grayscale-0 transition-all shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA8kSifud8NGk9W_c_--5afaKHEDrgqqh98PIeJ3_bqe5q-JWU8ZnlF_-Nc_mY0SCemUMgUY6a-CROchCjKIzTR4xgpXerGlRjA6Tfp9Qisa5KYP-eUbxglbB0hqe8mH5a9ShAvRCEaZEBMLbQNczcXJi9l1M8Pz6eicFGlkSxMDFH_SjQHR0tc3VaARiQmPA-Sjjrl-_jwut85_D-aUedAtXe8S5Qg3-G5fEzFKH9K3Hk7XeZ7BoJbuoqki8S3YCGq3bJwj8maevpE");'></div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-lg font-bold">Mark Davis</h3>
+<p class="text-sm text-gray-500">@tech_mark • Tech &amp; Gadgets</p>
+</div>
+</div>
+<div class="flex gap-6 mt-4">
+<div class="text-sm"><span class="font-bold">420K</span> <span class="text-gray-400">Followers</span></div>
+<div class="text-sm"><span class="font-bold">5.8%</span> <span class="text-gray-400">Eng.</span></div>
+<div class="text-sm"><span class="font-bold">San Francisco</span> <span class="text-gray-400">Location</span></div>
+</div>
+</div>
+</div>
+<div class="lg:w-64 w-full">
+<button class="w-full h-12 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all">
+                                Select Influencer
+                            </button>
+</div>
+</div>
+<div class="bg-white dark:bg-[#1a2632] rounded-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col lg:flex-row gap-8 items-center hover:border-primary/40 transition-all group">
+<div class="flex gap-6 flex-1 w-full">
+<div class="size-20 rounded-2xl bg-cover bg-center grayscale group-hover:grayscale-0 transition-all shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCMo1rQDKw6tDc4i6oFIoRIiQX3Er2QokyYYlLMvbEd0AuuIGHLof82ANRgja3cL3Lai9VPJyr_nhh3MVA2lT_aCIODomiDkxTXM2RLx-XDC_wQYVPVSFIuzVeuE5R-t0RqBXs0wSUxgGRzbZogkK_XaxfpVlrC5Abf9lbuaVDKzz6MPPVgwwKWddNRnOq96VGKiV9uG3_b0XmJAmMhBN9Rt0jJBRn7C4NQCw9rw9ZSZ3vHSV4-2v-K2qucpQ3R8RJsPyqzDnFiQsV6");'></div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-lg font-bold">Elena Rodriguez</h3>
+<p class="text-sm text-gray-500">@elena_daily • Lifestyle &amp; Travel</p>
+</div>
+</div>
+<div class="flex gap-6 mt-4">
+<div class="text-sm"><span class="font-bold">1.2M</span> <span class="text-gray-400">Followers</span></div>
+<div class="text-sm"><span class="font-bold">3.1%</span> <span class="text-gray-400">Eng.</span></div>
+<div class="text-sm"><span class="font-bold">Madrid, ES</span> <span class="text-gray-400">Location</span></div>
+</div>
+</div>
+</div>
+<div class="lg:w-64 w-full">
+<button class="w-full h-12 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all">
+                                Select Influencer
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<footer class="bg-white dark:bg-[#1a2632] border-t border-gray-200 dark:border-gray-800 px-8 py-6 sticky bottom-0 z-40">
+<div class="max-w-[1400px] mx-auto flex items-center justify-between">
+<div class="flex items-center gap-8">
+<div class="flex flex-col">
+<span class="text-xs text-gray-400 font-bold uppercase tracking-wider">Estimated Budget</span>
+<div class="flex items-baseline gap-1">
+<span class="text-2xl font-black">$4,200</span>
+<span class="text-sm text-gray-500 font-medium">/ $15,000</span>
+</div>
+</div>
+<div class="w-32 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden hidden md:block">
+<div class="h-full bg-primary w-[28%]"></div>
+</div>
+<div class="flex flex-col">
+<span class="text-xs text-gray-400 font-bold uppercase tracking-wider">Influencers</span>
+<span class="text-lg font-bold">1 Selected</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        Back to Details
+                    </button>
+<button class="px-10 py-3 bg-primary text-white rounded-xl font-black shadow-lg shadow-primary/30 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all">
+                        Continue to Services
+                    </button>
+</div>
+</div>
+</footer>
+</main>
+
+</body></html>

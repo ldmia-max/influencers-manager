@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Campaign Approval Portal</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-50 font-display min-h-screen flex flex-col">
+<header class="sticky top-0 z-50 flex items-center justify-between border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-3 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center size-10 rounded-lg bg-primary/10 text-primary">
+<span class="material-symbols-outlined">rocket_launch</span>
+</div>
+<div>
+<h2 class="text-lg font-bold leading-tight tracking-tight text-slate-900 dark:text-white">PulseLaunch</h2>
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Client Portal</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex flex-col items-end">
+<p class="text-sm font-semibold text-slate-900 dark:text-white">Acme Corp</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Logged in as Sarah M.</p>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-slate-200 dark:border-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDYQfFkkivfQgmtpHUQREOYAHnKCa6kFuk4oJkY52jIuf-ICabmBQK_BiY7z-ua8r6OFVyB7adlDZ6iJJnLDgUZY_sLmU1SNyoM44R66uUDwzuBK56tMJpK93pAhxpZeN0-p1jW6V0gnGomstMbGFfPC8TLjIt7jD1CQCbSxdyT4gkhjBYkOpo_UGewRaYiMpGCINapf63CzOhmblaB-E0F8ph-_-PR61vVtGG11dmtomyXF9hLJZc_TZB8ukW95Jc-ZaSr83yDip_3");'>
+</div>
+</div>
+</header>
+<main class="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<div class="lg:col-span-8 flex flex-col gap-6">
+<div class="flex flex-col gap-2 pb-4 border-b border-slate-200 dark:border-slate-800">
+<div class="flex flex-wrap items-center gap-3">
+<span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-bold uppercase tracking-wide">In Review</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">ID: #88234-AX</p>
+</div>
+<h1 class="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Summer 2024 Launch Campaign</h1>
+<div class="flex flex-wrap items-center gap-x-6 gap-y-2 mt-2 text-sm text-slate-600 dark:text-slate-300">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400" style="font-size: 20px;">date_range</span>
+<span>June 1 - Aug 30, 2024</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400" style="font-size: 20px;">account_balance_wallet</span>
+<span>Total Budget Allocation: <strong>$50,000</strong></span>
+</div>
+</div>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-4">
+<h3 class="text-lg font-bold text-slate-900 dark:text-white">Influencer Scope &amp; Deliverables</h3>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span>
+                        Filter
+                    </button>
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+                        Export PDF
+                    </button>
+</div>
+</div>
+<div class="group flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
+<div class="p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-12 ring-2 ring-slate-100 dark:ring-slate-800" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCornuC6Uc07OEKH4jbwIsD5mYa_3MYpe2TxuqhJSXkn9eHmdRFiNW6YjVbeBjs23OIsVptYBElQJdbNskPrW43_PR4p2gfwPzcYCATwDCC7B1oGOoJngHPzw4rRO1ce25iwRqdJ4gmKMMtqkkISO2JAnde5peM3HkBc6val-hPoGjUe2sokyBSHcErspwV5Tl2jgSV_I0sMmtpZnhTJfvGXedRukV7TB_fZQUOuFXgm4oKNaPUgOfiEgyOeVbUymU8IeHgWM0gQPgm");'>
+</div>
+<div>
+<h4 class="text-base font-bold text-slate-900 dark:text-white">Sarah Jenkins</h4>
+<p class="text-sm text-primary font-medium">@sarahstyles</p>
+</div>
+</div>
+<div class="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto">
+<div class="text-right">
+<p class="text-sm text-slate-500 dark:text-slate-400">Total Profile Cost</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white">$4,500</p>
+</div>
+<div class="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+<span class="ms-3 text-sm font-medium text-slate-900 dark:text-slate-300">Approve Profile</span>
+</label>
+</div>
+</div>
+<div class="bg-slate-50/50 dark:bg-slate-900/50 p-5 space-y-6">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<div class="size-6 flex items-center justify-center rounded-md bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-400">
+<span class="material-symbols-outlined text-[18px]">share</span>
+</div>
+<h5 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Instagram Services</h5>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-center gap-4 flex-1">
+<div class="flex items-center justify-center size-9 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined">movie</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-white">Instagram Reel</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Dedicated video content, 60s max</p>
+</div>
+</div>
+<div class="hidden md:flex flex-col items-end px-4 border-r border-slate-100 dark:border-slate-700/50 min-w-[120px]">
+<span class="text-xs text-slate-400">Unit Price</span>
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200">$2,000 x 1</span>
+</div>
+<div class="flex items-center gap-4 pl-4 min-w-[140px] justify-end">
+<span class="text-base font-bold text-slate-900 dark:text-white">$2,000</span>
+<input checked="" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/50 cursor-pointer" type="checkbox"/>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+<div class="flex items-center gap-4 flex-1">
+<div class="flex items-center justify-center size-9 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined">auto_stories</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-white">Instagram Story Frame</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">24h duration with link</p>
+</div>
+</div>
+<div class="hidden md:flex flex-col items-end px-4 border-r border-slate-100 dark:border-slate-700/50 min-w-[120px]">
+<span class="text-xs text-slate-400">Unit Price</span>
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200">$500 x 3</span>
+</div>
+<div class="flex items-center gap-4 pl-4 min-w-[140px] justify-end">
+<span class="text-base font-bold text-slate-900 dark:text-white">$1,500</span>
+<input checked="" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/50 cursor-pointer" type="checkbox"/>
+</div>
+</div>
+</div>
+</div>
+<div>
+<div class="flex items-center gap-2 mb-3">
+<div class="size-6 flex items-center justify-center rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+<span class="material-symbols-outlined text-[18px]">music_note</span>
+</div>
+<h5 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">TikTok Services</h5>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 opacity-60">
+<div class="flex items-center gap-4 flex-1">
+<div class="flex items-center justify-center size-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-500">
+<span class="material-symbols-outlined">videocam</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-500 dark:text-slate-400 line-through">TikTok Post</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">Cross-post from Reels</p>
+</div>
+</div>
+<div class="hidden md:flex flex-col items-end px-4 border-r border-slate-200 dark:border-slate-700 min-w-[120px]">
+<span class="text-xs text-slate-400">Unit Price</span>
+<span class="text-sm font-medium text-slate-500 line-through">$1,000 x 1</span>
+</div>
+<div class="flex items-center gap-4 pl-4 min-w-[140px] justify-end">
+<span class="text-base font-bold text-slate-500 dark:text-slate-400 line-through">$1,000</span>
+<input class="size-5 rounded border-slate-300 text-primary focus:ring-primary/50 cursor-pointer" type="checkbox"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="group flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
+<div class="p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-12 ring-2 ring-slate-100 dark:ring-slate-800" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD9JKSc37RWrsNjrF_XcY455fKyKitoHZMO6SRTG3qW8rvGhfUrGGWiz6CJESYDzuN_sRLA-nNVz1db1bFjBHu2IV2W_4RyWDENI4LusJrt7GxDQf5C_68U68Y_j7XT88OWxCupxdpyqBdRS7qzBFzC8KC3k74ukWczBK8GydKrT124b11wXLlJyqFPkYvS8S58U_XZi-TGcFNQg79odNQWwQERvIlLggNR5Uitpnfbreamh8pW7H_ZBPIPJIbPwDw0L_EsyKriboca");'>
+</div>
+<div>
+<h4 class="text-base font-bold text-slate-900 dark:text-white">Marcus Chen</h4>
+<p class="text-sm text-primary font-medium">@marcus_visuals</p>
+</div>
+</div>
+<div class="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto">
+<div class="text-right">
+<p class="text-sm text-slate-500 dark:text-slate-400">Total Profile Cost</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white">$2,200</p>
+</div>
+<div class="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+<button class="flex items-center justify-center size-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<div class="group flex flex-col bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100 transition-opacity">
+<div class="p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-12 grayscale" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAJraFUCHpTA9ZhmzVUvq_0Lm-Xsrf98xgPRWs7OI1PMgIrFEjEPZjaP8bcREWK3oeLMNN0dAM_RIbPwKPq_tQ0N0umle33yAQOw7TKpbhS6Cpjj-1X3uBMYOCJttX5logfixhLZU8qosTP94gZFabywjVhypaKPF7IeCGQl62hXAdCca_eVK_04rAHsF8GMEZU-_c5ry2uc_jvTzAiVaa4fqbI4RpJO5JaWzGspEVNG2D2JL_K_QHwWD9G1q_ae7mDAMts0F_oce2g");'>
+</div>
+<div>
+<h4 class="text-base font-bold text-slate-600 dark:text-slate-400">Jessica Bloom</h4>
+<p class="text-sm text-slate-400 font-medium">@jessicablooms</p>
+</div>
+</div>
+<div class="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto">
+<div class="text-right">
+<p class="text-sm text-slate-400 dark:text-slate-500">Total Profile Cost</p>
+<p class="text-lg font-bold text-slate-500 dark:text-slate-400 line-through">$3,500</p>
+</div>
+<div class="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+<button class="flex items-center justify-center size-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed">
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+<span class="ms-3 text-sm font-medium text-slate-500 dark:text-slate-400">Reject</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-4 sticky top-24">
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden flex flex-col">
+<div class="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+<h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">receipt_long</span>
+                        Approval Summary
+                    </h3>
+</div>
+<div class="p-6 flex flex-col gap-4">
+<div class="grid grid-cols-2 gap-3 mb-2">
+<div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg text-center">
+<p class="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Profiles</p>
+<p class="text-xl font-bold text-slate-900 dark:text-white">2 <span class="text-sm font-normal text-slate-400">/ 3</span></p>
+</div>
+<div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg text-center">
+<p class="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Services</p>
+<p class="text-xl font-bold text-slate-900 dark:text-white">12</p>
+</div>
+</div>
+<div class="space-y-3 pt-2">
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500 dark:text-slate-400">Original Quote</span>
+<span class="font-semibold text-slate-900 dark:text-white">$50,000</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-amber-600 dark:text-amber-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">remove_circle</span>
+                                Removed Items
+                            </span>
+<span class="font-semibold text-amber-600 dark:text-amber-500">-$4,500</span>
+</div>
+<div class="h-px bg-slate-200 dark:bg-slate-700 my-2"></div>
+<div class="flex justify-between items-end">
+<span class="text-slate-900 dark:text-white font-bold text-lg">Revised Total</span>
+<span class="text-3xl font-black text-primary tracking-tight">$45,500</span>
+</div>
+<p class="text-xs text-right text-slate-400 mt-1">Updates automatically</p>
+</div>
+<div class="flex flex-col gap-3 mt-4">
+<button class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg shadow-md shadow-blue-500/20 transition-all transform active:scale-[0.98]">
+<span>Submit Final Approval</span>
+<span class="material-symbols-outlined text-sm">check_circle</span>
+</button>
+<button class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+<span>Contact Agency</span>
+<span class="material-symbols-outlined text-sm">mail</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-blue-50 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/30">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-blue-600 dark:text-blue-400 shrink-0">info</span>
+<p class="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                            Approving this scope locks the budget for the selected influencers. Any further changes will require a new change order request.
+                        </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

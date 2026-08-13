@@ -1,0 +1,648 @@
+import { prisma } from "@/lib/prisma";
+import { CampaignStatus } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { ValidationError, NotFoundError } from "./errors";
+
+function generateApprovalToken(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+const VALID_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
+  DRAFT: ["REVIEW", "ACTIVE", "CANCELLED"],
+  REVIEW: ["PENDING", "ACTIVE", "DRAFT"],
+  PENDING: ["REVIEW", "CANCELLED"],
+  ACTIVE: ["COMPLETED", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+function getStatusMessage(status: CampaignStatus): string {
+  const messages: Record<CampaignStatus, string> = {
+    DRAFT: "Campaña movida a borrador",
+    REVIEW: "Campaña enviada a revisión del cliente",
+    PENDING: "Campaña pendiente de ajustes",
+    ACTIVE: "Campaña activada exitosamente",
+    COMPLETED: "Campaña marcada como completada",
+    CANCELLED: "Campaña cancelada",
+  };
+  return messages[status];
+}
+
+// --- API Queries ---
+
+export async function getCampaignsPaginated(params: {
+  userId: string;
+  isAdmin: boolean;
+  search?: string;
+  clientId?: string;
+  status?: CampaignStatus;
+  page: number;
+  pageSize: number;
+}) {
+  const skip = (params.page - 1) * params.pageSize;
+
+  const where = {
+    AND: [
+      !params.isAdmin ? { createdById: params.userId } : {},
+      params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" as const } },
+              { client: { companyName: { contains: params.search, mode: "insensitive" as const } } },
+            ],
+          }
+        : {},
+      params.clientId ? { clientId: params.clientId } : {},
+      params.status ? { status: params.status } : {},
+    ],
+  };
+
+  const [campaigns, total] = await Promise.all([
+    prisma.campaign.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: params.pageSize,
+      include: {
+        client: { select: { id: true, companyName: true } },
+        clientContact: { select: { id: true, firstName: true, lastName: true, email: true } },
+        createdBy: { select: { id: true, name: true } },
+        profiles: {
+          include: {
+            profile: { select: { id: true, name: true } },
+          },
+        },
+      },
+    }),
+    prisma.campaign.count({ where }),
+  ]);
+
+  // Batch load services to avoid N+1
+  const campaignIds = campaigns.map((c) => c.id);
+  const allServices = await prisma.campaignService.findMany({
+    where: {
+      campaignProfilePlatform: {
+        campaignProfile: { campaignId: { in: campaignIds } },
+      },
+    },
+    include: {
+      campaignProfilePlatform: {
+        select: { campaignProfile: { select: { campaignId: true } } },
+      },
+    },
+  });
+
+  const servicesByCampaign = new Map<string, { basePrice: unknown; quantity: number }[]>();
+  for (const service of allServices) {
+    const campaignId = service.campaignProfilePlatform.campaignProfile.campaignId;
+    if (!servicesByCampaign.has(campaignId)) {
+      servicesByCampaign.set(campaignId, []);
+    }
+    servicesByCampaign.get(campaignId)!.push(service);
+  }
+
+  const campaignsWithTotals = campaigns.map((campaign) => {
+    const services = servicesByCampaign.get(campaign.id) || [];
+    const totalBase = services.reduce((sum, s) => sum + Number(s.basePrice) * s.quantity, 0);
+    return {
+      ...campaign,
+      totalBase,
+      totalWithMarkup: totalBase * 1.2,
+      profileCount: campaign.profiles.length,
+    };
+  });
+
+  return {
+    campaigns: campaignsWithTotals,
+    total,
+    page: params.page,
+    pageSize: params.pageSize,
+    totalPages: Math.ceil(total / params.pageSize),
+  };
+}
+
+export async function getCampaignById(id: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id },
+    include: {
+      client: { select: { id: true, companyName: true, email: true } },
+      clientContact: {
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, position: true },
+      },
+      createdBy: { select: { id: true, name: true } },
+      profiles: {
+        include: {
+          profile: { select: { id: true, name: true, type: true, country: true, city: true } },
+          platforms: {
+            include: {
+              socialAccount: { include: { platform: true } },
+              services: {
+                include: { profileService: { include: { serviceType: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  return campaign;
+}
+
+// --- Page Queries ---
+
+export async function getCampaignsForPage(params: {
+  userId?: string;
+  isAdmin: boolean;
+  search?: string;
+  clientId?: string;
+  status?: CampaignStatus;
+  page: number;
+  pageSize: number;
+}) {
+  const skip = (params.page - 1) * params.pageSize;
+
+  const where = {
+    AND: [
+      !params.isAdmin ? { createdById: params.userId } : {},
+      params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" as const } },
+              { client: { companyName: { contains: params.search, mode: "insensitive" as const } } },
+            ],
+          }
+        : {},
+      params.clientId ? { clientId: params.clientId } : {},
+      params.status ? { status: params.status } : {},
+    ],
+  };
+
+  const [campaigns, total] = await Promise.all([
+    prisma.campaign.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: params.pageSize,
+      include: {
+        client: { select: { id: true, companyName: true } },
+        clientContact: { select: { id: true, firstName: true, lastName: true } },
+        profiles: {
+          include: {
+            platforms: {
+              include: {
+                socialAccount: { select: { followers: true } },
+                services: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.campaign.count({ where }),
+  ]);
+
+  return { campaigns, total, totalPages: Math.ceil(total / params.pageSize) };
+}
+
+export async function getCampaignDetail(id: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id },
+    include: {
+      client: { select: { id: true, companyName: true, email: true } },
+      clientContact: {
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, position: true },
+      },
+      createdBy: { select: { id: true, name: true } },
+      approvalTokens: {
+        select: {
+          id: true,
+          token: true,
+          expiresAt: true,
+          usedAt: true,
+          createdAt: true,
+          sentToEmail: true,
+          sentToName: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      profiles: {
+        include: {
+          profile: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              gender: { select: { displayName: true } },
+              department: { select: { name: true } },
+            },
+          },
+          platforms: {
+            include: {
+              socialAccount: {
+                select: {
+                  id: true,
+                  username: true,
+                  followers: true,
+                  platform: true,
+                },
+              },
+              services: {
+                include: {
+                  profileService: { include: { serviceType: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  return campaign;
+}
+
+export async function getCampaignForEdit(id: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id },
+    include: {
+      client: { select: { id: true, companyName: true } },
+      clientContact: { select: { id: true, firstName: true, lastName: true } },
+      profiles: {
+        include: {
+          profile: { select: { id: true, name: true } },
+          platforms: {
+            include: {
+              socialAccount: { select: { id: true } },
+              services: {
+                select: { id: true, quantity: true, basePrice: true, profileServiceId: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  return campaign;
+}
+
+export async function getDashboardCampaigns(userId: string, isAdmin: boolean) {
+  const [activeCampaigns, draftCampaigns] = await Promise.all([
+    prisma.campaign.findMany({
+      where: { status: "ACTIVE", ...(isAdmin ? {} : { createdById: userId }) },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        client: { select: { companyName: true } },
+        _count: { select: { profiles: true } },
+      },
+    }),
+    prisma.campaign.findMany({
+      where: { status: "DRAFT", ...(isAdmin ? {} : { createdById: userId }) },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        client: { select: { companyName: true } },
+        _count: { select: { profiles: true } },
+      },
+    }),
+  ]);
+
+  return { activeCampaigns, draftCampaigns };
+}
+
+// --- Mutations ---
+
+export async function createCampaign(data: {
+  name: string;
+  description?: string;
+  clientId: string;
+  clientContactId: string;
+  budget: number;
+  currency?: string;
+  startDate?: string;
+  endDate?: string;
+  createdById: string;
+}) {
+  if (data.budget <= 0) {
+    throw new ValidationError("El presupuesto debe ser mayor a 0");
+  }
+
+  const client = await prisma.client.findUnique({
+    where: { id: data.clientId },
+    include: { contacts: true },
+  });
+
+  if (!client) {
+    throw new NotFoundError("Cliente no encontrado");
+  }
+
+  const contactBelongsToClient = client.contacts.some((c) => c.id === data.clientContactId);
+  if (!contactBelongsToClient) {
+    throw new ValidationError("El contacto no pertenece al cliente seleccionado");
+  }
+
+  return prisma.campaign.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      clientId: data.clientId,
+      clientContactId: data.clientContactId,
+      budget: data.budget,
+      currency: data.currency || "COP",
+      startDate: data.startDate ? new Date(data.startDate) : null,
+      endDate: data.endDate ? new Date(data.endDate) : null,
+      createdById: data.createdById,
+    },
+    include: {
+      client: { select: { id: true, companyName: true } },
+      clientContact: { select: { id: true, firstName: true, lastName: true, email: true } },
+      createdBy: { select: { id: true, name: true } },
+    },
+  });
+}
+
+export async function updateCampaign(
+  id: string,
+  data: {
+    name?: string;
+    description?: string;
+    clientId?: string;
+    clientContactId?: string;
+    budget?: number;
+    currency?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    status?: CampaignStatus;
+  }
+) {
+  const existing = await prisma.campaign.findUnique({ where: { id } });
+
+  if (!existing) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  if (existing.status !== "DRAFT" && existing.status !== "PENDING") {
+    throw new ValidationError("Solo se pueden editar campañas en estado borrador o pendiente");
+  }
+
+  if (data.clientId && data.clientContactId) {
+    const client = await prisma.client.findUnique({
+      where: { id: data.clientId },
+      include: { contacts: true },
+    });
+
+    if (!client) {
+      throw new NotFoundError("Cliente no encontrado");
+    }
+
+    const contactBelongsToClient = client.contacts.some((c) => c.id === data.clientContactId);
+    if (!contactBelongsToClient) {
+      throw new ValidationError("El contacto no pertenece al cliente seleccionado");
+    }
+  }
+
+  return prisma.campaign.update({
+    where: { id },
+    data: {
+      ...(data.name && { name: data.name }),
+      ...(data.description !== undefined && { description: data.description }),
+      ...(data.clientId && { clientId: data.clientId }),
+      ...(data.clientContactId && { clientContactId: data.clientContactId }),
+      ...(data.budget !== undefined && { budget: data.budget }),
+      ...(data.currency && { currency: data.currency }),
+      ...(data.startDate !== undefined && {
+        startDate: data.startDate ? new Date(data.startDate) : null,
+      }),
+      ...(data.endDate !== undefined && {
+        endDate: data.endDate ? new Date(data.endDate) : null,
+      }),
+      ...(data.status && { status: data.status }),
+    },
+    include: {
+      client: { select: { id: true, companyName: true } },
+      clientContact: { select: { id: true, firstName: true, lastName: true, email: true } },
+      createdBy: { select: { id: true, name: true } },
+    },
+  });
+}
+
+export async function deleteCampaign(id: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id } });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  if (campaign.status !== "DRAFT") {
+    throw new ValidationError("Solo se pueden eliminar campañas en estado borrador");
+  }
+
+  await prisma.campaign.delete({ where: { id } });
+}
+
+// --- Status Machine ---
+
+export async function transitionCampaignStatus(
+  campaignId: string,
+  newStatus: CampaignStatus,
+  reason?: string
+) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: {
+      client: { select: { companyName: true } },
+      clientContact: { select: { firstName: true, lastName: true, email: true } },
+      profiles: {
+        select: {
+          id: true,
+          status: true,
+          platforms: { select: { id: true } },
+        },
+      },
+    },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  const validTransitions = VALID_TRANSITIONS[campaign.status];
+  if (!validTransitions.includes(newStatus)) {
+    throw new ValidationError(
+      `No se puede cambiar de ${campaign.status} a ${newStatus}`
+    );
+  }
+
+  let approvalToken: string | null = null;
+
+  // REVIEW transition: reset statuses + generate token
+  if (newStatus === "REVIEW") {
+    if (campaign.profiles.length === 0) {
+      throw new ValidationError(
+        "La campaña debe tener al menos un perfil para enviar a revisión"
+      );
+    }
+
+    await prisma.campaignProfile.updateMany({
+      where: { campaignId },
+      data: { status: "PENDING", rejectionReason: null, reviewedAt: null },
+    });
+
+    const platformIds = campaign.profiles.flatMap((p) => p.platforms.map((pl) => pl.id));
+    if (platformIds.length > 0) {
+      await prisma.campaignProfilePlatform.updateMany({
+        where: { id: { in: platformIds } },
+        data: { status: "PENDING", rejectionReason: null, reviewedAt: null },
+      });
+    }
+
+    await prisma.campaignService.updateMany({
+      where: {
+        campaignProfilePlatform: {
+          campaignProfile: { campaignId },
+        },
+      },
+      data: { isApproved: true, rejectionReason: null, reviewedAt: null },
+    });
+
+    approvalToken = generateApprovalToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await prisma.campaignApprovalToken.create({
+      data: {
+        token: approvalToken,
+        expiresAt,
+        campaignId,
+        sentToEmail: campaign.clientContact.email,
+        sentToName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
+      },
+    });
+  }
+
+  // ACTIVE transition: validate approvals
+  if (newStatus === "ACTIVE") {
+    if (campaign.status === "REVIEW") {
+      const allApproved = campaign.profiles.every((p) => p.status === "APPROVED");
+      if (!allApproved) {
+        const pendingCount = campaign.profiles.filter((p) => p.status === "PENDING").length;
+        const rejectedCount = campaign.profiles.filter((p) => p.status === "REJECTED").length;
+        throw new ValidationError(
+          JSON.stringify({
+            error: "Todos los perfiles deben estar aprobados para activar la campaña",
+            details: {
+              total: campaign.profiles.length,
+              approved: campaign.profiles.filter((p) => p.status === "APPROVED").length,
+              pending: pendingCount,
+              rejected: rejectedCount,
+            },
+          })
+        );
+      }
+    }
+
+    if (campaign.status === "DRAFT" && campaign.profiles.length > 0) {
+      await prisma.campaignProfile.updateMany({
+        where: { campaignId },
+        data: { status: "APPROVED", reviewedAt: new Date() },
+      });
+    }
+  }
+
+  // Update campaign status
+  const updateData: {
+    status: CampaignStatus;
+    activationReason?: string | null;
+    activatedAt?: Date | null;
+  } = { status: newStatus };
+
+  if (newStatus === "ACTIVE") {
+    updateData.activationReason = reason || null;
+    updateData.activatedAt = new Date();
+  }
+
+  const updatedCampaign = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: updateData,
+    include: {
+      profiles: {
+        select: {
+          id: true,
+          status: true,
+          profile: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  return {
+    campaign: updatedCampaign,
+    message: getStatusMessage(newStatus),
+    approvalToken,
+    emailData: newStatus === "REVIEW"
+      ? {
+          contactEmail: campaign.clientContact.email,
+          contactName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
+          campaignName: campaign.name,
+          companyName: campaign.client.companyName,
+        }
+      : null,
+  };
+}
+
+export async function regenerateApprovalToken(campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: {
+      clientContact: {
+        select: { firstName: true, lastName: true, email: true },
+      },
+    },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  if (campaign.status !== "REVIEW") {
+    throw new ValidationError(
+      "Solo se puede regenerar el token cuando la campaña está en revisión"
+    );
+  }
+
+  const token = generateApprovalToken();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const newToken = await prisma.campaignApprovalToken.create({
+    data: {
+      token,
+      expiresAt,
+      campaignId,
+      sentToEmail: campaign.clientContact.email,
+      sentToName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
+    },
+  });
+
+  return {
+    token: newToken,
+    approvalUrl: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/approve/${token}`,
+    contactEmail: campaign.clientContact.email,
+    contactName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
+    campaignName: campaign.name,
+    expiresAt,
+  };
+}

@@ -1,0 +1,548 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pg_trgm]
+}
+
+// ============ USUARIOS Y AUTENTICACION ============
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  profiles          Profile[]
+  createdCategories Category[]
+  createdClients    Client[]
+  campaigns         Campaign[]
+}
+
+// ============ GENEROS ============
+
+model Gender {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relaciones
+  profiles Profile[]
+}
+
+// ============ UBICACION GEOGRAFICA ============
+
+model Country {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique // Código ISO 3166-1 alpha-2 (ej: "CO", "MX", "AR")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relaciones
+  departments Department[]
+  profiles    Profile[]
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?  // Código del departamento/estado (opcional)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  country   Country @relation(fields: [countryId], references: [id])
+  countryId String
+  cities    City[]
+  profiles  Profile[]
+
+  @@unique([name, countryId])
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  department   Department @relation(fields: [departmentId], references: [id])
+  departmentId String
+  profiles     Profile[]
+
+  @@unique([name, departmentId])
+}
+
+// ============ RANGOS DE ALCANCE ============
+
+model ReachRange {
+  id              String   @id @default(cuid())
+  name            String   @unique // "nano", "micro", "mid", "macro", "mega"
+  displayName     String   // "Nano Influencer", "Micro Influencer", etc.
+  minFollowers    Int      // Mínimo de seguidores
+  maxFollowers    Int?     // Máximo de seguidores (null para sin límite)
+  reachPercentage Float    // Porcentaje de alcance estimado (ej: 0.40 para 40%)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+// ============ PERFILES DE INFLUENCERS/UGC ============
+
+enum ProfileType {
+  INFLUENCER
+  UGC
+  BOTH
+}
+
+model Profile {
+  id        String      @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  type      ProfileType
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relaciones
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  createdById      String
+  gender           Gender?           @relation(fields: [genderId], references: [id])
+  genderId         String?
+
+  // Ubicación geográfica
+  country      Country?    @relation(fields: [countryId], references: [id])
+  countryId    String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  departmentId String?
+  city         City?       @relation(fields: [cityId], references: [id])
+  cityId       String?
+
+  socialAccounts   SocialAccount[]
+  categories       ProfileCategory[]
+  campaignProfiles CampaignProfile[]
+}
+
+// ============ REDES SOCIALES (ESCALABLE) ============
+
+model SocialPlatform {
+  id          String   @id @default(cuid())
+  name        String   @unique // "instagram", "tiktok", "youtube", etc.
+  displayName String // "Instagram", "TikTok", "YouTube"
+  icon        String?  // Icono opcional para UI
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relaciones
+  accounts     SocialAccount[]
+  serviceTypes ServiceType[]
+}
+
+model SocialAccount {
+  id         String  @id @default(cuid())
+  username   String
+  profileUrl String?
+
+  // Datos del perfil
+  fullName      String?
+  biography     String?
+  verified      Boolean?
+  profilePicUrl String? // Ruta local de la foto de perfil
+
+  // Metricas de Apify
+  followers      Int?
+  following      Int?
+  posts          Int?
+  avgViews       Int?
+  avgLikes       Int?
+  engagementRate Float?
+  lastSyncAt     DateTime?
+
+  // IA - Embedding vectorial para búsqueda semántica (OpenAI/Cohere 1536 dims)
+  embedding  Unsupported("vector(1536)")?
+
+  // IA - Resumen semántico generado por IA (usado para generar el embedding)
+  aiSummary  String? @db.Text
+
+  // IA - Metadata estructurada de IA (tags, brandSafe, sentiment, etc.)
+  aiMetadata Json?
+
+  // Relaciones
+  profile           Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId         String
+  platform          SocialPlatform             @relation(fields: [platformId], references: [id])
+  platformId        String
+  services          ProfileService[]
+  campaignPlatforms CampaignProfilePlatform[]
+
+  @@unique([profileId, platformId])
+}
+
+// ============ TIPOS DE SERVICIO (DINAMICO) ============
+
+model ServiceType {
+  id          String        @id @default(cuid())
+  name        String // "reel", "reel_colaboracion", "story", "post", etc.
+  displayName String // "Reel", "Reel - Colaboracion", "Story", etc.
+  description String?
+
+  // Disponibilidad por plataforma y tipo de perfil
+  platform     SocialPlatform @relation(fields: [platformId], references: [id])
+  platformId   String
+  profileTypes ProfileType[] // [INFLUENCER], [UGC], o [INFLUENCER, UGC]
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  profileServices ProfileService[]
+
+  @@unique([name, platformId])
+}
+
+model ProfileService {
+  id       String  @id @default(cuid())
+  price    Decimal @db.Decimal(10, 2)
+  currency String  @default("COP")
+  notes    String?
+
+  // Relaciones
+  socialAccount    SocialAccount     @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  socialAccountId  String
+  serviceType      ServiceType       @relation(fields: [serviceTypeId], references: [id])
+  serviceTypeId    String
+  campaignServices CampaignService[]
+
+  @@unique([socialAccountId, serviceTypeId])
+}
+
+// ============ CATEGORIAS ============
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  // Quien la creo
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  // Relaciones
+  profiles ProfileCategory[]
+}
+
+model ProfileCategory {
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId  String
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+
+  @@id([profileId, categoryId])
+}
+
+// ============ CLIENTES ============
+
+model Client {
+  id             String   @id @default(cuid())
+  companyName    String // Nombre de la empresa (requerido)
+  nit            String? // NIT (opcional)
+  email          String   @unique // Email de la empresa (requerido)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Quien lo creo
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  // Relaciones
+  contacts   ClientContact[]
+  clientUser ClientUser? // Login del cliente
+  campaigns  Campaign[]
+}
+
+model ClientContact {
+  id        String   @id @default(cuid())
+  firstName String // Nombre (requerido)
+  lastName  String // Apellido (requerido)
+  phone     String? // Telefono (opcional)
+  email     String // Email del contacto (requerido)
+  position  String? // Cargo (opcional)
+  isPrimary Boolean  @default(false) // Contacto principal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId  String
+  campaigns Campaign[]
+}
+
+// ============ AUTENTICACION DE CLIENTES ============
+
+model ClientUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String // Contraseña hasheada
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String @unique
+}
+
+// ============ CAMPAÑAS ============
+
+enum CampaignStatus {
+  DRAFT      // Borrador - en creación/edición
+  REVIEW     // Enviada al cliente para revisión
+  PENDING    // Cliente rechazó algunos perfiles, esperando ajustes del usuario
+  ACTIVE     // Todos los perfiles aprobados, campaña en ejecución
+  COMPLETED  // Campaña finalizada
+  CANCELLED  // Campaña cancelada
+}
+
+enum CampaignProfileStatus {
+  PENDING   // Esperando revisión del cliente
+  APPROVED  // Aprobado por el cliente
+  REJECTED  // Rechazado por el cliente
+}
+
+model Campaign {
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  status           CampaignStatus @default(DRAFT)
+  budget           Decimal        @db.Decimal(12, 2)
+  currency         String         @default("COP")
+  startDate        DateTime?
+  endDate          DateTime?
+  activationReason String?        // Motivo opcional al activar la campaña
+  activatedAt      DateTime?      // Fecha de activación
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Relaciones con Cliente
+  client          Client        @relation(fields: [clientId], references: [id])
+  clientId        String
+  clientContact   ClientContact @relation(fields: [clientContactId], references: [id])
+  clientContactId String
+
+  // Quien la creo
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  // Perfiles en la campaña
+  profiles CampaignProfile[]
+
+  // Tokens de aprobación
+  approvalTokens CampaignApprovalToken[]
+
+  // Briefs que originaron esta campaña (no agrega columna a Campaign)
+  briefs CampaignBrief[]
+}
+
+// Token de aprobación para clientes
+model CampaignApprovalToken {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  sentToEmail String
+  sentToName  String?
+
+  // Relaciones
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+}
+
+model CampaignProfile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // Estado de aprobación del cliente
+  status          CampaignProfileStatus @default(PENDING)
+  rejectionReason String?               // Motivo de rechazo (opcional)
+  reviewedAt      DateTime?             // Fecha de revisión del cliente
+
+  // Relaciones
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  profile    Profile  @relation(fields: [profileId], references: [id])
+  profileId  String
+
+  // Plataformas seleccionadas para este perfil en esta campaña
+  platforms CampaignProfilePlatform[]
+
+  @@unique([campaignId, profileId])
+}
+
+model CampaignProfilePlatform {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Estado de aprobación por plataforma
+  status          CampaignProfileStatus @default(PENDING)
+  rejectionReason String?
+  reviewedAt      DateTime?
+
+  // Relaciones
+  campaignProfile   CampaignProfile @relation(fields: [campaignProfileId], references: [id], onDelete: Cascade)
+  campaignProfileId String
+  socialAccount     SocialAccount   @relation(fields: [socialAccountId], references: [id])
+  socialAccountId   String
+
+  // Servicios seleccionados para esta plataforma
+  services CampaignService[]
+
+  @@unique([campaignProfileId, socialAccountId])
+}
+
+model CampaignService {
+  id        String   @id @default(cuid())
+  quantity  Int      @default(1)
+  basePrice Decimal  @db.Decimal(10, 2)
+  currency  String   @default("COP")
+  createdAt DateTime @default(now())
+
+  // Estado de aprobación por servicio
+  isApproved      Boolean   @default(true)
+  clientNotes     String?
+  rejectionReason String?
+  reviewedAt      DateTime?
+
+  // Relaciones
+  campaignProfilePlatform   CampaignProfilePlatform @relation(fields: [campaignProfilePlatformId], references: [id], onDelete: Cascade)
+  campaignProfilePlatformId String
+  profileService            ProfileService          @relation(fields: [profileServiceId], references: [id])
+  profileServiceId          String
+
+  @@unique([campaignProfilePlatformId, profileServiceId])
+}
+
+// ============ BRIEF DE CAMPANA (formulario publico) ============
+// Tabla de recepcion: guarda lo que el cliente envia desde /brief sin
+// tocar el modelo Campaign. El equipo lo revisa y despues lo convierte
+// en una campana real. Por eso casi todo es opcional salvo lo que el
+// formulario marca como obligatorio.
+
+enum BriefStatus {
+  PENDIENTE
+  REVISADO
+  CONVERTIDO
+  DESCARTADO
+}
+
+model CampaignBrief {
+  id        String      @id @default(cuid())
+  status    BriefStatus @default(PENDIENTE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // --- 01 Datos de contacto ---
+  empresa           String
+  responsable       String
+  cargo             String
+  correo            String
+  telefono          String
+  apruebaContenidos String?
+  tiempoRespuesta   String?
+
+  // --- 02 Resumen de la campana ---
+  nombreCampana       String
+  descripcionProducto String
+  objetivoPrincipal   String
+  objetivoOtro        String?
+  fechaInicio         DateTime
+  fechaFinal          DateTime
+  fechaPublicacion    DateTime
+  fechasClave         String
+  presupuestoTotal    Decimal  @db.Decimal(12, 2)
+  moneda              String   @default("COP")
+  incluyePauta        String // SI | NO | POR_DEFINIR
+  pautaDias           Int?
+  kpis                String?
+  campanasPrevias     String?
+
+  // --- 03 Producto o servicio ---
+  queSePromociona     String[]
+  precioYCompra       String
+  territorioPromocion String
+  publicoObjetivo     String
+  enviaMuestra        String?
+  problemaResuelve    String?
+  atributos           String[]
+  competidores        String?
+
+  // --- 04 Mensajes y comunicacion ---
+  claimsObligatorios String
+  claimsProhibidos   String
+  libertadCreativa   String // TOTAL | PARCIAL | GUION_CERRADO
+  datosDuros         String?
+  temasSensibles     String?
+  tono               String[]
+
+  // --- 05 Enlaces y menciones ---
+  landingUrl        String?
+  usuariosEtiquetar String
+  hashtags          String?
+  appYTienda        String?
+  codigoDescuento   String?
+
+  // --- 06 Creadores de contenido ---
+  creadoresSugeridos Json? // [{ nombre, linkPerfil }]
+  nichos             String[]
+  plataformas        String[]
+  tamanoAudiencia    String?
+  cantidadCreadores  String?
+  ciudadPaisCreador  String?
+  perfilDemografico  String?
+  presenciaFisica    String?
+  creadoresVetados   String?
+  marcasVetadas      String?
+
+  // --- 07 Condiciones legales y de uso ---
+  colaboracionConMarca String // SI | NO
+  etiquetaPublicidad   String[]
+  exclusividad         String?
+  permanenciaContenido String?
+  restriccionesLegales String?
+
+  // --- 08 Documentos adjuntos ---
+  documentos Json? // [{ nombre, url, tamano, tipo }]
+
+  // --- 09 Referencias ---
+  referenciasGustan   String?
+  referenciasNoGustan String?
+  comentarios         String?
+
+  // Campana generada al convertir el brief (se rellena despues)
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId String?
+
+  @@index([status, createdAt])
+}
