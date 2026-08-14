@@ -46,6 +46,24 @@ const RUTAS_PRIVADAS = [
 ];
 
 export const authConfig: NextAuthConfig = {
+  /**
+   * La app corre SIEMPRE detras de un proxy inverso (Traefik en
+   * Dokploy), asi que hay que confiar en la cabecera Host que este
+   * reenvia. Sin esto, NextAuth rechaza cada peticion con
+   * "UntrustedHost: Host must be trusted" y el login queda inservible.
+   *
+   * Va fijado aqui y no via AUTH_TRUST_HOST porque esa variable es un
+   * campo de minas: NextAuth resuelve
+   *   trustHost ??= !!(AUTH_URL ?? AUTH_TRUST_HOST ?? VERCEL ?? ...)
+   * es decir, mira AUTH_URL y NO NEXTAUTH_URL, y como usa ?? antes del
+   * !!, dejar AUTH_TRUST_HOST declarada pero VACIA la resuelve como
+   * false. Declarada-en-blanco rompe igual que no declararla.
+   *
+   * Es seguro porque quien fija el Host es el proxy segun su regla de
+   * enrutado, no el cliente. Dejaria de serlo si el contenedor se
+   * expusiera directamente a internet sin proxy delante.
+   */
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
