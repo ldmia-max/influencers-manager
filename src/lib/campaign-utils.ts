@@ -1,6 +1,6 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
-export const MARKUP_PERCENTAGE = 0.2; // 20%
+export const MARKUP_PERCENTAGE = 0.4; // 40%
 
 export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador",
