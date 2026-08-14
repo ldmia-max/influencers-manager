@@ -25,6 +25,12 @@ async function main() {
   const platforms = [
     { name: "instagram", displayName: "Instagram", icon: "instagram" },
     { name: "tiktok", displayName: "TikTok", icon: "tiktok" },
+    // YouTube y Kick no tienen sincronizacion con Apify: el despacho de
+    // src/lib/apify.ts solo contempla instagram y tiktok, y cualquier
+    // otra plataforma se salta en silencio. Sus cuentas se crean y se
+    // les pone precio a mano, pero no traen metricas ni foto.
+    { name: "youtube", displayName: "YouTube", icon: "youtube" },
+    { name: "kick", displayName: "Kick", icon: "kick" },
   ];
 
   const createdPlatforms: Record<string, { id: string }> = {};
@@ -109,6 +115,64 @@ async function main() {
       name: "ugc_video",
       displayName: "Video UGC",
       platformName: "tiktok",
+      profileTypes: [ProfileType.UGC, ProfileType.BOTH],
+    },
+    // YouTube - Influencer (tambien disponible para BOTH)
+    {
+      name: "video",
+      displayName: "Video",
+      platformName: "youtube",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    {
+      name: "video_colaboracion",
+      displayName: "Video - Colaboracion",
+      platformName: "youtube",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    {
+      name: "short",
+      displayName: "Short",
+      platformName: "youtube",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    {
+      name: "mencion",
+      displayName: "Mencion",
+      platformName: "youtube",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    // YouTube - UGC (tambien disponible para BOTH)
+    {
+      name: "ugc_video",
+      displayName: "Video UGC",
+      platformName: "youtube",
+      profileTypes: [ProfileType.UGC, ProfileType.BOTH],
+    },
+    // Kick - Influencer (tambien disponible para BOTH)
+    {
+      name: "live",
+      displayName: "Live",
+      platformName: "kick",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    {
+      name: "mencion_live",
+      displayName: "Mencion en Live",
+      platformName: "kick",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    {
+      name: "clip",
+      displayName: "Clip",
+      platformName: "kick",
+      profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+    },
+    // Kick - UGC (tambien disponible para BOTH)
+    {
+      name: "ugc_video",
+      displayName: "Video UGC",
+      platformName: "kick",
       profileTypes: [ProfileType.UGC, ProfileType.BOTH],
     },
   ];
