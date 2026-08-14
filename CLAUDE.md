@@ -75,7 +75,14 @@ Because `"use cache"` functions can't read the session, anything session-depende
 
 **Pricing hangs off `SocialAccount`, not `Profile`.** A `ProfileService` is unique per `[socialAccountId, serviceTypeId]`, so the same service on Instagram and TikTok are two separate rows. Any query touching prices must nest through `socialAccounts.services`. Prices are `Decimal(10,2)` and are **serialized to strings** before crossing to the client (`serializeProfile` in `src/data-access/profiles.ts`) — `ProfileWithRelations` types `price` as `string`.
 
-`ServiceType` is scoped by `platformId` **and** a `profileTypes: ProfileType[]` array. A profile of type `BOTH` only sees service types that explicitly list `BOTH` — the seed duplicates `[INFLUENCER, BOTH]` / `[UGC, BOTH]` for this reason, and `ProfileForm` reimplements the filter client-side.
+`ServiceType` is scoped by `platformId` **and** a `profileTypes: ProfileType[]` array. That array is read in exactly one place — `getAvailableServices()` in `src/components/forms/profile-form.tsx` — and the rule is not what the seed's shape suggests:
+
+```js
+if (type === "BOTH") return true;        // sees every service on the platform
+return st.profileTypes.includes(type);   // only INFLUENCER / UGC actually filter
+```
+
+A `BOTH` profile therefore sees everything on the platform whatever `profileTypes` says; the seed's `[INFLUENCER, BOTH]` / `[UGC, BOTH]` duplication is convention, not a requirement. **Nothing enforces it server-side** — that client-side filter is the only consumer of the field.
 
 Location is a three-level chain `Country → Department → City`, all optional on `Profile`. `ReachRange` (nano/micro/mid/macro/mega) is a lookup table with a `reachPercentage` used for estimated-reach math.
 
@@ -178,7 +185,7 @@ Catch `ValidationError` → 400 and `NotFoundError` → 404. Dynamic params are 
 
 Data-driven; no schema change needed:
 1. Add to the `platforms` array in `prisma/seed.ts`
-2. Add its `ServiceType` entries in the same seed (remember to include `BOTH` in `profileTypes`)
+2. Add its `ServiceType` entries in the same seed (`BOTH` in `profileTypes` is the seed's convention, not a functional requirement — see above)
 3. Add an actor + normalizer branch in `src/lib/apify.ts` and to the `platformName === ...` checks in `POST /api/profiles` and `/api/profiles/[id]/sync`
 
 ### Prisma singleton
