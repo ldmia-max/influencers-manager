@@ -17,7 +17,8 @@
     "db:backup": "node scripts/backup-db.js",
     "db:restore": "node scripts/restore-db.js",
     "db:export": "npx tsx scripts/export-database.ts",
-    "email:preview": "npx tsx scripts/preview-emails.ts"
+    "email:preview": "npx tsx scripts/preview-emails.ts",
+    "email:check": "npx tsx scripts/check-email.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

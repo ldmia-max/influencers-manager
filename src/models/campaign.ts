@@ -167,6 +167,14 @@ export interface UpdateStatusResponse {
   id: string;
   status: CampaignStatus;
   approvalUrl?: string;
+  /**
+   * Resultado del correo al cliente en la transicion a REVIEW. Ausente
+   * en las demas transiciones, que no mandan nada. Si sent es false el
+   * cambio de estado SI se hizo: solo fallo el aviso, y el enlace de
+   * aprobacion sigue sirviendo para pasarselo al cliente a mano.
+   */
+  email?: { sent: boolean; reason?: string; error?: string };
+  emailRecipient?: string;
 }
 
 export interface RegenerateTokenResponse {

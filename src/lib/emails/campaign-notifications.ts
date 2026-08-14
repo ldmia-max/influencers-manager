@@ -1,6 +1,6 @@
 import { getUserEmailById } from "@/data-access/users";
 import { getRejectedProfileDetails } from "@/data-access/campaign-approval";
-import { sendEmail } from "./resend";
+import { sendEmail, type ResultadoEmail } from "./resend";
 import {
   campaignReviewTemplate,
   tokenRegeneratedTemplate,
@@ -13,16 +13,22 @@ function getBaseUrl() {
 }
 
 /**
- * Envía email al cliente cuando la campaña se envía a revisión
+ * Envia al cliente el correo de revision de campana.
+ *
+ * Devuelve el resultado en vez de lanzar y olvidar. Antes se llamaba
+ * sin await y con un .catch() que solo escribia en consola: si el envio
+ * fallaba, la interfaz seguia diciendo "campana enviada a revision" y
+ * nadie se enteraba hasta que el cliente decia que no habia recibido
+ * nada. Quien llama decide que hacer con el fallo.
  */
-export function notifyCampaignSentToReview(params: {
+export async function notifyCampaignSentToReview(params: {
   contactEmail: string;
   contactName: string;
   campaignName: string;
   companyName: string;
   approvalToken: string;
   expiresAt: Date;
-}) {
+}): Promise<ResultadoEmail> {
   const template = campaignReviewTemplate({
     contactName: params.contactName,
     campaignName: params.campaignName,
@@ -31,8 +37,7 @@ export function notifyCampaignSentToReview(params: {
     expiresAt: params.expiresAt,
   });
 
-  sendEmail({ to: params.contactEmail, ...template })
-    .catch((err) => console.error("Failed to send review email:", err));
+  return sendEmail({ to: params.contactEmail, ...template });
 }
 
 /**

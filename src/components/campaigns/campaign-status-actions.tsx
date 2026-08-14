@@ -37,6 +37,7 @@ import {
   Check,
   Link2,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   CAMPAIGN_STATUS_LABELS,
@@ -69,6 +70,12 @@ export function CampaignStatusActions({
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showApprovalUrlDialog, setShowApprovalUrlDialog] = useState(false);
   const [approvalUrl, setApprovalUrl] = useState("");
+  // Resultado del correo al cliente. undefined = todavia no se sabe.
+  const [emailResult, setEmailResult] = useState<{
+    sent: boolean;
+    error?: string;
+    recipient?: string;
+  }>();
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async () => {
@@ -100,6 +107,15 @@ export function CampaignStatusActions({
       // Si se envió a REVIEW, mostrar el diálogo con la URL de aprobación
       if (newStatus === "REVIEW" && data.approvalUrl) {
         setApprovalUrl(data.approvalUrl);
+        setEmailResult(
+          data.email
+            ? {
+                sent: data.email.sent,
+                error: data.email.error,
+                recipient: data.emailRecipient,
+              }
+            : undefined
+        );
         setShowApprovalUrlDialog(true);
       }
 
@@ -481,10 +497,39 @@ export function CampaignStatusActions({
             </DialogTitle>
             <DialogDescription>
               La campaña ha sido enviada al cliente para su aprobación.
-              Comparte el siguiente enlace con el cliente.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Estado real del correo. El cambio de estado se hizo en
+                cualquier caso: lo que puede fallar es solo el aviso. */}
+            {emailResult?.sent && (
+              <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <p className="text-sm text-green-800">
+                  Correo enviado
+                  {emailResult.recipient ? ` a ${emailResult.recipient}` : ""}.
+                </p>
+              </div>
+            )}
+            {emailResult && !emailResult.sent && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-medium">
+                    No se pudo enviar el correo al cliente.
+                  </p>
+                  <p className="mt-1">
+                    La campaña sí quedó en revisión: comparte el enlace de
+                    abajo manualmente.
+                  </p>
+                  {emailResult.error && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Motivo: {emailResult.error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Link2 className="h-4 w-4" />

@@ -32,12 +32,20 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     const result = await transitionCampaignStatus(campaignId, body.status, body.reason);
 
-    // Send email notification if transitioning to REVIEW
+    // Envio del correo al cliente al pasar a REVIEW.
+    //
+    // Se ESPERA el resultado y se informa en la respuesta. El cambio de
+    // estado ya esta hecho y no se deshace porque falle el correo: la
+    // campana queda en revision y el enlace de aprobacion sigue siendo
+    // valido, asi que el equipo puede pasarselo al cliente a mano. Pero
+    // tiene que saberlo, y antes no se enteraba.
+    let email: { sent: boolean; reason?: string; error?: string } | undefined;
+
     if (result.emailData && result.approvalToken) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      notifyCampaignSentToReview({
+      const envio = await notifyCampaignSentToReview({
         contactEmail: result.emailData.contactEmail,
         contactName: result.emailData.contactName,
         campaignName: result.emailData.campaignName,
@@ -45,6 +53,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         approvalToken: result.approvalToken,
         expiresAt,
       });
+
+      email = envio.success
+        ? { sent: true }
+        : { sent: false, reason: envio.reason, error: envio.error };
     }
 
     // Build response
@@ -53,9 +65,13 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       message: string;
       approvalToken?: string;
       approvalUrl?: string;
+      email?: { sent: boolean; reason?: string; error?: string };
+      emailRecipient?: string;
     } = {
       campaign: result.campaign,
       message: result.message,
+      email,
+      emailRecipient: result.emailData?.contactEmail,
     };
 
     if (result.approvalToken) {
