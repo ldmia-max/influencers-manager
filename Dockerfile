@@ -16,7 +16,13 @@
 FROM node:22-alpine AS base
 # openssl lo exigen los motores de Prisma; libc6-compat cubre los
 # binarios compilados contra glibc que no existen tal cual en Alpine.
-RUN apk add --no-cache libc6-compat openssl
+#
+# bash no lo necesita la aplicacion: Alpine trae sh (BusyBox) y con eso
+# corre el entrypoint. Se instala porque la terminal de contenedores de
+# Dokploy invoca "bash" sin alternativa, y sin el falla con
+# 'exec: "bash": executable file not found in $PATH'. Son ~2 MB a cambio
+# de poder administrar el contenedor desde el panel.
+RUN apk add --no-cache libc6-compat openssl bash
 WORKDIR /app
 
 
