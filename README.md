@@ -466,8 +466,10 @@ Las migraciones crean las tablas vacías. Falta cargar los datos de catálogo: u
 El seed (`prisma/seed.ts`) está escrito en TypeScript y el proyecto lo ejecuta con `ts-node`, que es dependencia de desarrollo y no llega a la imagen. Por eso la imagen incluye `tsx`. Una vez desplegado, desde la consola del contenedor en Dokploy:
 
 ```bash
-SEED_DEMO=false node ./prisma-cli/node_modules/tsx/dist/cli.mjs prisma/seed.ts
+cd /app && SEED_DEMO=false node ./prisma-cli/node_modules/tsx/dist/cli.mjs prisma/seed.ts
 ```
+
+El `cd /app` hace falta: la terminal de Dokploy abre en `/`, no en el `WORKDIR` de la imagen, y tanto la ruta de `tsx` como la de `seed.ts` son relativas. Por SSH con `docker exec` sí se entra directamente en `/app`, pero el `cd` no estorba.
 
 **`SEED_DEMO=false` es importante:** sin esa variable el seed crea además perfiles, clientes y campañas inventados («María García», «Restaurante El Sabor»…), que son útiles en local pero no deben acabar en producción.
 

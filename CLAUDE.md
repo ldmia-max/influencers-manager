@@ -195,7 +195,7 @@ npx prisma migrate diff --from-migrations prisma/migrations \
 
 The production DB must run a PostgreSQL image that ships pgvector — the first migration does `CREATE EXTENSION vector` and `pg_trgm`.
 
-**Seeding in production:** `prisma/seed.ts` runs through `ts-node`, a devDependency absent from the image, so the Dockerfile bundles `tsx` alongside the Prisma CLI. Run it once from the container shell with `SEED_DEMO=false node ./prisma-cli/node_modules/tsx/dist/cli.mjs prisma/seed.ts` — without that flag the seed also inserts fictional profiles, clients, and campaigns that are only meant for local development.
+**Seeding in production:** `prisma/seed.ts` runs through `ts-node`, a devDependency absent from the image, so the Dockerfile bundles `tsx` alongside the Prisma CLI. Run it once from the container shell with `cd /app && SEED_DEMO=false node ./prisma-cli/node_modules/tsx/dist/cli.mjs prisma/seed.ts`. The `cd` matters — Dokploy's terminal opens at `/`, not the image `WORKDIR`, and both paths in that command are relative. Without `SEED_DEMO=false` the seed also inserts fictional profiles, clients, and campaigns meant only for local development.
 
 ## Environment variables
 
