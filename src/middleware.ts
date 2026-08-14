@@ -18,6 +18,7 @@ export const config = {
     "/campaigns/:path*",
     "/categories/:path*",
     "/briefs/:path*",
+    "/client-dashboard/:path*",
     "/login",
     "/register",
   ],

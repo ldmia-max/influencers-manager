@@ -646,3 +646,44 @@ export async function regenerateApprovalToken(campaignId: string) {
     expiresAt,
   };
 }
+
+/**
+ * Campanas visibles para un cliente en su portal.
+ *
+ * El filtro por clientId no es negociable: es lo unico que impide que
+ * un cliente vea las campanas de otro. El clientId sale de la cookie
+ * firmada de sesion (src/lib/client-session.ts), nunca de la peticion.
+ *
+ * Se excluyen los borradores: una campana en DRAFT esta a medias y el
+ * cliente no deberia verla hasta que se le manda a revision.
+ *
+ * Devuelve el presupuesto ya formateado como cadena porque Decimal de
+ * Prisma no puede cruzar a un componente de cliente.
+ */
+export async function getCampaignsForClientPortal(clientId: string) {
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      clientId,
+      status: { not: CampaignStatus.DRAFT },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      budget: true,
+      currency: true,
+      startDate: true,
+      endDate: true,
+      createdAt: true,
+      _count: { select: { profiles: true } },
+    },
+  });
+
+  return campaigns.map((campaign) => ({
+    ...campaign,
+    budget: campaign.budget.toString(),
+    totalProfiles: campaign._count.profiles,
+  }));
+}

@@ -99,7 +99,18 @@ Three flows deliberately run with no session, all under `/api/public/*`:
 
 1. **`/brief`** — long public intake form writing to `CampaignBrief`, a wide staging table with almost everything optional. Staff review it at `/briefs` and `convertirBriefACampana()` (`src/services/brief-conversion.ts`) turns it into a real `Campaign`. Attachments upload **directly from the browser to Vercel Blob** via `POST /api/public/brief/upload` (`handleUpload`), because Vercel's 4.5 MB request-body cap makes a normal multipart POST fail with 413; the route's protection is the token scope (`briefs/` prefix, allowed MIME types, max size), not a session.
 2. **`/approve/[token]`** — the client approval portal, authorized by a `CampaignApprovalToken` (unique, `expiresAt`, single-use `usedAt`). `GET /api/public/approve/[token]` maps `EXPIRED_TOKEN`/`USED_TOKEN`/`INVALID_STATUS` to 410/400 with a `code` field the UI switches on.
-3. **`/client-login` + `/client-dashboard`** — the `ClientUser` portal. This is still **not wired into NextAuth**: `POST /api/client-auth/login` does a bcrypt check and returns client data with a `TODO: Create session/JWT`, and `/client-dashboard` has no auth check. Do not assume a client session exists anywhere.
+3. **`/client-login`** — the entry point of the client portal. The login endpoint itself is public; everything behind it is not. See below.
+
+### The client portal is a second, independent session system
+
+`ClientUser` is not a `User`: no role, no access to `(app)`, sees only its own data. It deliberately does **not** go through NextAuth — folding it in would force the staff session to carry two kinds of subject.
+
+- `src/lib/client-session.ts` signs and verifies an `HS256` JWT (via `jose`) with issuer `influencer-manager` and audience `client-portal`, using `NEXTAUTH_SECRET`. It is imported by the middleware, so it runs on **Edge — never import Prisma or bcryptjs into it**.
+- `POST /api/client-auth/login` sets the `client-session` httpOnly cookie; `POST /api/client-auth/logout` overwrites it with `maxAge: 0` (matching options exactly, or the browser keeps the original).
+- `/client-dashboard` is in the `src/middleware.ts` matcher and handled by a dedicated branch in `authorized` (`RUTA_CLIENTE`) that redirects to `/client-login`, not `/login`. The page re-verifies because that is where `clientId` comes from.
+- `getCampaignsForClientPortal(clientId)` filters by `clientId` and excludes `DRAFT`. **That filter is the only thing separating one client's data from another's** — `clientId` must always come from the signed cookie, never from the request.
+
+Rotating `NEXTAUTH_SECRET` invalidates client sessions too, not just staff ones.
 
 ### Route protection
 

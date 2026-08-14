@@ -187,7 +187,7 @@ src/
     (dashboard)/         Área privada: dashboard, perfiles, categorías, clientes
     admin/               Panel de administración (solo rol ADMIN)
     client-login/        Portal de clientes: acceso
-    client-dashboard/    Portal de clientes: bienvenida
+    client-dashboard/    Portal de clientes: campañas de la empresa
     api/                 Route handlers
   components/
     ui/                  Componentes base de Shadcn/ui
@@ -282,9 +282,16 @@ En cambio `SocialPlatform`, `ServiceType` y `Category` nunca se borran en cascad
 
 ### Portal de clientes
 
-Área independiente (`/client-login`, `/client-dashboard`) pensada para que las empresas cliente accedan a su propia información. Los administradores generan las credenciales desde la ficha de cada cliente.
+Área independiente (`/client-login`, `/client-dashboard`) para que las empresas cliente consulten sus campañas. Los administradores generan las credenciales desde la ficha de cada cliente.
 
-Está **a medio implementar**: ver [Estado actual y pendientes](#estado-actual-y-pendientes).
+Es un **sistema de sesión aparte del de NextAuth**, que gobierna al personal interno. Un `ClientUser` no es un `User`: no tiene rol, no entra en `(app)` y solo ve lo suyo. Funciona así:
+
+1. `POST /api/client-auth/login` valida con bcrypt contra `ClientUser` (rechaza los `isActive: false`) y emite una cookie `client-session`: un JWT `HS256` httpOnly, firmado con `NEXTAUTH_SECRET`, con emisor y audiencia propios y 30 días de vigencia.
+2. `/client-dashboard` está en el matcher de [src/middleware.ts](src/middleware.ts) y lo atiende el callback `authorized`, que verifica esa cookie y redirige a `/client-login` si no vale. La página vuelve a validarla, porque de ahí sale el `clientId` con el que consulta.
+3. `getCampaignsForClientPortal(clientId)` filtra por ese `clientId` y excluye los borradores. **Ese filtro es lo único que separa a un cliente de otro**, así que el `clientId` nunca debe salir de la petición, solo de la cookie firmada.
+4. `POST /api/client-auth/logout` borra la cookie. Al ser httpOnly, el navegador no puede hacerlo por su cuenta.
+
+Rotar `NEXTAUTH_SECRET` cierra también las sesiones de los clientes, no solo las del personal.
 
 ---
 
@@ -374,7 +381,7 @@ El sistema es dirigido por datos y no requiere cambios en el esquema:
 
 Puntos que conviene conocer antes de trabajar sobre el código:
 
-**El portal de clientes no crea sesión.** `POST /api/client-auth/login` verifica el email y la contraseña correctamente, pero termina con un `TODO` en lugar de emitir un token: devuelve los datos del cliente y nada más. Por su parte `/client-dashboard` es una página de bienvenida sin ninguna comprobación de acceso y sin cobertura del middleware. Esa mitad está sin terminar.
+**El portal de clientes solo muestra campañas.** Ya tiene sesión propia y control de acceso (ver [Portal de clientes](#portal-de-clientes)), pero su alcance es deliberadamente corto: la empresa ve el listado de sus campañas que no están en borrador, y nada más. No hay detalle de campaña, ni informes, ni descarga de contenidos. Para aprobar o rechazar perfiles el cliente sigue usando el enlace con token de `/approve/[token]`, que es un flujo aparte y no requiere credenciales.
 
 **La visibilidad de perfiles es incoherente entre la página y la API.** `getCachedProfiles()` en [src/lib/cache.ts](src/lib/cache.ts) devuelve deliberadamente **todos** los perfiles a cualquier usuario, y es la función que alimenta la página `/profiles`. En cambio `GET /api/profiles` filtra por `createdById` cuando el usuario no es administrador. Si se cambian las reglas de visibilidad hay que tocar ambos sitios o quedarán en desacuerdo.
 

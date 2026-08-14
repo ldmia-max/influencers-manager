@@ -1,5 +1,9 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import {
+  COOKIE_SESION_CLIENTE,
+  verificarSesionCliente,
+} from "./client-session";
 
 // Definido localmente para evitar importar @prisma/client en Edge runtime
 type UserRole = "ADMIN" | "USER";
@@ -44,6 +48,13 @@ const RUTAS_PRIVADAS = [
   "/categories",
   "/briefs",
 ];
+
+/**
+ * Area del portal de clientes. Va aparte de RUTAS_PRIVADAS porque no la
+ * protege la sesion del personal sino la del cliente, y su login es
+ * otro. Tambien debe figurar en el matcher de src/middleware.ts.
+ */
+const RUTA_CLIENTE = "/client-dashboard";
 
 export const authConfig: NextAuthConfig = {
   /**
@@ -90,9 +101,27 @@ export const authConfig: NextAuthConfig = {
       }
       return session;
     },
-    authorized({ auth, request: { nextUrl } }) {
+    async authorized({ auth, request }) {
+      const { nextUrl } = request;
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;
+
+      // --- Portal de clientes ---
+      // Sistema de sesion aparte del personal: un ClientUser no tiene
+      // sesion de NextAuth, asi que aqui no sirve `auth`. Se valida su
+      // cookie firmada y se le manda a SU login, no al del personal.
+      if (
+        pathname === RUTA_CLIENTE ||
+        pathname.startsWith(`${RUTA_CLIENTE}/`)
+      ) {
+        const sesion = await verificarSesionCliente(
+          request.cookies.get(COOKIE_SESION_CLIENTE)?.value
+        );
+        if (!sesion) {
+          return Response.redirect(new URL("/client-login", nextUrl));
+        }
+        return true;
+      }
 
       // Coincidencia por segmento completo: "/briefs" queda protegido
       // pero "/brief" (el formulario publico) NO, pese al prefijo comun.
