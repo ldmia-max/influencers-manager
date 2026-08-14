@@ -1,0 +1,46 @@
+# Lo que NO debe entrar en el contexto de construccion de la imagen.
+# Cuanto menos se copie, mas rapido el build y menos posibilidades de
+# colar un secreto dentro de la imagen.
+
+node_modules
+.next
+out
+build
+
+# Secretos: las variables se inyectan desde Dokploy, nunca desde el
+# fichero. La plantilla .env.example si se deja pasar.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.github
+
+# Herramientas y notas que no afectan a la ejecucion
+.claude
+.vscode
+.agents
+planes
+stitch_campaign_creation_dashboard
+README.md
+CLAUDE.md
+
+# Datos y volcados pesados
+backups
+data_json
+email-previews
+public/uploads
+uploads
+*.sql
+!prisma/migrations/**/*.sql
+
+docker-compose.dev.yml
+Dockerfile
+.dockerignore
+
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+nul
+tmpclaude-*

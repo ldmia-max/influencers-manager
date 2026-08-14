@@ -1,5 +1,8 @@
 import { ApifyClient } from "apify-client";
 import { put } from "@vercel/blob";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
+import { directorioUploads, RUTA_PUBLICA_UPLOADS } from "./uploads";
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN,
@@ -19,10 +22,19 @@ export interface InstagramProfileData {
 }
 
 /**
- * Descarga una imagen de perfil y la sube a Vercel Blob
- * @param imageUrl URL de la imagen a descargar
- * @param username Nombre de usuario para nombrar el archivo
- * @returns URL pública del archivo en Vercel Blob
+ * Descarga la foto de perfil y la guarda donde corresponda.
+ *
+ * Dos destinos segun el entorno:
+ *  - Con BLOB_READ_WRITE_TOKEN: Vercel Blob, y se guarda su URL absoluta.
+ *  - Sin token (el caso de OVH): disco, en el directorio de subidas, y
+ *    se guarda una ruta relativa servida por /api/uploads.
+ *
+ * No escribe en public/: con output: "standalone" Next no sirve los
+ * archivos que aparezcan ahi despues del build.
+ *
+ * @returns URL utilizable en un <img>, o null si algo fallo. Devolver
+ *          null no aborta la sincronizacion: el perfil se queda sin
+ *          foto pero conserva sus metricas.
  */
 async function downloadProfilePicture(
   imageUrl: string,
@@ -41,16 +53,21 @@ async function downloadProfilePicture(
     // Determinar extensión del archivo
     const contentType = response.headers.get("content-type");
     const ext = contentType?.includes("png") ? "png" : "jpg";
+    const nombre = `${username}_${Date.now()}.${ext}`;
 
-    // Subir a Vercel Blob
-    const filename = `profiles/${username}_${Date.now()}.${ext}`;
-    const blob = await put(filename, buffer, {
-      access: "public",
-      contentType: contentType || "image/jpeg",
-    });
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blob = await put(`profiles/${nombre}`, buffer, {
+        access: "public",
+        contentType: contentType || "image/jpeg",
+      });
+      return blob.url;
+    }
 
-    // Retornar URL pública de Vercel Blob
-    return blob.url;
+    const destino = join(directorioUploads(), "profiles");
+    await mkdir(destino, { recursive: true });
+    await writeFile(join(destino, nombre), buffer);
+
+    return `${RUTA_PUBLICA_UPLOADS}/profiles/${nombre}`;
   } catch (error) {
     console.error("Error downloading profile picture:", error);
     return null;

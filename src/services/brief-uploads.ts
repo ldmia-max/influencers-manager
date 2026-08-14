@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { directorioUploads, RUTA_PUBLICA_UPLOADS } from "@/lib/uploads";
 import {
   MAX_ARCHIVOS,
   MAX_BYTES,
@@ -20,8 +21,10 @@ import {
  * limite de 4.5 MB por peticion serverless hace inviable mandarlos
  * dentro del formulario.
  *
- * Escribe en public/uploads/briefs/. En OVH esa ruta debe ser un volumen
- * montado, o los archivos se pierden al reconstruir la imagen.
+ * Escribe en el directorio de subidas (UPLOADS_DIR), que en el
+ * contenedor es un volumen montado. NO escribe en public/: con
+ * output: "standalone" Next no sirve lo que aparezca ahi despues del
+ * build. Los archivos se entregan por /api/uploads/[...ruta].
  */
 
 export { MAX_ARCHIVOS, MAX_BYTES, MAX_BYTES_TOTAL, EXTENSIONES_VISIBLES };
@@ -60,7 +63,7 @@ export async function guardarDocumentosBrief(
   }
 
   const carpeta = randomUUID();
-  const destino = join(process.cwd(), "public", "uploads", "briefs", carpeta);
+  const destino = join(directorioUploads(), "briefs", carpeta);
   await mkdir(destino, { recursive: true });
 
   const guardados: DocumentoAdjunto[] = [];
@@ -74,7 +77,7 @@ export async function guardarDocumentosBrief(
 
     guardados.push({
       nombre: archivo.name,
-      url: `/uploads/briefs/${carpeta}/${nombre}`,
+      url: `${RUTA_PUBLICA_UPLOADS}/briefs/${carpeta}/${nombre}`,
       tamano: archivo.size,
       tipo: archivo.type || "desconocido",
     });

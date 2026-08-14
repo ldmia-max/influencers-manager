@@ -1,0 +1,7 @@
+# Se desarrolla en Windows y se despliega en Linux. Estos archivos
+# DEBEN guardarse con finales de linea LF: si a docker-entrypoint.sh le
+# entra CRLF, el contenedor muere al arrancar con un error que no dice
+# gran cosa ("bad interpreter: /bin/sh^M").
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-entrypoint.sh text eol=lf

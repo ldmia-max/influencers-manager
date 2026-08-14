@@ -428,7 +428,20 @@ async function main() {
     where: { name: "ugc_video", platformId: instagramPlatform.id },
   });
 
-  // ============ CREAR PERFILES DE EJEMPLO ============
+  // ============ DATOS DE EJEMPLO ============
+  // Todo lo anterior son datos de catalogo (usuario admin, plataformas,
+  // tipos de servicio, categorias, generos, ubicaciones y rangos de
+  // alcance) y hace falta en cualquier entorno.
+  //
+  // Lo que viene a continuacion son perfiles, clientes y campanas
+  // INVENTADOS, utiles en local pero que no deben acabar en produccion.
+  // Con SEED_DEMO=false el seed termina aqui.
+  if (process.env.SEED_DEMO === "false") {
+    console.log("\nSEED_DEMO=false: se omiten los datos de ejemplo.");
+    console.log("\nSeeding completed!");
+    return;
+  }
+
   console.log("\nCreando perfiles de ejemplo...");
 
   const profilesData = [

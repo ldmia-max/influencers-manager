@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Sora } from "next/font/google";
 import { getCachedCategories } from "@/data-access/categories";
 import { BriefForm } from "@/components/brief/brief-form";
@@ -12,6 +14,53 @@ export const metadata: Metadata = {
 };
 
 /**
+ * Carga los nichos desde la base de datos.
+ *
+ * Va aparte y dentro de un <Suspense> a proposito: el resto de la
+ * pagina es estatica y se prerenderiza en el build, pero durante el
+ * "docker build" NO hay base de datos accesible. Si la consulta
+ * colgara del componente de pagina, el build reventaria con
+ * PrismaClientInitializationError al intentar prerenderizar /brief.
+ *
+ * El connection() es imprescindible, no decorativo: con
+ * cacheComponents activado Next ejecuta las funciones "use cache"
+ * durante el build para precargarlas, asi que el <Suspense> por si
+ * solo NO evita la consulta. connection() ancla este fragmento a la
+ * peticion real y deja que solo la cascara se genere en el build.
+ */
+async function FormularioBrief() {
+  await connection();
+
+  const categorias = await getCachedCategories();
+
+  const nichos = categorias
+    .filter((c) => c.isActive)
+    .map((c) => ({ value: c.name, label: c.name }));
+  // "Otro" siempre al final, no viene de la base de datos
+  nichos.push({ value: "Otro", label: "Otro" });
+
+  // Con token de Blob (Vercel) los adjuntos se suben directos
+  // desde el navegador, esquivando el limite de 4.5 MB por
+  // peticion. Sin token (local y OVH) viajan en el POST.
+  return (
+    <BriefForm
+      nichos={nichos}
+      blobHabilitado={Boolean(process.env.BLOB_READ_WRITE_TOKEN)}
+    />
+  );
+}
+
+function FormularioBriefCargando() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="h-11 animate-pulse rounded-lg bg-gray-200" />
+      <div className="h-11 animate-pulse rounded-lg bg-gray-200" />
+      <div className="h-32 animate-pulse rounded-lg bg-gray-200" />
+    </div>
+  );
+}
+
+/**
  * Pagina PUBLICA del brief de campana.
  *
  * Vive fuera de los grupos (app) y (auth), y no figura en RUTAS_PRIVADAS
@@ -23,15 +72,7 @@ export const metadata: Metadata = {
  * formulario digital, la marca se recoge en el punto 01 y la fecha se
  * registra sola al enviarlo.
  */
-export default async function BriefPage() {
-  const categorias = await getCachedCategories();
-
-  const nichos = categorias
-    .filter((c) => c.isActive)
-    .map((c) => ({ value: c.name, label: c.name }));
-  // "Otro" siempre al final, no viene de la base de datos
-  nichos.push({ value: "Otro", label: "Otro" });
-
+export default function BriefPage() {
   return (
     <main className="min-h-screen bg-[#faf9f5] py-8 px-4 sm:py-10">
       <div className="mx-auto w-full max-w-3xl">
@@ -109,13 +150,9 @@ export default async function BriefPage() {
         </div>
 
         <div className="mt-8">
-          {/* Con token de Blob (Vercel) los adjuntos se suben directos
-              desde el navegador, esquivando el limite de 4.5 MB por
-              peticion. Sin token (local y OVH) viajan en el POST. */}
-          <BriefForm
-            nichos={nichos}
-            blobHabilitado={Boolean(process.env.BLOB_READ_WRITE_TOKEN)}
-          />
+          <Suspense fallback={<FormularioBriefCargando />}>
+            <FormularioBrief />
+          </Suspense>
         </div>
 
         <footer className="mt-12 border-t border-gray-200 pt-6 text-sm text-gray-500">

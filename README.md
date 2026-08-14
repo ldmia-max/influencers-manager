@@ -378,43 +378,106 @@ Puntos que conviene conocer antes de trabajar sobre el código:
 
 **La visibilidad de perfiles es incoherente entre la página y la API.** `getCachedProfiles()` en [src/lib/cache.ts](src/lib/cache.ts) devuelve deliberadamente **todos** los perfiles a cualquier usuario, y es la función que alimenta la página `/profiles`. En cambio `GET /api/profiles` filtra por `createdById` cuando el usuario no es administrador. Si se cambian las reglas de visibilidad hay que tocar ambos sitios o quedarán en desacuerdo.
 
-**Las rutas de administración no invalidan su caché.** Los endpoints de plataformas y tipos de servicio no llaman a `revalidateTag`, así que un cambio hecho desde el panel puede tardar hasta 2 horas en reflejarse en los formularios y filtros. Reiniciar el servidor lo fuerza.
+**Las rutas de administración no invalidan su caché.** Los endpoints de plataformas, tipos de servicio, ubicaciones y géneros no llaman a `revalidateTag`, así que un cambio hecho desde el panel puede tardar hasta una hora (`cacheLife("hours")`) en reflejarse en los formularios y filtros. Reiniciar el servidor lo fuerza.
 
-**No hay migraciones de Prisma.** No existe el directorio `prisma/migrations`: el esquema se ha venido sincronizando con `db push`. Es cómodo en desarrollo, pero contra una base de producción es arriesgado, porque `db push` altera el esquema sin historial ni marcha atrás y puede descartar columnas con datos. Antes del despliegue conviene generar una migración inicial y pasar a `prisma migrate deploy`.
+**Hay migraciones, pero el `db push` dejó secuelas.** `prisma/migrations` ya existe y el contenedor aplica `prisma migrate deploy` al arrancar. Conviene saber de dónde viene: durante un tiempo el esquema se sincronizó con `db push` y con SQL suelto en `prisma/sql/`, y eso dejó `CampaignBrief`, `Profile.email`, `Profile.phone` y `CampaignService.clientNotes` fuera del historial. Se recuperó en la migración `20260213000000_add_campaign_brief`. Si se vuelve a usar `db push` contra la base local, hay que generar la migración correspondiente antes de desplegar (ver el `migrate diff` de la sección de despliegue).
 
-**Las imágenes se guardan en el sistema de archivos.** `public/uploads/profiles/` está en el `.gitignore` y no viaja en el repositorio. En un despliegue con contenedores hay que montar un volumen en esa ruta, o las fotos se perderán en cada reconstrucción.
+**Los archivos subidos no viven en `public/`.** Van al directorio de `UPLOADS_DIR` (`./uploads` en local, un volumen en producción) y se sirven por `/api/uploads/[...ruta]`. El motivo es que con `output: "standalone"` Next no entrega los archivos añadidos a `public/` después del build: devuelven 404 aunque estén en el disco. Vercel Blob sigue disponible como alternativa para las fotos de perfil si se define `BLOB_READ_WRITE_TOKEN`.
 
 ---
 
 ## Despliegue
 
-El destino previsto es un **servidor privado en OVH-Cloud**, con un contenedor para la aplicación Next.js y otro para PostgreSQL.
+La aplicación se despliega en un **servidor OVH gestionado con Dokploy**, con dos servicios: uno de PostgreSQL 17 con pgvector y otro para la app. La URL pública es `https://influencer-manager.losdemarketing.com`.
 
-### Variables a cambiar respecto al entorno local
+El repositorio ya trae todo lo necesario para construir la imagen:
 
-| Variable | Local | Producción |
-|---|---|---|
-| `NEXTAUTH_URL` | `http://localhost:3000` | `https://tudominio.com` |
-| `DATABASE_URL` | `…@localhost:5432/influencer-manager` | `…@db:5432/influencer_prod` (el host es el nombre del servicio en `docker-compose`) |
-| `NEXTAUTH_SECRET` | uno cualquiera | **otro distinto**, generado aleatoriamente |
-| `AUTH_TRUST_HOST` | sin definir | `true` si hay proxy inverso delante |
-| `APIFY_API_TOKEN` | el mismo en ambos entornos | |
+| Archivo | Para qué sirve |
+|---|---|
+| `Dockerfile` | Imagen de producción en tres etapas (`deps` → `builder` → `runner`) sobre `node:22-alpine`. |
+| `docker-entrypoint.sh` | Aplica `prisma migrate deploy` y luego arranca el servidor. |
+| `.dockerignore` | Deja fuera del contexto los `.env`, `node_modules`, volcados SQL y notas. |
+| `src/app/api/health/route.ts` | Sonda de salud pública en `/api/health`. |
 
-El contenedor de PostgreSQL necesita además `POSTGRES_USER`, `POSTGRES_PASSWORD` y `POSTGRES_DB`, que deben ser coherentes con lo que indique `DATABASE_URL`.
+### Cómo está construida la imagen
 
-### Trabajo pendiente de infraestructura
+- `next.config.ts` usa `output: "standalone"`, así que la imagen final lleva `server.js` y solo las dependencias que Next rastreó, no `node_modules` entero.
+- **Durante `docker build` no hay base de datos.** El `DATABASE_URL` de esa etapa es ficticio y ninguna página puede consultar la base al prerenderizarse. Si se añade una página estática que lea de la base, el build falla ahí. La solución es la de `src/app/brief/page.tsx`: aislar la consulta en un componente dentro de `<Suspense>` y llamar a `await connection()` antes de consultar. Con `cacheComponents` activado, el `<Suspense>` por sí solo **no** basta, porque Next ejecuta las funciones `"use cache"` en el build para precargarlas.
+- Por la misma razón `export const dynamic = "force-dynamic"` está prohibido en este proyecto: `cacheComponents` lo rechaza y rompe el build. Se usa `connection()`.
+- El CLI de Prisma se instala en una etapa aparte y viaja en `/app/prisma-cli`. No se puede copiar `node_modules/prisma` suelto: el CLI depende de paquetes que viven fuera de esa carpeta y el contenedor muere con `Cannot find module 'effect'`.
+- El servidor escucha en `0.0.0.0:3000` (`HOSTNAME=0.0.0.0`). Si escuchara en `localhost`, Traefik no podría alcanzarlo.
 
-Cambiar las variables de entorno **no es suficiente** para desplegar. Falta:
+### Migraciones
 
-1. `Dockerfile`, `docker-compose.yml` y `.dockerignore`.
-2. Añadir `output: "standalone"` a [next.config.ts](next.config.ts), para que la imagen no tenga que incluir todo `node_modules`.
-3. Un volumen montado en `public/uploads` que preserve las fotos de perfil entre reconstrucciones.
-4. La migración inicial de Prisma, para desplegar con `prisma migrate deploy` en lugar de `db push`.
-5. Un mecanismo de despliegue: a diferencia de un PaaS, **un `git push` no despliega nada por sí solo en un servidor propio**. Hay que configurar un workflow de GitHub Actions que se conecte por SSH, o ejecutar manualmente `git pull && docker compose up -d --build` en el servidor.
+`docker-entrypoint.sh` ejecuta `prisma migrate deploy` en cada arranque, antes de levantar Next. Se puede desactivar con `RUN_MIGRATIONS=false`.
+
+Las extensiones `vector` y `pg_trgm` las crea la primera migración, pero solo funcionan si la imagen de PostgreSQL las incluye (`pgvector/pgvector`). Con una imagen de Postgres pelada, la migración falla.
+
+> **El historial de migraciones tiene que estar completo.** Durante un tiempo se trabajó con `db push` y con SQL suelto en `prisma/sql/`, y eso dejó `CampaignBrief`, `Profile.email`, `Profile.phone` y `CampaignService.clientNotes` fuera de las migraciones. Se corrigió en `20260213000000_add_campaign_brief`. Antes de desplegar un cambio de esquema conviene comprobar que no hay desviación:
+>
+> ```bash
+> npx prisma migrate diff \
+>   --from-migrations prisma/migrations \
+>   --to-schema-datamodel prisma/schema.prisma \
+>   --shadow-database-url "postgresql://postgres:devpass@localhost:5433/shadow_tmp" \
+>   --exit-code
+> ```
+>
+> Si devuelve SQL en vez de "No difference detected", falta una migración.
+
+### Variables de entorno en Dokploy
+
+Se cargan en el servicio de la app (**Environment**), nunca en un archivo dentro de la imagen. La lista completa y comentada está en `.env.example`.
+
+| Variable | Valor en producción |
+|---|---|
+| `NEXTAUTH_URL` | `https://influencer-manager.losdemarketing.com` |
+| `DATABASE_URL` | URL **interna** del servicio de Postgres en Dokploy |
+| `NEXTAUTH_SECRET` | uno nuevo, distinto del de local |
+| `AUTH_TRUST_HOST` | `true` — obligatorio detrás de Traefik |
+| `APIFY_API_TOKEN` | el mismo que en local |
+| `UPLOADS_DIR` | `/app/uploads` — ya fijado en el `Dockerfile`, solo hace falta el volumen |
+| `ANTHROPIC_API_KEY` | solo si se quiere el asistente de campañas |
+| `ENABLE_EMAILS`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | solo si se quieren correos |
+
+### Almacenamiento de archivos
+
+Los archivos subidos —fotos de perfil que descarga Apify y adjuntos del formulario `/brief`— se guardan **en disco**, en el directorio que indica `UPLOADS_DIR` (`/app/uploads` en el contenedor, `./uploads` en local), y se entregan por la ruta `/api/uploads/[...ruta]`.
+
+No se usa `public/` a propósito: con `output: "standalone"` **Next calcula el listado de `public/` durante el build**, así que un archivo escrito después responde 404 aunque esté en el disco. De ahí que haga falta una ruta propia que lo lea y lo devuelva.
+
+Esa ruta es pública, igual que lo era el almacenamiento en Blob: las fotos de perfil se muestran en `/approve/[token]`, que el cliente abre sin sesión. Lo que protege un adjunto del brief es que su carpeta es un UUID aleatorio. La ruta normaliza el destino antes de leer y rechaza con 400 cualquier intento de salirse del directorio.
+
+**En Dokploy hay que montar un volumen en `/app/uploads`**, o los archivos se pierden en cada redespliegue.
+
+Queda como alternativa Vercel Blob: si se define `BLOB_READ_WRITE_TOKEN`, las fotos de perfil van allí en lugar de al disco.
+
+### Configuración del servicio en Dokploy
+
+1. Tipo de build: **Dockerfile** (en la raíz del repositorio).
+2. Dominio: `influencer-manager.losdemarketing.com`, puerto interno **3000**, HTTPS con Let's Encrypt.
+3. Sonda de salud apuntando a `/api/health`. Devuelve 503 si la base no responde, para que no entre tráfico durante un redespliegue.
+4. Montar un volumen persistente en `/app/uploads`.
+
+### Primer despliegue: datos iniciales
+
+Las migraciones crean las tablas vacías. Falta cargar los datos de catálogo: usuario administrador, plataformas, tipos de servicio, categorías, géneros, ubicaciones y rangos de alcance.
+
+El seed (`prisma/seed.ts`) está escrito en TypeScript y el proyecto lo ejecuta con `ts-node`, que es dependencia de desarrollo y no llega a la imagen. Por eso la imagen incluye `tsx`. Una vez desplegado, desde la consola del contenedor en Dokploy:
+
+```bash
+SEED_DEMO=false node ./prisma-cli/node_modules/tsx/dist/cli.mjs prisma/seed.ts
+```
+
+**`SEED_DEMO=false` es importante:** sin esa variable el seed crea además perfiles, clientes y campañas inventados («María García», «Restaurante El Sabor»…), que son útiles en local pero no deben acabar en producción.
+
+Se ejecuta una sola vez. Es idempotente en su mayor parte (usa `upsert`), pero no hay razón para repetirlo.
+
+Justo después, **entrar y cambiar la contraseña del administrador sembrado** (`admin@example.com` / `admin123`).
 
 ### Flujo de trabajo con git
 
-La rama principal es `master`. El desarrollo se hace en ramas aparte y se integra en `master` cuando está probado en local.
+La rama principal es `main`, y es la que despliega Dokploy: lo que se integre ahí sale a producción. El desarrollo se hace en ramas aparte y se integra en `main` cuando está probado en local.
 
 ```bash
 git checkout -b mi-funcionalidad
