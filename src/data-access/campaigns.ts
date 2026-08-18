@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
+import { calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
@@ -114,7 +114,7 @@ export async function getCampaignsPaginated(params: {
     return {
       ...campaign,
       totalBase,
-      totalWithMarkup: calculateMarkupPrice(totalBase),
+      totalWithMarkup: calculateMarkupPrice(totalBase, campaign.markupPercentage),
       profileCount: campaign.profiles.length,
     };
   });
@@ -373,6 +373,10 @@ export async function createCampaign(data: {
       startDate: data.startDate ? new Date(data.startDate) : null,
       endDate: data.endDate ? new Date(data.endDate) : null,
       createdById: data.createdById,
+      // Congela el margen vigente. A partir de aqui esta campana ya no
+      // depende de la constante global: subirla el ano que viene no le
+      // cambiara los precios.
+      markupPercentage: MARKUP_PERCENTAGE,
     },
     include: {
       client: { select: { id: true, companyName: true } },
@@ -694,4 +698,36 @@ export async function getCampaignsForClientPortal(clientId: string) {
     budget: campaign.budget.toString(),
     totalProfiles: campaign._count.profiles,
   }));
+}
+
+/**
+ * Cambia el margen de UNA campana.
+ *
+ * Va aparte de updateCampaign a proposito: esa funcion solo deja editar
+ * campanas en DRAFT o PENDING, y aqui hace falta poder ajustar tambien
+ * las ya activas o cerradas para renegociaciones. Quien puede llamarla
+ * lo decide la ruta, que exige permiso de administracion.
+ *
+ * Cambiar el margen de una campana ya aprobada altera cifras que el
+ * cliente acepto: es una decision del negocio, no un descuido, y por
+ * eso esta reservada al ADMIN.
+ */
+export async function setCampaignMarkup(id: string, markup: number) {
+  if (!Number.isFinite(markup) || markup < 0 || markup > 5) {
+    throw new ValidationError(
+      "El margen debe estar entre 0 y 5 (0% y 500%)"
+    );
+  }
+
+  const existing = await prisma.campaign.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) throw new NotFoundError("Campaña no encontrada");
+
+  return prisma.campaign.update({
+    where: { id },
+    data: { markupPercentage: markup },
+    select: { id: true, markupPercentage: true },
+  });
 }

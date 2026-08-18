@@ -11,6 +11,12 @@ interface ServiceItemProps {
   quantity: number;
   basePrice: number;
   currency: string;
+  /**
+   * Margen congelado de la campana. Se propaga desde el portal en vez
+   * de leer la constante global: una campana antigua debe seguir
+   * mostrando el margen con el que se aprobo.
+   */
+  markup: number;
   isApproved: boolean;
   clientNotes?: string;
   onToggle: (id: string, isApproved: boolean) => void;
@@ -19,6 +25,7 @@ interface ServiceItemProps {
 }
 
 export function ServiceItem({
+  markup,
   id,
   serviceName,
   quantity,
@@ -30,7 +37,7 @@ export function ServiceItem({
   onNotesChange,
   disabled = false,
 }: ServiceItemProps) {
-  const markupPrice = calculateMarkupPrice(basePrice);
+  const markupPrice = calculateMarkupPrice(basePrice, markup);
   const total = markupPrice * quantity;
 
   return (

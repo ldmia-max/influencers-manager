@@ -99,6 +99,7 @@ export default async function EditCampaignPage({ params }: PageProps) {
         existingProfileIds={existingProfileIds}
         existingConfig={existingConfig}
         currentStatus={campaign.status}
+        markup={campaign.markupPercentage}
       />
     </div>
   );

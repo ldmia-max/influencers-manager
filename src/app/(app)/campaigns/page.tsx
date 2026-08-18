@@ -151,7 +151,10 @@ export default async function CampaignsPage({
       });
     });
 
-    const totalWithMarkup = calculateMarkupPrice(totalBase);
+    const totalWithMarkup = calculateMarkupPrice(
+      totalBase,
+      campaign.markupPercentage
+    );
 
     return {
       ...campaign,

@@ -66,3 +66,13 @@ export const removeCampaignProfilesSchema = z.object({
 });
 
 export type RemoveCampaignProfilesPayload = z.infer<typeof removeCampaignProfilesSchema>;
+
+export const setMarkupSchema = z.object({
+  // Se recibe en tanto por uno (0.4 = 40%), igual que se guarda.
+  markupPercentage: z
+    .number()
+    .min(0, "El margen no puede ser negativo")
+    .max(5, "El margen no puede superar el 500%"),
+});
+
+export type SetMarkupPayload = z.infer<typeof setMarkupSchema>;

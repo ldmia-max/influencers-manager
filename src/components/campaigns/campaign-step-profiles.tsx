@@ -51,6 +51,7 @@ function getProfileAvatar(profile: ProfileWithServices) {
 export function CampaignStepProfiles() {
   const { profiles, filters } = useCampaignWizard();
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
+  const markup = useCampaignWizardStore((s) => s.markup);
   const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
   const showFilters = useCampaignWizardStore((s) => s.showFilters);
   const setShowFilters = useCampaignWizardStore((s) => s.setShowFilters);
@@ -520,7 +521,7 @@ export function CampaignStepProfiles() {
                             {platform.selected && (
                               <div className="ml-6 space-y-1">
                                 {platform.services.map((service) => {
-                                  const price = calculateMarkupPrice(service.basePrice);
+                                  const price = calculateMarkupPrice(service.basePrice, markup);
                                   return (
                                     <div
                                       key={service.profileServiceId}

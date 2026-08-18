@@ -45,6 +45,7 @@ export function CampaignEditor({
   existingProfileIds = [],
   existingConfig = [],
   currentStatus: currentStatusProp,
+  markup,
   onSaveSuccess,
 }: CampaignEditorProps) {
   const router = useRouter();
@@ -55,6 +56,7 @@ export function CampaignEditor({
   // -------------------------------------------------------------------------
   const campaignId = useCampaignWizardStore((s) => s.campaignId);
   const setCampaignId = useCampaignWizardStore((s) => s.setCampaignId);
+  const setMarkup = useCampaignWizardStore((s) => s.setMarkup);
   const formData = useCampaignWizardStore((s) => s.formData);
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
@@ -101,6 +103,12 @@ export function CampaignEditor({
       showFilters: false,
     });
   }
+
+  // Al editar una campana existente, el asistente debe calcular con SU
+  // margen congelado y no con el global.
+  useEffect(() => {
+    if (markup !== undefined) setMarkup(markup);
+  }, [markup, setMarkup]);
 
   useEffect(() => {
     const mySessionId = sessionId.current;

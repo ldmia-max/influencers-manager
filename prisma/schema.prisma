@@ -337,6 +337,20 @@ model Campaign {
   status           CampaignStatus @default(DRAFT)
   budget           Decimal        @db.Decimal(12, 2)
   currency         String         @default("COP")
+
+  /// Margen aplicado a los precios base de ESTA campana, congelado al
+  /// crearla con el valor global vigente (MARKUP_PERCENTAGE).
+  ///
+  /// Existe para que subir el margen no reescriba el pasado: antes se
+  /// calculaba siempre con la constante, asi que al pasar del 20% al
+  /// 40% cambiaron de precio hasta las campanas que el cliente ya habia
+  /// aprobado. Ahora cada una conserva el suyo y el valor global solo
+  /// rige para las nuevas.
+  ///
+  /// Es Float y no Decimal a proposito: es una tasa, no un importe, y
+  /// el calculo ya se hacia en coma flotante, asi que no anade
+  /// imprecision y evita serializar un Decimal mas hacia el cliente.
+  markupPercentage Float          @default(0.4)
   startDate        DateTime?
   endDate          DateTime?
   activationReason String?        // Motivo opcional al activar la campaña

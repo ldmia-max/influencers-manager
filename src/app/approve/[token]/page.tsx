@@ -32,6 +32,8 @@ interface CampaignData {
     description?: string;
     budget: string;
     currency: string;
+    /** Margen congelado de esta campana; no usar la constante global. */
+    markupPercentage: number;
     client: {
       companyName: string;
     };
@@ -210,7 +212,10 @@ export default function ApprovePage() {
     data.campaign.profiles.forEach((profile) => {
       profile.platforms.forEach((platform) => {
         platform.services.forEach((service) => {
-          const markupPrice = calculateMarkupPrice(Number(service.basePrice));
+          const markupPrice = calculateMarkupPrice(
+            Number(service.basePrice),
+            data.campaign.markupPercentage
+          );
           const total = markupPrice * service.quantity;
           original += total;
 
@@ -714,6 +719,7 @@ export default function ApprovePage() {
               return (
                 <ProfileCard
                   key={profile.id}
+                  markup={data.campaign.markupPercentage}
                   id={profile.id}
                   profileName={profile.profile.name}
                   profileType={profile.profile.type}

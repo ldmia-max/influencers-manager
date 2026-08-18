@@ -1,5 +1,13 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
+/**
+ * Margen POR DEFECTO para las campanas nuevas.
+ *
+ * Ya no es el margen de todas: cada campana congela el suyo en
+ * Campaign.markupPercentage al crearse. Cambiar este valor solo afecta
+ * a las que se creen a partir de entonces, que es lo que permite
+ * actualizarlo cada ano sin repreciar lo ya negociado.
+ */
 export const MARKUP_PERCENTAGE = 0.4; // 40%
 
 export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
@@ -55,19 +63,25 @@ export const USER_VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 /**
- * Aplica el margen de MARKUP_PERCENTAGE al precio base.
+ * Aplica un margen al precio base.
  *
- * Es el UNICO sitio donde debe aplicarse el margen. Hubo tres lugares
- * que lo multiplicaban por 1.2 a mano y quedaron desfasados al subirlo
- * al 40%: el detalle de campana por API, el listado y las consultas de
- * data-access mostraban totales distintos entre si.
+ * Es el UNICO sitio donde debe aplicarse. Hubo tres lugares que lo
+ * multiplicaban por 1.2 a mano y quedaron desfasados al subirlo al 40%.
+ *
+ * SIEMPRE que exista una campana hay que pasarle su
+ * campaign.markupPercentage. Omitir el argumento usa el margen por
+ * defecto, y eso solo es correcto ANTES de que exista la campana: el
+ * carrito y el asistente, que trabajan sobre precios sueltos.
  *
  * Aplicarlo sobre un total es equivalente a aplicarlo servicio a
  * servicio y sumar, asi que sirve para ambos usos.
  */
-export function calculateMarkupPrice(basePrice: number | Decimal): number {
+export function calculateMarkupPrice(
+  basePrice: number | Decimal,
+  markup: number = MARKUP_PERCENTAGE
+): number {
   const price = typeof basePrice === "number" ? basePrice : Number(basePrice);
-  return price * (1 + MARKUP_PERCENTAGE);
+  return price * (1 + markup);
 }
 
 /**
@@ -75,14 +89,15 @@ export function calculateMarkupPrice(basePrice: number | Decimal): number {
  */
 export function calculateServiceTotal(
   basePrice: number | Decimal,
-  quantity: number
+  quantity: number,
+  markup: number = MARKUP_PERCENTAGE
 ): {
   baseTotal: number;
   markupTotal: number;
 } {
   const price = typeof basePrice === "number" ? basePrice : Number(basePrice);
   const baseTotal = price * quantity;
-  const markupTotal = calculateMarkupPrice(price) * quantity;
+  const markupTotal = calculateMarkupPrice(price, markup) * quantity;
   return { baseTotal, markupTotal };
 }
 

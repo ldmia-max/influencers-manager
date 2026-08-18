@@ -271,5 +271,11 @@ export interface CampaignEditorProps {
   existingProfileIds?: string[];
   existingConfig?: ProfileConfig[];
   currentStatus?: CampaignStatus;
+  /**
+   * Margen congelado de la campana que se edita. Se omite al crear una
+   * nueva, que usa el global por defecto. Sin esto, editar una campana
+   * antigua mostraria precios distintos a los que aprobo el cliente.
+   */
+  markup?: number;
   onSaveSuccess?: () => void;
 }

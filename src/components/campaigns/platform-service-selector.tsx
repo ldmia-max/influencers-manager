@@ -12,6 +12,7 @@ import { Instagram, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { formatNumber, calculateReach, getReachPercentage } from "@/lib/format";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
 import { calculateMarkupPrice, calculateServiceTotal } from "@/lib/campaign-utils";
+import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
 import type {
   ProfileWithServices,
   ProfileConfig,
@@ -36,6 +37,8 @@ export function PlatformServiceSelector({
   onRemoveProfile,
 }: PlatformServiceSelectorProps) {
   const { data: reachRanges = [] } = useReachRanges();
+  // Margen de la campana que se esta editando (o el global si es nueva).
+  const markup = useCampaignWizardStore((st) => st.markup);
   const [expandedProfiles, setExpandedProfiles] = useState<string[]>([]);
 
   // Inicializar configuración cuando cambian los perfiles seleccionados
@@ -218,7 +221,7 @@ export function PlatformServiceSelector({
         plat.services.forEach((s) => {
           if (s.quantity > 0) {
             const { baseTotal: sBase, markupTotal: sMarkup } =
-              calculateServiceTotal(s.basePrice, s.quantity);
+              calculateServiceTotal(s.basePrice, s.quantity, markup);
             baseTotal += sBase;
             markupTotal += sMarkup;
           }
@@ -339,12 +342,14 @@ export function PlatformServiceSelector({
                         <div className="grid gap-3">
                           {platform.services.map((service) => {
                             const markupPrice = calculateMarkupPrice(
-                              service.basePrice
+                              service.basePrice,
+                              markup
                             );
                             const { markupTotal: sMarkup } =
                               calculateServiceTotal(
                                 service.basePrice,
-                                service.quantity
+                                service.quantity,
+                                markup
                               );
 
                             return (

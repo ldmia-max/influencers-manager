@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
+import { calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 import type { CampaignData, ProfileConfig, WizardStep } from "@/models/campaign";
 
 // =============================================================================
@@ -9,6 +9,13 @@ import type { CampaignData, ProfileConfig, WizardStep } from "@/models/campaign"
 interface CampaignWizardStore {
   // Campaign identity
   campaignId: string | undefined;
+  /**
+   * Margen aplicado en el asistente. Al editar una campana existente es
+   * el suyo, congelado; al crear una nueva, el global por defecto. Sin
+   * esto, editar una campana antigua mostraria precios distintos a los
+   * que el cliente aprobo.
+   */
+  markup: number;
 
   // Form slice
   formData: CampaignData;
@@ -35,6 +42,7 @@ interface CampaignWizardStore {
 
   // Form actions
   setCampaignId: (id: string) => void;
+  setMarkup: (markup: number) => void;
   setFormData: (data: CampaignData) => void;
   setClientPopoverOpen: (open: boolean) => void;
   setContactPopoverOpen: (open: boolean) => void;
@@ -90,6 +98,8 @@ const defaultState = {
   success: "",
   currentStep: 1 as WizardStep,
   showFilters: true,
+  // Se sobrescribe al editar una campana existente con el suyo.
+  markup: MARKUP_PERCENTAGE,
 };
 
 // =============================================================================
@@ -109,7 +119,7 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
         if (p.selected) {
           p.services.forEach((s) => {
             if (s.quantity > 0) {
-              total += calculateMarkupPrice(s.basePrice) * s.quantity;
+              total += calculateMarkupPrice(s.basePrice, get().markup) * s.quantity;
             }
           });
         }
@@ -128,6 +138,7 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
   },
 
   // Form actions
+  setMarkup: (markup) => set({ markup }),
   setCampaignId: (id) => set({ campaignId: id }),
   setFormData: (data) => set({ formData: data }),
   setClientPopoverOpen: (open) => set({ clientPopoverOpen: open }),

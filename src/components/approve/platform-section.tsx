@@ -20,6 +20,12 @@ export interface ServiceData {
 }
 
 interface PlatformSectionProps {
+  /**
+   * Margen congelado de la campana. Se propaga desde el portal en vez
+   * de leer la constante global: una campana antigua debe seguir
+   * mostrando el margen con el que se aprobo.
+   */
+  markup: number;
   id: string;
   platformName: string;
   platformIcon?: string;
@@ -42,6 +48,7 @@ function getProfileUrl(platformName: string, username: string): string | null {
 }
 
 export function PlatformSection({
+  markup,
   id,
   platformName,
   username,
@@ -58,7 +65,7 @@ export function PlatformSection({
 
   const approvedServices = services.filter((s) => s.isApproved);
   const totalApproved = approvedServices.reduce((sum, s) => {
-    return sum + calculateMarkupPrice(s.basePrice) * s.quantity;
+    return sum + calculateMarkupPrice(s.basePrice, markup) * s.quantity;
   }, 0);
   const reach = calculateReach(followers ?? 0, reachRanges);
   const reachPercent = getReachPercentage(followers ?? 0, reachRanges);
@@ -144,6 +151,7 @@ export function PlatformSection({
         <div className="p-4 pt-2 space-y-1">
           {services.map((service) => (
             <ServiceItem
+              markup={markup}
               key={service.id}
               id={service.id}
               serviceName={service.serviceName}

@@ -89,7 +89,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     cp.platforms.forEach((cpp) => {
       cpp.services.forEach((cs) => {
         const basePrice = Number(cs.basePrice);
-        totalCampaign += calculateMarkupPrice(basePrice) * cs.quantity;
+        totalCampaign +=
+          calculateMarkupPrice(basePrice, campaign.markupPercentage) * cs.quantity;
         // Contar formatos
         const fname = cs.profileService.serviceType.displayName;
         formatCounts.set(fname, (formatCounts.get(fname) || 0) + cs.quantity);
@@ -293,7 +294,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                               <TableBody>
                                 {cpp.services.map((cs) => {
                                   const basePrice = Number(cs.basePrice);
-                                  const price = calculateMarkupPrice(basePrice);
+                                  const price = calculateMarkupPrice(
+                                    basePrice,
+                                    campaign.markupPercentage
+                                  );
                                   const subtotal = price * cs.quantity;
 
                                   return (

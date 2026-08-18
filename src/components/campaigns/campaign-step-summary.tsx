@@ -49,6 +49,7 @@ function getProfileAvatar(profile: ProfileWithServices) {
 export function CampaignStepSummary() {
   const { onSave, onActivateDirectly, profiles, currentStatus } = useCampaignWizard();
   const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
+  const markup = useCampaignWizardStore((s) => s.markup);
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const loading = useCampaignWizardStore((s) => s.loading);
   const budget = useCampaignWizardStore((s) => s.getBudget());
@@ -72,7 +73,7 @@ export function CampaignStepSummary() {
         if (p.selected) {
           for (const s of p.services) {
             if (s.quantity > 0) {
-              total += calculateMarkupPrice(s.basePrice) * s.quantity;
+              total += calculateMarkupPrice(s.basePrice, markup) * s.quantity;
             }
           }
         }
@@ -80,7 +81,7 @@ export function CampaignStepSummary() {
       totals.set(config.profileId, total);
     }
     return totals;
-  }, [configuredProfiles]);
+  }, [configuredProfiles, markup]);
 
   const handleActivate = () => {
     onActivateDirectly(activationReason);
@@ -149,7 +150,7 @@ export function CampaignStepSummary() {
                           const platformTotal = platform.services
                             .filter((s) => s.quantity > 0)
                             .reduce(
-                              (acc, s) => acc + calculateMarkupPrice(s.basePrice) * s.quantity,
+                              (acc, s) => acc + calculateMarkupPrice(s.basePrice, markup) * s.quantity,
                               0
                             );
 
@@ -184,7 +185,7 @@ export function CampaignStepSummary() {
                                 {platform.services
                                   .filter((s) => s.quantity > 0)
                                   .map((service) => {
-                                    const servicePrice = calculateMarkupPrice(service.basePrice);
+                                    const servicePrice = calculateMarkupPrice(service.basePrice, markup);
                                     const serviceTotal = servicePrice * service.quantity;
                                     return (
                                       <div

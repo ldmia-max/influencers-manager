@@ -35,7 +35,10 @@ export async function GET(req: Request, { params }: RouteParams) {
       });
     });
 
-    const totalWithMarkup = calculateMarkupPrice(totalBase);
+    const totalWithMarkup = calculateMarkupPrice(
+      totalBase,
+      campaign.markupPercentage
+    );
 
     return NextResponse.json({
       ...campaign,
