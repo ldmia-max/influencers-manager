@@ -3,10 +3,8 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import {
-  CREDENCIALES_INVALIDAS,
   TRAS_LOGIN_CORRECTO,
   estaBloqueado,
-  mensajeBloqueo,
   trasFalloDeLogin,
 } from "./login-throttle";
 import { authConfig } from "./auth.config";
