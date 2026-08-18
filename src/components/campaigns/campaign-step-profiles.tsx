@@ -25,6 +25,7 @@ import type { ProfileWithServices } from "@/models/campaign";
 import { PROFILE_TYPES } from "@/models/campaign";
 import { useCampaignWizard } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
+import { PriceInput } from "@/components/ui/price-input";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
 import { ClientPagination } from "@/components/ui/client-pagination";
 
@@ -52,6 +53,9 @@ export function CampaignStepProfiles() {
   const { profiles, filters } = useCampaignWizard();
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const markup = useCampaignWizardStore((s) => s.markup);
+  const setComboActivo = useCampaignWizardStore((s) => s.setComboActivo);
+  const setComboPrecio = useCampaignWizardStore((s) => s.setComboPrecio);
+  const setComboDescripcion = useCampaignWizardStore((s) => s.setComboDescripcion);
   const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
   const showFilters = useCampaignWizardStore((s) => s.showFilters);
   const setShowFilters = useCampaignWizardStore((s) => s.setShowFilters);
@@ -524,6 +528,71 @@ export function CampaignStepProfiles() {
                                   const price = calculateMarkupPrice(service.basePrice, markup);
                                   const clave =
                                     service.profileServiceId ?? service.serviceTypeId;
+                                  // El combo no lleva unidades: lleva precio
+                                  // pactado y una descripcion. Va en dos lineas
+                                  // para que las cifras no queden recortadas.
+                                  if (service.esCombo) {
+                                    const activo = service.quantity > 0;
+                                    return (
+                                      <div
+                                        key={clave}
+                                        className="rounded-md border border-dashed border-[#E1145F]/40 bg-[#E1145F]/[0.03] p-2"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Checkbox
+                                            checked={activo}
+                                            onCheckedChange={() =>
+                                              setComboActivo(
+                                                profile.id,
+                                                platform.socialAccountId,
+                                                !activo
+                                              )
+                                            }
+                                            className="h-4 w-4"
+                                          />
+                                          <span className="flex-1 text-xs font-medium">
+                                            Combo
+                                          </span>
+                                          {activo && (
+                                            <span className="text-xs text-muted-foreground">
+                                              ${formatNumber(price.toFixed(0))}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {activo && (
+                                          <div className="mt-2 flex flex-col gap-2 pl-6 sm:flex-row">
+                                            <Input
+                                              placeholder="Qué incluye (ej. Reel + 3 Stories)"
+                                              value={service.comboDescripcion ?? ""}
+                                              onChange={(e) =>
+                                                setComboDescripcion(
+                                                  profile.id,
+                                                  platform.socialAccountId,
+                                                  e.target.value
+                                                )
+                                              }
+                                              className="h-8 flex-1 text-xs"
+                                              maxLength={200}
+                                            />
+                                            <PriceInput
+                                              value={String(service.basePrice || "")}
+                                              onChange={(v) =>
+                                                setComboPrecio(
+                                                  profile.id,
+                                                  platform.socialAccountId,
+                                                  Number(v) || 0
+                                                )
+                                              }
+                                              placeholder="Precio pactado"
+                                              className="h-8 w-full text-xs sm:w-44"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
                                   return (
                                     <div
                                       key={clave}

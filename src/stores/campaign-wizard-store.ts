@@ -231,8 +231,10 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
   },
 
   /**
-   * El combo se apaga poniendo su precio a 0: no hay unidades que
-   * alternar, y el precio es justo lo que decide si entra en la campana.
+   * El estado de activacion del combo es su cantidad, igual que en los
+   * demas formatos. Derivarlo del precio no funcionaba: activar no
+   * cambia el precio, asi que la casilla no llegaba a marcarse nunca y
+   * los campos de precio y descripcion no aparecian.
    */
   setComboActivo: (profileId, socialAccountId, activo) =>
     set((state) => ({
@@ -247,7 +249,14 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
                   : {
                       ...p,
                       services: p.services.map((s) =>
-                        s.esCombo ? { ...s, basePrice: activo ? s.basePrice : 0 } : s
+                        s.esCombo
+                          ? {
+                              ...s,
+                              quantity: activo ? 1 : 0,
+                              basePrice: activo ? s.basePrice : 0,
+                              comboDescripcion: activo ? s.comboDescripcion : "",
+                            }
+                          : s
                       ),
                     }
               ),

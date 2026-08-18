@@ -64,7 +64,8 @@ function construirCombo(
       profileServiceId: null,
       serviceTypeId: COMBO_ID,
       serviceName: "Combo",
-      quantity: 1,
+      // Nace apagado; solo viene activo si la campana ya tenia combo.
+      quantity: previo && previo.basePrice > 0 ? 1 : 0,
       basePrice: previo?.basePrice ?? 0,
       esCombo: true,
       comboDescripcion: previo?.comboDescripcion ?? "",

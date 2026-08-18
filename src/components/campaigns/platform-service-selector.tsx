@@ -358,9 +358,7 @@ export function PlatformServiceSelector({
 
                             const clave =
                               service.profileServiceId ?? service.serviceTypeId;
-                            const activo = service.esCombo
-                              ? service.basePrice > 0
-                              : service.quantity > 0;
+                            const activo = service.quantity > 0;
 
                             return (
                               <div
@@ -408,10 +406,12 @@ export function PlatformServiceSelector({
                                     </Label>
                                   )}
                                 </div>
-                                <div className="col-span-2">
-                                  {service.esCombo ? (
-                                    // Un combo es un acuerdo cerrado: no lleva
-                                    // unidades, lleva el precio pactado.
+                                {service.esCombo ? (
+                                  // El combo no lleva unidades, y su precio
+                                  // unitario es el mismo importe pactado, asi
+                                  // que ocupa las dos columnas: en una sola no
+                                  // caben las cifras y quedaban cortadas.
+                                  <div className="col-span-4">
                                     <PriceInput
                                       value={String(service.basePrice || "")}
                                       onChange={(v) =>
@@ -421,30 +421,34 @@ export function PlatformServiceSelector({
                                           Number(v) || 0
                                         )
                                       }
-                                      placeholder="Precio"
-                                      className="w-28"
+                                      placeholder="Precio pactado"
+                                      className="w-full"
                                     />
-                                  ) : (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      value={service.quantity}
-                                      onChange={(e) =>
-                                        updateServiceQuantity(
-                                          profileConfig.profileId,
-                                          platform.socialAccountId,
-                                          clave,
-                                          parseInt(e.target.value, 10) || 0
-                                        )
-                                      }
-                                      className="w-20"
-                                      disabled={service.quantity === 0}
-                                    />
-                                  )}
-                                </div>
-                                <div className="col-span-2 text-sm font-medium">
-                                  ${formatNumber(markupPrice.toFixed(0))}
-                                </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="col-span-2">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={service.quantity}
+                                        onChange={(e) =>
+                                          updateServiceQuantity(
+                                            profileConfig.profileId,
+                                            platform.socialAccountId,
+                                            clave,
+                                            parseInt(e.target.value, 10) || 0
+                                          )
+                                        }
+                                        className="w-20"
+                                        disabled={service.quantity === 0}
+                                      />
+                                    </div>
+                                    <div className="col-span-2 text-sm font-medium">
+                                      ${formatNumber(markupPrice.toFixed(0))}
+                                    </div>
+                                  </>
+                                )}
                                 <div className="col-span-3 text-sm font-medium text-right">
                                   {service.quantity > 0 && (
                                     <span>
