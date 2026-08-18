@@ -65,8 +65,8 @@ export default function LoginPage() {
             <Image
               src="/img/logo.png"
               alt="Los de Marketing"
-              width={200}
-              height={55}
+              width={493}
+              height={159}
               className="h-14 w-auto"
               priority
             />

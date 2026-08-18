@@ -8,8 +8,8 @@ export function ApprovalHeader() {
           <Image
             src="/img/logo.png"
             alt="Los de Marketing"
-            width={180}
-            height={50}
+            width={493}
+            height={159}
             className="h-12 w-auto"
             priority
           />

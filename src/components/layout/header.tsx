@@ -112,8 +112,8 @@ export function Header({ user }: HeaderProps) {
             <Image
               src="/img/logo.png"
               alt="Los de Marketing"
-              width={150}
-              height={40}
+              width={493}
+              height={159}
               className="h-10 w-auto"
               priority
             />
