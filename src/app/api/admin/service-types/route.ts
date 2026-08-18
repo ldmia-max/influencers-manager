@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { getAllServiceTypesWithCounts, createServiceType } from "@/data-access/service-types";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -7,11 +7,8 @@ import { createServiceTypeSchema } from "@/lib/schemas/service-type";
 
 export async function GET() {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const serviceTypes = await getAllServiceTypesWithCounts();
     return NextResponse.json(serviceTypes);
@@ -26,11 +23,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createServiceTypeSchema);
     if (body instanceof NextResponse) return body;

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getClientsPaginated, createClient } from "@/data-access/clients";
 import { ValidationError } from "@/data-access/errors";
+import { exigirPermiso } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { createClientSchema } from "@/lib/schemas/client";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("clientes", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || undefined;
@@ -31,11 +28,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("clientes", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createClientSchema);
     if (body instanceof NextResponse) return body;
@@ -45,7 +39,7 @@ export async function POST(req: Request) {
       nit: body.nit,
       email: body.email,
       contacts: body.contacts,
-      createdById: session.user.id,
+      createdById: sesion.userId,
     });
     return NextResponse.json(client, { status: 201 });
   } catch (error) {

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getCategoryById, updateCategory, deleteCategory } from "@/data-access/categories";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
+import { exigirPermiso } from "@/lib/api-guard";
 import { updateCategorySchema } from "@/lib/schemas/category";
 
 export async function GET(
@@ -10,6 +10,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sesion = await exigirPermiso("categorias", "leer");
+    if (sesion instanceof NextResponse) return sesion;
+
     const { id } = await params;
     const category = await getCategoryById(id);
     return NextResponse.json(category);
@@ -30,18 +33,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden editar categorías" },
-        { status: 403 }
-      );
-    }
+    const sesion = await exigirPermiso("categorias", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     const body = await parseBody(req, updateCategorySchema);
@@ -68,18 +61,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden eliminar categorías" },
-        { status: 403 }
-      );
-    }
+    const sesion = await exigirPermiso("categorias", "borrar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     await deleteCategory(id);

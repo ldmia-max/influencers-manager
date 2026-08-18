@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getActiveCategories, createCategory } from "@/data-access/categories";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
+import { exigirPermiso } from "@/lib/api-guard";
 import { createCategorySchema } from "@/lib/schemas/category";
 
 export async function GET() {
   try {
+    const sesion = await exigirPermiso("categorias", "leer");
+    if (sesion instanceof NextResponse) return sesion;
+
     const categories = await getActiveCategories();
     return NextResponse.json(categories);
   } catch (error) {
@@ -20,18 +23,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("categorias", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createCategorySchema);
     if (body instanceof NextResponse) return body;
     const category = await createCategory({
       name: body.name,
       description: body.description,
-      createdById: session.user.id,
+      createdById: sesion.userId,
     });
     return NextResponse.json(category, { status: 201 });
   } catch (error) {

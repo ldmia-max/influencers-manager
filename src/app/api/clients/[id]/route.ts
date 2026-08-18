@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getClientById, updateClient, deleteClient } from "@/data-access/clients";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
+import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { updateClientSchema } from "@/lib/schemas/client";
 
 export async function GET(
@@ -10,11 +10,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("clientes", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     const client = await getClientById(id);
@@ -36,13 +33,18 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("clientes", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
+
+    // Los clientes los modifica quien los creo (o un ADMIN). La LECTURA
+    // sigue siendo global: crear una campana obliga a elegir cliente y
+    // filtrarla dejaria fuera las cuentas de los companeros.
+    const actual = await getClientById(id);
+    const sinPermiso = exigirPropiedad(sesion, "clientes", actual.createdById);
+    if (sinPermiso) return sinPermiso;
+
     const body = await parseBody(req, updateClientSchema);
     if (body instanceof NextResponse) return body;
 
@@ -73,18 +75,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden eliminar clientes" },
-        { status: 403 }
-      );
-    }
+    const sesion = await exigirPermiso("clientes", "borrar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     await deleteClient(id);

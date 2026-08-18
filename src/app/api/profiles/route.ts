@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { auth } from "@/lib/auth";
 import { syncSocialAccountMetrics } from "@/lib/apify";
 import {
   getProfilesPaginated,
@@ -11,15 +10,13 @@ import {
 } from "@/data-access/profiles";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
+import { exigirPermiso } from "@/lib/api-guard";
 import { profileSchema } from "@/lib/schemas/profile";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("perfiles", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { searchParams } = new URL(req.url);
     const pageParam = searchParams.get("page");
@@ -29,10 +26,10 @@ export async function GET(req: Request) {
     const page = parseInt(pageParam || "1");
     const pageSize = parseInt(pageSizeParam || "50");
 
-    const where =
-      session.user.role === "ADMIN"
-        ? undefined
-        : { createdById: session.user.id };
+    // Catalogo compartido: todos los usuarios ven todos los creadores.
+    // Antes se filtraba por createdById aqui mientras la pagina
+    // /profiles mostraba todos, asi que API y pantalla discrepaban.
+    const where = undefined;
 
     if (usePagination) {
       const result = await getProfilesPaginated(where, page, pageSize);
@@ -52,18 +49,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("perfiles", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, profileSchema);
     if (body instanceof NextResponse) return body;
 
     const profile = await createProfile({
       ...body,
-      createdById: session.user.id,
+      createdById: sesion.userId,
     });
 
     // Sincronizar datos de Apify para cada cuenta social

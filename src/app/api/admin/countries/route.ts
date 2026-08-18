@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { getAllCountriesWithCounts, createCountry } from "@/data-access/locations";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -7,11 +7,8 @@ import { createCountrySchema } from "@/lib/schemas/location";
 
 export async function GET() {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const countries = await getAllCountriesWithCounts();
     return NextResponse.json(countries);
@@ -26,11 +23,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createCountrySchema);
     if (body instanceof NextResponse) return body;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { convertirBriefACampana, cambiarEstadoBrief } from "@/services/brief-conversion";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { exigirPermiso } from "@/lib/api-guard";
 
 /**
  * Rutas PRIVADAS de gestion de briefs. Requieren sesion.
@@ -16,14 +16,13 @@ interface RouteParams {
 
 // POST: convertir el brief en campana
 export async function POST(req: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  // Convertir un brief en campana es, en la practica, crear una campana.
+  const sesion = await exigirPermiso("briefs", "crear");
+  if (sesion instanceof NextResponse) return sesion;
 
   try {
     const { id } = await params;
-    const resultado = await convertirBriefACampana(id, session.user.id);
+    const resultado = await convertirBriefACampana(id, sesion.userId);
 
     return NextResponse.json({
       message: "Campaña creada a partir del brief",
@@ -46,10 +45,8 @@ export async function POST(req: Request, { params }: RouteParams) {
 
 // PATCH: cambiar el estado del brief
 export async function PATCH(req: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const sesion = await exigirPermiso("briefs", "actualizar");
+  if (sesion instanceof NextResponse) return sesion;
 
   try {
     const { id } = await params;

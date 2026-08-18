@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { getAllUsersForAdmin, createUserAdmin } from "@/data-access/users";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -7,11 +7,8 @@ import { createUserSchema } from "@/lib/schemas/user";
 
 export async function GET() {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const users = await getAllUsersForAdmin();
     return NextResponse.json(users);
@@ -26,11 +23,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createUserSchema);
     if (body instanceof NextResponse) return body;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { regenerateApprovalToken, getCampaignById } from "@/data-access/campaigns";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { notifyTokenRegenerated } from "@/lib/emails/campaign-notifications";
 
 interface RouteParams {
@@ -10,20 +10,14 @@ interface RouteParams {
 
 export async function POST(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id: campaignId } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Check ownership
     const existing = await getCampaignById(campaignId);
-    if (!isAdmin && existing.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", existing.createdById);
+    if (sinPermiso) return sinPermiso;
 
     const result = await regenerateApprovalToken(campaignId);
 

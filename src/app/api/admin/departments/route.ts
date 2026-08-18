@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { getAllDepartmentsWithCountries, createDepartment } from "@/data-access/locations";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -7,11 +7,8 @@ import { createDepartmentSchema } from "@/lib/schemas/location";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { searchParams } = new URL(req.url);
     const countryId = searchParams.get("countryId") || undefined;
@@ -29,11 +26,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("administracion", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createDepartmentSchema);
     if (body instanceof NextResponse) return body;

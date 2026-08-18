@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getActiveGenders, createGender } from "@/data-access/genders";
 import { ValidationError } from "@/data-access/errors";
+import { exigirPermiso } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { createGenderSchema } from "@/lib/schemas/gender";
 
 export async function GET() {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("perfiles", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const genders = await getActiveGenders();
     return NextResponse.json(genders);
@@ -26,11 +23,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    // Los generos se crean desde el formulario de perfiles.
+    const sesion = await exigirPermiso("perfiles", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createGenderSchema);
     if (body instanceof NextResponse) return body;

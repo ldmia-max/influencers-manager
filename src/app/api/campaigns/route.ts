@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getCampaignsPaginated, createCampaign } from "@/data-access/campaigns";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { exigirPermiso } from "@/lib/api-guard";
 import { CampaignStatus } from "@prisma/client";
 import { parseBody } from "@/lib/validate-request";
 import { createCampaignSchema } from "@/lib/schemas/campaign";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || undefined;
@@ -22,8 +19,8 @@ export async function GET(req: Request) {
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
 
     const result = await getCampaignsPaginated({
-      userId: session.user.id,
-      isAdmin: session.user.role === "ADMIN",
+      userId: sesion.userId,
+      isAdmin: sesion.rol === "ADMIN",
       search,
       clientId,
       status,
@@ -43,18 +40,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await parseBody(req, createCampaignSchema);
     if (body instanceof NextResponse) return body;
 
     const campaign = await createCampaign({
       ...body,
-      createdById: session.user.id,
+      createdById: sesion.userId,
     });
 
     return NextResponse.json(campaign, { status: 201 });

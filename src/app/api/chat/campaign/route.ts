@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { sendMessageToAI, type ChatMessage } from "@/lib/ai";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
@@ -701,10 +701,9 @@ async function executeTool(
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    // El asistente crea campanas, asi que exige el permiso de crearlas.
+    const sesion = await exigirPermiso("campanas", "crear");
+    if (sesion instanceof NextResponse) return sesion;
 
     const body: ChatRequest = await request.json();
     const { messages, campaignState } = body;
@@ -738,8 +737,8 @@ ${campaignState.selectedProfiles.length > 0 ? `  - ${campaignState.selectedProfi
           toolUse.name,
           toolUse.input as Record<string, unknown>,
           updatedState,
-          session.user.id,
-          session.user.email
+          sesion.userId,
+          sesion.email
         );
 
         if (newState) {

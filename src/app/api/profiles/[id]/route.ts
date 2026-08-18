@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { auth } from "@/lib/auth";
 import { syncSocialAccountMetrics } from "@/lib/apify";
 import {
   getProfileById,
@@ -11,6 +10,7 @@ import {
 } from "@/data-access/profiles";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
+import { exigirPermiso } from "@/lib/api-guard";
 import { profileSchema } from "@/lib/schemas/profile";
 
 export async function GET(
@@ -18,13 +18,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("perfiles", "leer");
+    if (sesion instanceof NextResponse) return sesion;
+
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
     const profile = await getProfileById(id);
     return NextResponse.json(profile);
   } catch (error) {
@@ -44,13 +41,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("perfiles", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
+
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
     const body = await parseBody(req, profileSchema);
     if (body instanceof NextResponse) return body;
 
@@ -110,21 +104,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("perfiles", "borrar");
+    if (sesion instanceof NextResponse) return sesion;
+
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    // Solo administradores pueden eliminar perfiles
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden eliminar perfiles" },
-        { status: 403 }
-      );
-    }
-
     await deleteProfile(id);
     return NextResponse.json({ success: true });
   } catch (error) {

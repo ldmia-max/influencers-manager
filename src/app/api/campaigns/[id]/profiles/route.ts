@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getCampaignById } from "@/data-access/campaigns";
 import {
   getCampaignProfiles,
@@ -7,6 +6,7 @@ import {
   removeCampaignProfiles,
 } from "@/data-access/campaign-profiles";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { setCampaignProfilesSchema, removeCampaignProfilesSchema } from "@/lib/schemas/campaign";
 
@@ -16,20 +16,14 @@ interface RouteParams {
 
 export async function GET(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id: campaignId } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Verify access
     const campaign = await getCampaignById(campaignId);
-    if (!isAdmin && campaign.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
+    if (sinPermiso) return sinPermiso;
 
     const profiles = await getCampaignProfiles(campaignId);
 
@@ -48,20 +42,14 @@ export async function GET(req: Request, { params }: RouteParams) {
 
 export async function POST(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id: campaignId } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Verify access and status
     const campaign = await getCampaignById(campaignId);
-    if (!isAdmin && campaign.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
+    if (sinPermiso) return sinPermiso;
 
     if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
       return NextResponse.json(
@@ -92,20 +80,14 @@ export async function POST(req: Request, { params }: RouteParams) {
 
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id: campaignId } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Verify access and status
     const campaign = await getCampaignById(campaignId);
-    if (!isAdmin && campaign.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
+    if (sinPermiso) return sinPermiso;
 
     if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
       return NextResponse.json(

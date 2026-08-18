@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import {
   getCampaignById,
   updateCampaign,
   deleteCampaign,
 } from "@/data-access/campaigns";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { updateCampaignSchema } from "@/lib/schemas/campaign";
 
@@ -15,21 +15,14 @@ interface RouteParams {
 
 export async function GET(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "leer");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
     const campaign = await getCampaignById(id);
 
-    // Verificar acceso
-    if (!isAdmin && campaign.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+    const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
+    if (sinPermiso) return sinPermiso;
 
     // Calcular totales
     let totalBase = 0;
@@ -62,20 +55,14 @@ export async function GET(req: Request, { params }: RouteParams) {
 
 export async function PUT(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Check ownership before attempting update
     const existing = await getCampaignById(id);
-    if (!isAdmin && existing.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", existing.createdById);
+    if (sinPermiso) return sinPermiso;
 
     const body = await parseBody(req, updateCampaignSchema);
     if (body instanceof NextResponse) return body;
@@ -100,20 +87,14 @@ export async function PUT(req: Request, { params }: RouteParams) {
 
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const sesion = await exigirPermiso("campanas", "borrar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
-    const isAdmin = session.user.role === "ADMIN";
-
-    // Check ownership before delete
     const existing = await getCampaignById(id);
-    if (!isAdmin && existing.createdById !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+
+    const sinPermiso = exigirPropiedad(sesion, "campanas", existing.createdById);
+    if (sinPermiso) return sinPermiso;
 
     await deleteCampaign(id);
 

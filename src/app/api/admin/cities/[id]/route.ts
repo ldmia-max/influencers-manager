@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { patchCity, updateCity, deleteCity } from "@/data-access/locations";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -10,12 +10,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("administracion", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
     const { id } = await params;
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
 
     const body = await parseBody(req, patchCitySchema);
     if (body instanceof NextResponse) return body;
@@ -35,12 +32,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("administracion", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
     const { id } = await params;
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
 
     const body = await parseBody(req, createCitySchema);
     if (body instanceof NextResponse) return body;
@@ -63,12 +57,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const sesion = await exigirPermiso("administracion", "borrar");
+    if (sesion instanceof NextResponse) return sesion;
     const { id } = await params;
-
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
 
     await deleteCity(id);
     return NextResponse.json({ success: true });

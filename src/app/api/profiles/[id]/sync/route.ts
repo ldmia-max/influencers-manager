@@ -1,34 +1,25 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { auth } from "@/lib/auth";
 import { syncSocialAccountMetrics } from "@/lib/apify";
 import {
   getProfileWithSocialAccounts,
   updateSocialAccountMetrics,
 } from "@/data-access/profiles";
 import { NotFoundError } from "@/data-access/errors";
+import { exigirPermiso } from "@/lib/api-guard";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    // Sincronizar metricas es actualizar el perfil, y los perfiles son
+    // catalogo compartido: no se exige ser quien lo creo.
+    const sesion = await exigirPermiso("perfiles", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
+
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
     const profile = await getProfileWithSocialAccounts(id);
-
-    // Verificar acceso
-    if (
-      session.user.role !== "ADMIN" &&
-      profile.createdById !== session.user.id
-    ) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
 
     const results = [];
     const errors = [];

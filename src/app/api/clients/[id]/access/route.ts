@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { exigirPermiso } from "@/lib/api-guard";
 import { createOrUpdateClientAccess, deleteClientAccess } from "@/data-access/clients";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
@@ -10,18 +10,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden gestionar accesos de clientes" },
-        { status: 403 }
-      );
-    }
+    // Dar o quitar acceso al portal es administracion, no gestion de
+    // clientes: crea credenciales que ven datos de campanas.
+    const sesion = await exigirPermiso("administracion", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     const body = await parseBody(req, clientAccessSchema);
@@ -52,18 +44,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Solo administradores pueden gestionar accesos de clientes" },
-        { status: 403 }
-      );
-    }
+    const sesion = await exigirPermiso("administracion", "actualizar");
+    if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
     await deleteClientAccess(id);
