@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
 import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { updateClientSchema } from "@/lib/schemas/client";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 export async function GET(
   req: Request,
@@ -79,7 +80,22 @@ export async function DELETE(
     if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
+
+    const cliente = await getClientById(id);
     await deleteClient(id);
+
+    await auditar({
+      action: ACCIONES.clienteBorrado,
+      entity: "Client",
+      entityId: id,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Eliminó el cliente "${cliente.companyName}"`,
+      metadata: { empresa: cliente.companyName, email: cliente.email },
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof NotFoundError) {

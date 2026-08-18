@@ -5,6 +5,7 @@ import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { notifyCampaignSentToReview } from "@/lib/emails/campaign-notifications";
 import { parseBody } from "@/lib/validate-request";
 import { transitionStatusSchema } from "@/lib/schemas/campaign";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -24,7 +25,25 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const body = await parseBody(req, transitionStatusSchema);
     if (body instanceof NextResponse) return body;
 
+    const estadoAnterior = existing.status;
     const result = await transitionCampaignStatus(campaignId, body.status, body.reason);
+
+    await auditar({
+      action: ACCIONES.campanaEstado,
+      entity: "Campaign",
+      entityId: campaignId,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Cambió "${existing.name}" de ${estadoAnterior} a ${body.status}`,
+      metadata: {
+        de: estadoAnterior,
+        a: body.status,
+        motivo: body.reason ?? null,
+        destinatario: result.emailData?.contactEmail ?? null,
+      },
+      req,
+    });
 
     // Envio del correo al cliente al pasar a REVIEW.
     //

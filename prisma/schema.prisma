@@ -592,3 +592,48 @@ model CampaignBrief {
 
   @@index([status, createdAt])
 }
+
+// ============ AUDITORIA ============
+
+/// Quien realizo la accion. No es una relacion a User a proposito: el
+/// actor puede ser personal, un cliente del portal o un contacto que
+/// aprueba con token y no tiene cuenta. Ademas, una FK haria que borrar
+/// un usuario arrastrase su propio rastro, que es justo lo contrario de
+/// lo que persigue una auditoria.
+enum AuditActor {
+  USER      // personal con sesion de NextAuth
+  CLIENT    // ClientUser en el portal
+  APPROVAL  // contacto verificado por codigo en /approve
+  SYSTEM
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  /// Verbo en punto: "campaign.status_changed", "profile.deleted"...
+  action   String
+  /// Modelo afectado y su id, para poder reconstruir la historia de un
+  /// registro concreto aunque ese registro ya no exista.
+  entity   String
+  entityId String?
+
+  actorType  AuditActor
+  actorId    String?
+  actorEmail String?
+
+  /// Frase corta ya legible, para no depender de interpretar metadata.
+  summary  String?
+  /// Detalle libre: valores antes y despues, recuentos, motivos.
+  metadata Json?
+
+  /// Detras de Traefik llega en x-forwarded-for. Vacio en los eventos
+  /// de login del personal: NextAuth no da acceso a la peticion dentro
+  /// de authorize().
+  ip        String?
+  userAgent String?
+
+  @@index([entity, entityId, createdAt])
+  @@index([createdAt])
+  @@index([actorEmail, createdAt])
+}

@@ -9,6 +9,7 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { notifyApprovalResult } from "@/lib/emails/campaign-notifications";
 import { parseBody } from "@/lib/validate-request";
 import { submitApprovalBodySchema } from "@/lib/schemas/approval";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
@@ -47,6 +48,25 @@ export async function POST(req: Request, { params }: RouteParams) {
     const body = await parseBody(req, submitApprovalBodySchema);
     if (body instanceof NextResponse) return body;
     const { summary, emailData } = await submitApproval(token, body.finalDecisions);
+
+    // La pieza que faltaba: si el cliente discute lo aprobado, aqui
+    // consta quien lo hizo, cuando y desde donde. El correo sale de la
+    // sesion verificada por codigo, no de lo que mande el navegador.
+    await auditar({
+      action: ACCIONES.aprobacionEnviada,
+      entity: "Campaign",
+      entityId: emailData.campaignId,
+      actorType: "APPROVAL",
+      actorEmail: sesion.email,
+      summary: `${sesion.email} finalizó la revisión de "${emailData.campaignName}": ${summary.approvedProfiles} aprobados y ${summary.rejectedProfiles} rechazados`,
+      metadata: {
+        totalPerfiles: summary.totalProfiles,
+        aprobados: summary.approvedProfiles,
+        rechazados: summary.rejectedProfiles,
+        cliente: emailData.clientName,
+      },
+      req,
+    });
 
     // Notify campaign creator via email
     notifyApprovalResult({

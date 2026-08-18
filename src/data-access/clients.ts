@@ -7,6 +7,7 @@ import {
   mensajeBloqueo,
   trasFalloDeLogin,
 } from "@/lib/login-throttle";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 interface ClientContact {
   id?: string;
@@ -413,10 +414,21 @@ export async function loginClient(email: string, password: string) {
   const isValidPassword = await bcrypt.compare(password, clientUser.password);
 
   if (!isValidPassword) {
-    await prisma.clientUser.update({
-      where: { id: clientUser.id },
-      data: trasFalloDeLogin(clientUser.failedLoginAttempts),
+    const estado = trasFalloDeLogin(clientUser.failedLoginAttempts);
+    await prisma.clientUser.update({ where: { id: clientUser.id }, data: estado });
+
+    await auditar({
+      action: estado.lockedUntil ? ACCIONES.cuentaBloqueada : ACCIONES.loginFallido,
+      entity: "ClientUser",
+      entityId: clientUser.id,
+      actorType: "CLIENT",
+      actorId: clientUser.id,
+      actorEmail: clientUser.email,
+      summary: estado.lockedUntil
+        ? "Cuenta del portal bloqueada tras agotar los intentos"
+        : `Contraseña incorrecta en el portal (intento ${estado.failedLoginAttempts})`,
     });
+
     throw new ValidationError("Credenciales inválidas");
   }
 
@@ -426,6 +438,16 @@ export async function loginClient(email: string, password: string) {
       data: TRAS_LOGIN_CORRECTO,
     });
   }
+
+  await auditar({
+    action: ACCIONES.loginOk,
+    entity: "ClientUser",
+    entityId: clientUser.id,
+    actorType: "CLIENT",
+    actorId: clientUser.id,
+    actorEmail: clientUser.email,
+    summary: `Inició sesión en el portal (${clientUser.client.companyName})`,
+  });
 
   return {
     id: clientUser.client.id,

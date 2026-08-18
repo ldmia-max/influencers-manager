@@ -2,6 +2,7 @@ import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { auditar, ACCIONES } from "./audit";
 import {
   TRAS_LOGIN_CORRECTO,
   estaBloqueado,
@@ -57,6 +58,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // cuenta bloqueada seguiria admitiendo intentos y el limite no
         // frenaria nada.
         if (estaBloqueado(user)) {
+          await auditar({
+            action: ACCIONES.cuentaBloqueada,
+            entity: "User",
+            entityId: user.id,
+            actorType: "USER",
+            actorId: user.id,
+            actorEmail: user.email,
+            summary: `Intento de acceso con la cuenta bloqueada`,
+          });
           throw new CuentaBloqueada();
         }
 
@@ -66,10 +76,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
 
         if (!isPasswordValid) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: trasFalloDeLogin(user.failedLoginAttempts),
+          const estado = trasFalloDeLogin(user.failedLoginAttempts);
+          await prisma.user.update({ where: { id: user.id }, data: estado });
+
+          await auditar({
+            action: estado.lockedUntil
+              ? ACCIONES.cuentaBloqueada
+              : ACCIONES.loginFallido,
+            entity: "User",
+            entityId: user.id,
+            actorType: "USER",
+            actorId: user.id,
+            actorEmail: user.email,
+            summary: estado.lockedUntil
+              ? "Cuenta bloqueada tras agotar los intentos"
+              : `Contraseña incorrecta (intento ${estado.failedLoginAttempts})`,
           });
+
           throw new CredencialesInvalidas();
         }
 
@@ -81,6 +104,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             data: TRAS_LOGIN_CORRECTO,
           });
         }
+
+        await auditar({
+          action: ACCIONES.loginOk,
+          entity: "User",
+          entityId: user.id,
+          actorType: "USER",
+          actorId: user.id,
+          actorEmail: user.email,
+          summary: "Inició sesión",
+        });
 
         return {
           id: user.id,

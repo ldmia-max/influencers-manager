@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
 import { exigirPermiso } from "@/lib/api-guard";
 import { updateCategorySchema } from "@/lib/schemas/category";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 export async function GET(
   req: Request,
@@ -65,7 +66,22 @@ export async function DELETE(
     if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
+
+    const categoria = await getCategoryById(id);
     await deleteCategory(id);
+
+    await auditar({
+      action: ACCIONES.categoriaBorrada,
+      entity: "Category",
+      entityId: id,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Eliminó la categoría "${categoria.name}"`,
+      metadata: { nombre: categoria.name },
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof NotFoundError) {

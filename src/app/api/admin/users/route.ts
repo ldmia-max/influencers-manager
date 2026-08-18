@@ -4,6 +4,7 @@ import { getAllUsersForAdmin, createUserAdmin } from "@/data-access/users";
 import { ValidationError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
 import { createUserSchema } from "@/lib/schemas/user";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 export async function GET() {
   try {
@@ -29,6 +30,19 @@ export async function POST(req: Request) {
     const body = await parseBody(req, createUserSchema);
     if (body instanceof NextResponse) return body;
     const user = await createUserAdmin({ name: body.name, email: body.email, password: body.password, role: body.role });
+
+    await auditar({
+      action: ACCIONES.usuarioCreado,
+      entity: "User",
+      entityId: user.id,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Creó la cuenta ${user.email} con rol ${user.role}`,
+      metadata: { email: user.email, rol: user.role },
+      req,
+    });
+
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
     if (error instanceof ValidationError) {

@@ -9,6 +9,7 @@ import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { updateCampaignSchema } from "@/lib/schemas/campaign";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -101,6 +102,18 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     if (sinPermiso) return sinPermiso;
 
     await deleteCampaign(id);
+
+    await auditar({
+      action: ACCIONES.campanaBorrada,
+      entity: "Campaign",
+      entityId: id,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Eliminó la campaña "${existing.name}"`,
+      metadata: { nombre: existing.name, estado: existing.status },
+      req,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

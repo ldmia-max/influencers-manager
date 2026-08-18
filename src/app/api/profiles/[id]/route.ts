@@ -12,6 +12,7 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
 import { exigirPermiso } from "@/lib/api-guard";
 import { profileSchema } from "@/lib/schemas/profile";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 export async function GET(
   req: Request,
@@ -108,7 +109,25 @@ export async function DELETE(
     if (sesion instanceof NextResponse) return sesion;
 
     const { id } = await params;
+
+    // Se lee ANTES de borrar: despues ya no habria de donde sacar el
+    // nombre, y un registro que solo diga "se borro un perfil" no sirve
+    // para reconstruir nada.
+    const perfil = await getProfileById(id);
     await deleteProfile(id);
+
+    await auditar({
+      action: ACCIONES.perfilBorrado,
+      entity: "Profile",
+      entityId: id,
+      actorType: "USER",
+      actorId: sesion.userId,
+      actorEmail: sesion.email,
+      summary: `Eliminó el perfil "${perfil.name}"`,
+      metadata: { nombre: perfil.name, tipo: perfil.type },
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof NotFoundError) {

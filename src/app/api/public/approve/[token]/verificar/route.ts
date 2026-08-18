@@ -14,6 +14,7 @@ import {
   verificarSesionAprobacion,
 } from "@/lib/approval-session";
 import { notifyCodigoAprobacion } from "@/lib/emails/campaign-notifications";
+import { auditar, ACCIONES } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
@@ -105,6 +106,16 @@ export async function POST(req: Request, { params }: RouteParams) {
     // --- Paso 2: validar el codigo y abrir sesion ---
     if (typeof cuerpo.codigo === "string") {
       const { email } = await validarCodigo(token, cuerpo.codigo.trim());
+
+      await auditar({
+        action: ACCIONES.aprobacionVerificada,
+        entity: "CampaignApprovalToken",
+        entityId: token,
+        actorType: "APPROVAL",
+        actorEmail: email,
+        summary: `${email} verificó su correo y accedió al portal de aprobación`,
+        req,
+      });
 
       const jwt = await firmarSesionAprobacion({ token, email });
       const almacen = await cookies();
