@@ -4,6 +4,7 @@ import { CampaignEditor } from "@/components/campaigns/campaign-editor";
 import { getCampaignForEdit } from "@/data-access/campaigns";
 import { getClientsWithContacts } from "@/data-access/clients";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
+import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,8 +18,6 @@ export default async function EditCampaignPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  const isAdmin = session.user.role === "ADMIN";
-
   let campaign;
   try {
     campaign = await getCampaignForEdit(id);
@@ -26,8 +25,13 @@ export default async function EditCampaignPage({ params }: PageProps) {
     notFound();
   }
 
-  // Verificar permisos
-  if (!isAdmin && campaign.createdById !== session.user.id) {
+  // El alcance lo decide la tabla de permisos, no el rol: hoy las
+  // campanas son de todo el equipo, pero si manana se restringen basta
+  // con cambiar la tabla y esta comprobacion sigue valiendo.
+  if (
+    exigePropiedadParaEscribir(session.user.role as Rol, "campanas") &&
+    campaign.createdById !== session.user.id
+  ) {
     redirect("/campaigns");
   }
 

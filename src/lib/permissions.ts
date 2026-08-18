@@ -71,11 +71,13 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
 /**
  * Recursos en los que un USER solo puede ESCRIBIR sobre lo que creo el.
  *
- * Perfiles y categorias quedan fuera a proposito: son el catalogo comun
- * de la agencia y cualquiera trabaja sobre el.
+ * Perfiles, categorias y campanas quedan fuera: el equipo trabaja sobre
+ * un fondo comun y cualquiera puede continuar el trabajo de otro. Ojo,
+ * que campanas siga aqui en "false" no las deja indefensas: borrarlas
+ * requiere rol ADMIN, y eso lo decide la MATRIZ de arriba.
  *
- * Clientes esta dentro, pero solo para escritura: la LECTURA sigue
- * siendo global porque crear una campana obliga a elegir un cliente, y
+ * Clientes es la unica excepcion, y solo para escritura: la LECTURA es
+ * global porque crear una campana obliga a elegir un cliente, y
  * filtrarla dejaria a un usuario sin poder trabajar con las cuentas que
  * registro un companero.
  */
@@ -83,7 +85,7 @@ const PROPIEDAD_PARA_ESCRIBIR: Record<Recurso, boolean> = {
   perfiles: false,
   categorias: false,
   clientes: true,
-  campanas: true,
+  campanas: false,
   briefs: false,
   informes: false,
   aprobacion: false,
@@ -95,7 +97,7 @@ const PROPIEDAD_PARA_LEER: Record<Recurso, boolean> = {
   perfiles: false,
   categorias: false,
   clientes: false,
-  campanas: true,
+  campanas: false,
   briefs: false,
   informes: false,
   aprobacion: false,

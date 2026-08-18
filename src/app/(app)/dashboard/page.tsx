@@ -11,15 +11,18 @@ import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_VARIANTS,
 } from "@/lib/campaign-utils";
+import { exigePropiedadParaLeer, type Rol } from "@/lib/permissions";
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user.id;
-  const isAdmin = session?.user.role === "ADMIN";
+  const rol = (session?.user.role ?? "USER") as Rol;
+  const verTodasCampanas = !exigePropiedadParaLeer(rol, "campanas");
+  const verTodosPerfiles = !exigePropiedadParaLeer(rol, "perfiles");
 
   const [profileCount, { activeCampaigns, draftCampaigns }] = await Promise.all([
-    getProfileCount(isAdmin ? undefined : { createdById: userId }),
-    getDashboardCampaigns(userId!, isAdmin ?? false),
+    getProfileCount(verTodosPerfiles ? undefined : { createdById: userId }),
+    getDashboardCampaigns(userId!, verTodasCampanas),
   ]);
 
   const totalCampaigns = activeCampaigns.length + draftCampaigns.length;

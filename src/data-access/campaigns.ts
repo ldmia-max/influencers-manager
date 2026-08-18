@@ -32,7 +32,13 @@ function getStatusMessage(status: CampaignStatus): string {
 
 export async function getCampaignsPaginated(params: {
   userId: string;
-  isAdmin: boolean;
+  /**
+   * Si el usuario ve todas o solo las suyas. Lo decide la tabla de
+   * permisos (exigePropiedadParaLeer), no el rol: antes se llamaba
+   * isAdmin y ataba el alcance a ser administrador, asi que ampliar la
+   * visibilidad obligaba a tocar cada consulta.
+   */
+  verTodas: boolean;
   search?: string;
   clientId?: string;
   status?: CampaignStatus;
@@ -43,7 +49,7 @@ export async function getCampaignsPaginated(params: {
 
   const where = {
     AND: [
-      !params.isAdmin ? { createdById: params.userId } : {},
+      !params.verTodas ? { createdById: params.userId } : {},
       params.search
         ? {
             OR: [
@@ -157,7 +163,8 @@ export async function getCampaignById(id: string) {
 
 export async function getCampaignsForPage(params: {
   userId?: string;
-  isAdmin: boolean;
+  /** Ver todas o solo las propias. Lo decide la tabla de permisos. */
+  verTodas: boolean;
   search?: string;
   clientId?: string;
   status?: CampaignStatus;
@@ -168,7 +175,7 @@ export async function getCampaignsForPage(params: {
 
   const where = {
     AND: [
-      !params.isAdmin ? { createdById: params.userId } : {},
+      !params.verTodas ? { createdById: params.userId } : {},
       params.search
         ? {
             OR: [
@@ -300,10 +307,10 @@ export async function getCampaignForEdit(id: string) {
   return campaign;
 }
 
-export async function getDashboardCampaigns(userId: string, isAdmin: boolean) {
+export async function getDashboardCampaigns(userId: string, verTodas: boolean) {
   const [activeCampaigns, draftCampaigns] = await Promise.all([
     prisma.campaign.findMany({
-      where: { status: "ACTIVE", ...(isAdmin ? {} : { createdById: userId }) },
+      where: { status: "ACTIVE", ...(verTodas ? {} : { createdById: userId }) },
       orderBy: { updatedAt: "desc" },
       include: {
         client: { select: { companyName: true } },
@@ -311,7 +318,7 @@ export async function getDashboardCampaigns(userId: string, isAdmin: boolean) {
       },
     }),
     prisma.campaign.findMany({
-      where: { status: "DRAFT", ...(isAdmin ? {} : { createdById: userId }) },
+      where: { status: "DRAFT", ...(verTodas ? {} : { createdById: userId }) },
       orderBy: { updatedAt: "desc" },
       include: {
         client: { select: { companyName: true } },

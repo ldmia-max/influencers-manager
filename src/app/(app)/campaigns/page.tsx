@@ -28,6 +28,7 @@ import {
 } from "@/lib/campaign-utils";
 import { getCachedReachRanges } from "@/lib/cache";
 import { CampaignStatus } from "@prisma/client";
+import { exigePropiedadParaLeer, type Rol } from "@/lib/permissions";
 
 interface SearchParams {
   search?: string;
@@ -48,12 +49,15 @@ export default async function CampaignsPage({
   const page = params.page ? parseInt(params.page) : 1;
   const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
   const skip = (page - 1) * pageSize;
-  const isAdmin = session?.user.role === "ADMIN";
+  // El alcance lo decide la tabla de permisos, no el rol.
+  const verTodas = !exigePropiedadParaLeer(
+    (session?.user.role ?? "USER") as Rol,
+    "campanas"
+  );
 
   const where = {
     AND: [
-      // Filtrar por creador si no es admin
-      !isAdmin ? { createdById: session?.user.id } : {},
+      verTodas ? {} : { createdById: session?.user.id },
       // Filtro por búsqueda
       params.search
         ? {

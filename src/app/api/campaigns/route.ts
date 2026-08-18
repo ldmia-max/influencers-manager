@@ -5,6 +5,7 @@ import { exigirPermiso } from "@/lib/api-guard";
 import { CampaignStatus } from "@prisma/client";
 import { parseBody } from "@/lib/validate-request";
 import { createCampaignSchema } from "@/lib/schemas/campaign";
+import { exigePropiedadParaLeer } from "@/lib/permissions";
 
 export async function GET(req: Request) {
   try {
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
 
     const result = await getCampaignsPaginated({
       userId: sesion.userId,
-      isAdmin: sesion.rol === "ADMIN",
+      verTodas: !exigePropiedadParaLeer(sesion.rol, "campanas"),
       search,
       clientId,
       status,
