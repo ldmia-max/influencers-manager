@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { briefSchema } from "@/lib/schemas/brief";
+import { BriefPasos, type PasoBrief } from "./brief-pasos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +62,38 @@ const estadoInicial = {
 
 type Estado = typeof estadoInicial;
 
+
+/**
+ * Los nueve vagones del brief.
+ *
+ * `campos` es lo que se valida antes de dejar avanzar. Se contrasta
+ * contra briefSchema completo y se filtran los errores de este paso, en
+ * vez de partir el esquema: asi las reglas son literalmente las mismas
+ * que aplica el servidor y no pueden desincronizarse. Ademas el esquema
+ * lleva dos refine() cruzados (fecha final vs inicio, dias de pauta) que
+ * un .pick() por paso no podria reproducir.
+ */
+const PASOS: PasoBrief[] = [
+  { numero: "01", titulo: "Datos de contacto", corto: "Contacto",
+    campos: ["empresa", "responsable", "cargo", "correo", "telefono"] },
+  { numero: "02", titulo: "Resumen de la campaña", corto: "Campaña",
+    campos: ["nombreCampana", "descripcionProducto", "objetivoPrincipal", "fechaInicio",
+             "fechaFinal", "fechaPublicacion", "fechasClave", "presupuestoTotal",
+             "incluyePauta", "pautaDias"] },
+  { numero: "03", titulo: "Producto o servicio a promocionar", corto: "Producto",
+    campos: ["queSePromociona", "precioYCompra", "territorioPromocion", "publicoObjetivo"] },
+  { numero: "04", titulo: "Mensajes y comunicación", corto: "Mensajes",
+    campos: ["claimsObligatorios", "claimsProhibidos", "libertadCreativa"] },
+  { numero: "05", titulo: "Enlaces y menciones", corto: "Enlaces",
+    campos: ["usuariosEtiquetar"] },
+  { numero: "06", titulo: "Creadores de contenido", corto: "Creadores",
+    campos: ["nichos"] },
+  { numero: "07", titulo: "Condiciones legales y de uso", corto: "Legal",
+    campos: ["colaboracionConMarca"] },
+  { numero: "08", titulo: "Documentos adjuntos", corto: "Adjuntos", campos: [] },
+  { numero: "09", titulo: "Referencias", corto: "Referencias", campos: [] },
+];
+
 export function BriefForm({
   nichos,
   blobHabilitado = false,
@@ -75,6 +110,10 @@ export function BriefForm({
   const [errorArchivos, setErrorArchivos] = useState("");
   const [errorGeneral, setErrorGeneral] = useState("");
   const [enviado, setEnviado] = useState(false);
+  const [paso, setPaso] = useState(0);
+  // Hasta donde ha llegado: permite volver atras sin revalidar, pero no
+  // saltar hacia adelante esquivando la validacion.
+  const [maxVisitado, setMaxVisitado] = useState(0);
 
   const set = <K extends keyof Estado>(campo: K, valor: Estado[K]) => {
     setD((prev) => ({ ...prev, [campo]: valor }));
@@ -102,20 +141,80 @@ export function BriefForm({
       return { ...prev, atributos: filas };
     });
 
+  /** El payload que se valida y se envia. Uno solo, para que la
+   *  validacion por paso y el envio final no puedan divergir. */
+  const construirPayload = () => ({
+    ...d,
+    moneda: "COP",
+    atributos: d.atributos.filter((a) => a.trim()),
+    creadoresSugeridos: d.creadoresSugeridos.filter(
+      (c) => c.nombre.trim() || c.linkPerfil.trim()
+    ),
+  });
+
+  /**
+   * Valida SOLO los campos del paso indicado.
+   *
+   * Se pasa el brief entero por briefSchema y se filtran los problemas
+   * que caen en este vagon. Los de pasos posteriores se ignoran a
+   * proposito: todavia no toca rellenarlos.
+   */
+  function validarPaso(indice: number): boolean {
+    const campos = PASOS[indice].campos;
+    if (campos.length === 0) return true;
+
+    const resultado = briefSchema.safeParse(construirPayload());
+    if (resultado.success) return true;
+
+    const delPaso: Record<string, string> = {};
+    for (const problema of resultado.error.issues) {
+      const campo = String(problema.path[0]);
+      if (campos.includes(campo) && !delPaso[campo]) {
+        delPaso[campo] = problema.message;
+      }
+    }
+
+    setErrores(delPaso);
+    return Object.keys(delPaso).length === 0;
+  }
+
+  function siguiente() {
+    if (!validarPaso(paso)) {
+      setErrorGeneral("Faltan datos obligatorios en este paso.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setErrores({});
+    setErrorGeneral("");
+    const destino = Math.min(paso + 1, PASOS.length - 1);
+    setPaso(destino);
+    setMaxVisitado((m) => Math.max(m, destino));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function atras() {
+    setErrores({});
+    setErrorGeneral("");
+    setPaso((x) => Math.max(x - 1, 0));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+
+    // Con el formulario en pasos, pulsar Intro en cualquier campo
+    // dispara el submit. Sin esta guarda, el brief se enviaria a medio
+    // rellenar desde el paso 01.
+    if (paso !== PASOS.length - 1) {
+      siguiente();
+      return;
+    }
+
     setEnviando(true);
     setErrores({});
     setErrorGeneral("");
 
-    const payload = {
-      ...d,
-      moneda: "COP",
-      atributos: d.atributos.filter((a) => a.trim()),
-      creadoresSugeridos: d.creadoresSugeridos.filter(
-        (c) => c.nombre.trim() || c.linkPerfil.trim()
-      ),
-    };
+    const payload = construirPayload();
 
     const alInicio = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -167,6 +266,18 @@ export function BriefForm({
           const mapa: Record<string, string> = {};
           for (const det of json.details) mapa[det.path] = det.message;
           setErrores(mapa);
+
+          // Si el servidor rechaza un campo de un paso anterior, hay que
+          // llevar al usuario hasta el: en un formulario por pasos,
+          // marcar en rojo un campo que no esta en pantalla no le dice
+          // nada. Se salta al primer vagon con problemas.
+          const conError = PASOS.findIndex((x) =>
+            x.campos.some((campo) => campo in mapa)
+          );
+          if (conError >= 0 && conError !== paso) {
+            setPaso(conError);
+            setMaxVisitado((m) => Math.max(m, conError));
+          }
         }
         setErrorGeneral(
           json.error ??
@@ -209,7 +320,19 @@ export function BriefForm({
   }
 
   return (
-    <form onSubmit={enviar} className="space-y-8">
+    <form onSubmit={enviar} className="space-y-6">
+      <BriefPasos
+        pasos={PASOS}
+        actual={paso}
+        maxVisitado={maxVisitado}
+        onIr={(i) => {
+          setErrores({});
+          setErrorGeneral("");
+          setPaso(i);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
+
       {errorGeneral && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
@@ -224,7 +347,7 @@ export function BriefForm({
         </div>
       )}
 
-      {/* ---------- 01 ---------- */}
+      {paso === 0 && (
       <Seccion numero="01" titulo="Datos de contacto">
         <CampoTexto label="Empresa / Marca" required value={d.empresa}
           onChange={(v) => set("empresa", v)} error={errores.empresa} />
@@ -248,8 +371,9 @@ export function BriefForm({
             { value: "72h", label: "72 h" },
           ]} />
       </Seccion>
+      )}
 
-      {/* ---------- 02 ---------- */}
+      {paso === 1 && (
       <Seccion numero="02" titulo="Resumen de la campaña">
         <CampoTexto label="Nombre de la campaña" required value={d.nombreCampana}
           onChange={(v) => set("nombreCampana", v)} error={errores.nombreCampana} />
@@ -312,8 +436,9 @@ export function BriefForm({
         <CampoArea label="¿Hay campañas previas? ¿Qué funcionó y qué no?"
           value={d.campanasPrevias} onChange={(v) => set("campanasPrevias", v)} />
       </Seccion>
+      )}
 
-      {/* ---------- 03 ---------- */}
+      {paso === 2 && (
       <Seccion numero="03" titulo="Producto o servicio a promocionar">
         <GrupoCheck label="¿Qué se promociona?" required
           seleccion={d.queSePromociona} onChange={(v) => set("queSePromociona", v)}
@@ -348,8 +473,9 @@ export function BriefForm({
           hint="Para evitar comparaciones o creadores en conflicto"
           value={d.competidores} onChange={(v) => set("competidores", v)} />
       </Seccion>
+      )}
 
-      {/* ---------- 04 ---------- */}
+      {paso === 3 && (
       <Seccion numero="04" titulo="Mensajes y comunicación">
         <CampoArea label="Frases / claims que deben decirse textualmente" required
           value={d.claimsObligatorios} onChange={(v) => set("claimsObligatorios", v)}
@@ -374,8 +500,9 @@ export function BriefForm({
           onChange={(v) => set("tono", v)}
           opciones={["Cercano", "Divertido", "Aspiracional", "Educativo", "Profesional"]} />
       </Seccion>
+      )}
 
-      {/* ---------- 05 ---------- */}
+      {paso === 4 && (
       <Seccion numero="05" titulo="Enlaces y menciones">
         <CampoTexto label="URL / Landing page" placeholder="https://"
           value={d.landingUrl} onChange={(v) => set("landingUrl", v)}
@@ -391,8 +518,9 @@ export function BriefForm({
         <CampoTexto label="Código de descuento / cupón" value={d.codigoDescuento}
           onChange={(v) => set("codigoDescuento", v)} />
       </Seccion>
+      )}
 
-      {/* ---------- 06 ---------- */}
+      {paso === 5 && (
       <Seccion numero="06" titulo="Creadores de contenido">
         <Campo label="6.1 · Creadores sugeridos por la marca"
           hint="Opcional. Si aún no hay nombres definidos, completa el perfil ideal.">
@@ -445,8 +573,9 @@ export function BriefForm({
           </div>
         </div>
       </Seccion>
+      )}
 
-      {/* ---------- 07 ---------- */}
+      {paso === 6 && (
       <Seccion numero="07" titulo="Condiciones legales y de uso">
         <GrupoRadio label="¿El contenido estará en colaboración con la marca?" required
           name="colaboracion" valor={d.colaboracionConMarca}
@@ -466,8 +595,9 @@ export function BriefForm({
           hint="Salud, financiero, alcohol…" value={d.restriccionesLegales}
           onChange={(v) => set("restriccionesLegales", v)} />
       </Seccion>
+      )}
 
-      {/* ---------- 08 ---------- */}
+      {paso === 7 && (
       <Seccion numero="08" titulo="Documentos adjuntos">
         <p className="text-sm text-gray-600">
           Puedes adjuntar el material de apoyo que tengas disponible: brochure o
@@ -598,8 +728,9 @@ export function BriefForm({
           </div>
         </Campo>
       </Seccion>
+      )}
 
-      {/* ---------- 09 ---------- */}
+      {paso === 8 && (
       <Seccion numero="09" titulo="Referencias">
         <CampoArea label="Referencias de contenido que les gustan" hint="Enlaces"
           value={d.referenciasGustan} onChange={(v) => set("referenciasGustan", v)} />
@@ -608,14 +739,48 @@ export function BriefForm({
         <CampoArea label="Comentarios adicionales" value={d.comentarios}
           onChange={(v) => set("comentarios", v)} />
       </Seccion>
+      )}
 
-      <div className="flex flex-col items-center gap-3 pb-4">
-        <Button type="submit" disabled={enviando} size="lg"
-          className="w-full bg-[#E1145F] hover:bg-[#C1104F] sm:w-auto sm:px-12">
-          {enviando ? progreso || "Enviando…" : "Enviar brief"}
-        </Button>
-        <p className="text-xs text-gray-500">
-          Al enviar, tus datos quedan registrados para la preparación de la campaña.
+      <div className="flex flex-col gap-3 pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={atras}
+            disabled={paso === 0 || enviando}
+            className={paso === 0 ? "invisible" : ""}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Atrás
+          </Button>
+
+          {paso < PASOS.length - 1 ? (
+            <Button
+              type="button"
+              size="lg"
+              onClick={siguiente}
+              className="bg-[#E1145F] hover:bg-[#C1104F] sm:px-10"
+            >
+              Siguiente
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={enviando}
+              size="lg"
+              className="bg-[#E1145F] hover:bg-[#C1104F] sm:px-12"
+            >
+              {enviando ? progreso || "Enviando…" : "Enviar brief"}
+            </Button>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-gray-500">
+          {paso < PASOS.length - 1
+            ? `Paso ${paso + 1} de ${PASOS.length}. Puedes volver atrás sin perder lo escrito.`
+            : "Al enviar, tus datos quedan registrados para la preparación de la campaña."}
         </p>
       </div>
     </form>
