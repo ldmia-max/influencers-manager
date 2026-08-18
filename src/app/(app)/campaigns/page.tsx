@@ -29,6 +29,7 @@ import {
 import { getCachedReachRanges } from "@/lib/cache";
 import { CampaignStatus } from "@prisma/client";
 import { exigePropiedadParaLeer, type Rol } from "@/lib/permissions";
+import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 interface SearchParams {
   search?: string;
@@ -150,7 +151,7 @@ export default async function CampaignsPage({
       });
     });
 
-    const totalWithMarkup = totalBase * 1.2;
+    const totalWithMarkup = calculateMarkupPrice(totalBase);
 
     return {
       ...campaign,

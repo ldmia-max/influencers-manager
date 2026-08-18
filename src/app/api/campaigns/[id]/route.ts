@@ -8,6 +8,7 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { updateCampaignSchema } from "@/lib/schemas/campaign";
+import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -34,7 +35,7 @@ export async function GET(req: Request, { params }: RouteParams) {
       });
     });
 
-    const totalWithMarkup = totalBase * 1.2;
+    const totalWithMarkup = calculateMarkupPrice(totalBase);
 
     return NextResponse.json({
       ...campaign,

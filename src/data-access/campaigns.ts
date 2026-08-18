@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
+import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
@@ -113,7 +114,7 @@ export async function getCampaignsPaginated(params: {
     return {
       ...campaign,
       totalBase,
-      totalWithMarkup: totalBase * 1.2,
+      totalWithMarkup: calculateMarkupPrice(totalBase),
       profileCount: campaign.profiles.length,
     };
   });

@@ -55,7 +55,15 @@ export const USER_VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 /**
- * Calcula el precio con markup del 20%
+ * Aplica el margen de MARKUP_PERCENTAGE al precio base.
+ *
+ * Es el UNICO sitio donde debe aplicarse el margen. Hubo tres lugares
+ * que lo multiplicaban por 1.2 a mano y quedaron desfasados al subirlo
+ * al 40%: el detalle de campana por API, el listado y las consultas de
+ * data-access mostraban totales distintos entre si.
+ *
+ * Aplicarlo sobre un total es equivalente a aplicarlo servicio a
+ * servicio y sumar, asi que sirve para ambos usos.
  */
 export function calculateMarkupPrice(basePrice: number | Decimal): number {
   const price = typeof basePrice === "number" ? basePrice : Number(basePrice);
