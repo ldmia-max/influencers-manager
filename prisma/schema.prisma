@@ -28,6 +28,18 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// --- Freno a la fuerza bruta ---
+  /// Intentos fallidos consecutivos y hasta cuando esta bloqueado el
+  /// acceso. Se cuenta por cuenta y no por IP porque NextAuth no
+  /// expone la IP en authorize(), y porque la IP es lo primero que
+  /// rota un atacante.
+  ///
+  /// El bloqueo es temporal a proposito: uno permanente convierte el
+  /// formulario en un arma para dejar fuera a un companero fallando su
+  /// contrasena cinco veces.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   // Relaciones
   profiles          Profile[]
   createdCategories Category[]
@@ -307,6 +319,10 @@ model ClientUser {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Mismo freno que en User. Ver alli el motivo del bloqueo temporal.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   // Relaciones
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { BLOQUEO_MINUTOS } from "@/lib/login-throttle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,9 +33,17 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        // NextAuth devuelve "Configuration" o "CredentialsSignin" para errores de login
-        // Mostramos un mensaje más amigable
-        setError("Email o contraseña incorrectos");
+        // NextAuth propaga el motivo en `code`, no en `error`, y solo
+        // si authorize() lanzo un CredentialsSignin (ver src/lib/auth.ts).
+        // Sin esto, una cuenta bloqueada veria "contraseña incorrecta"
+        // aun escribiendola bien, y seguiria reintentando sin entender
+        // nada.
+        const codigo = (result as { code?: string }).code;
+        setError(
+          codigo === "bloqueado"
+            ? `Demasiados intentos fallidos. Vuelve a intentarlo en ${BLOQUEO_MINUTOS} minutos.`
+            : "Email o contraseña incorrectos"
+        );
       } else if (result?.ok) {
         router.push("/dashboard");
         router.refresh();

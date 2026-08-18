@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { ValidationError, NotFoundError } from "./errors";
+import {
+  TRAS_LOGIN_CORRECTO,
+  estaBloqueado,
+  mensajeBloqueo,
+  trasFalloDeLogin,
+} from "@/lib/login-throttle";
 
 interface ClientContact {
   id?: string;
@@ -390,6 +396,8 @@ export async function loginClient(email: string, password: string) {
   });
 
   if (!clientUser) {
+    // Misma respuesta que con contrasena mala: no se revela que
+    // correos tienen acceso al portal.
     throw new ValidationError("Credenciales inválidas");
   }
 
@@ -397,10 +405,26 @@ export async function loginClient(email: string, password: string) {
     throw new ValidationError("Tu cuenta está inactiva. Contacta con soporte.");
   }
 
+  // Antes de comparar la contrasena, o el limite no frenaria nada.
+  if (estaBloqueado(clientUser)) {
+    throw new ValidationError(mensajeBloqueo(clientUser.lockedUntil!));
+  }
+
   const isValidPassword = await bcrypt.compare(password, clientUser.password);
 
   if (!isValidPassword) {
+    await prisma.clientUser.update({
+      where: { id: clientUser.id },
+      data: trasFalloDeLogin(clientUser.failedLoginAttempts),
+    });
     throw new ValidationError("Credenciales inválidas");
+  }
+
+  if (clientUser.failedLoginAttempts > 0 || clientUser.lockedUntil) {
+    await prisma.clientUser.update({
+      where: { id: clientUser.id },
+      data: TRAS_LOGIN_CORRECTO,
+    });
   }
 
   return {
