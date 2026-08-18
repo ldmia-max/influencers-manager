@@ -109,7 +109,8 @@ export interface ProfileWithServices {
 }
 
 // =============================================================================
-// Configuration Types (re-exported from platform-service-selector)
+// Configuration Types: forma de los perfiles y formatos mientras se
+// arma una campana en el asistente. Viven aqui, no en el componente.
 // =============================================================================
 
 export interface ServiceConfig {

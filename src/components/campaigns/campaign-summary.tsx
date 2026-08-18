@@ -11,7 +11,7 @@ import {
   calculateBudgetPercentage,
   calculateRemainingBudget,
 } from "@/lib/campaign-utils";
-import type { ProfileConfig } from "./platform-service-selector";
+import type { ProfileConfig } from "@/models/campaign";
 import type { ProfileWithServices } from "@/models/campaign";
 
 interface CampaignSummaryProps {
