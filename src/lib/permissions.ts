@@ -71,20 +71,20 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
 /**
  * Recursos en los que un USER solo puede ESCRIBIR sobre lo que creo el.
  *
- * Perfiles, categorias y campanas quedan fuera: el equipo trabaja sobre
- * un fondo comun y cualquiera puede continuar el trabajo de otro. Ojo,
- * que campanas siga aqui en "false" no las deja indefensas: borrarlas
- * requiere rol ADMIN, y eso lo decide la MATRIZ de arriba.
+ * Hoy ninguno: el equipo trabaja sobre un fondo comun y cualquiera
+ * puede continuar el trabajo de otro. Que esten todos en "false" no los
+ * deja indefensos, porque QUE acciones existen lo fija la MATRIZ de
+ * arriba: un USER no borra clientes ni campanas por mucho que no haya
+ * restriccion de propiedad.
  *
- * Clientes es la unica excepcion, y solo para escritura: la LECTURA es
- * global porque crear una campana obliga a elegir un cliente, y
- * filtrarla dejaria a un usuario sin poder trabajar con las cuentas que
- * registro un companero.
+ * La tabla se conserva, en vez de eliminar el concepto, porque volver a
+ * restringir cualquier recurso es cambiar aqui un false por un true y
+ * ninguna ruta se entera.
  */
 const PROPIEDAD_PARA_ESCRIBIR: Record<Recurso, boolean> = {
   perfiles: false,
   categorias: false,
-  clientes: true,
+  clientes: false,
   campanas: false,
   briefs: false,
   informes: false,
