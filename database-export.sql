@@ -6,7 +6,7 @@
 SET session_replication_role = 'replica';
 
 -- User
-INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmklwofft0000eo5808ibwebc', 'admin@example.com', '$2b$10$l92viSk2hlV7DOmg0gg4NObOyoKR4ouER8.G5nCiZ/vPWbdFr1bXS', 'Administrador', 'ADMIN', '2026-01-20T01:18:53.994Z', '2026-01-20T01:18:53.994Z');
+INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmklwofft0000eo5808ibwebc', 'ldm.ia@losdemarketing.com', '$2b$10$A.mcs7gki0vSv.xim3dY8.Fw7LCv5tOy4O6.mNENrcvPhRUlB.oxe', 'Administrador', 'ADMIN', '2026-01-20T01:18:53.994Z', '2026-01-20T01:18:53.994Z');
 INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmkmzcnbe000nvojg1jw6h2h5', 'desarrollo@losdemarketing.com', '$2b$10$He4gl1o1cEJzg7Eq4Qt5geAYZVmVXre6zY0dlLbWRqzBHu5.yBWwe', 'minijuegosz', 'USER', '2026-01-20T19:21:29.354Z', '2026-01-20T19:21:29.354Z');
 INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmkr7rfmu0000jo04n3gfw9ms', 'alejo.martinez@losdemarketing.com', '$2b$10$gaIAaxrU.0xfkc2K..hqSurCKS83pgKGC0qfglH4S.EsZE7sHHck2', 'Alejandro', 'USER', '2026-01-23T18:28:00.871Z', '2026-01-23T18:28:00.871Z');
 INSERT INTO "User" ("id", "email", "password", "name", "role", "createdAt", "updatedAt") VALUES ('cmlif54ts0000js04iz6mt2zw', 'carolina@losdemarketing.com', '$2b$10$P0sQrg38ParEbpXbH5aOi.hiomnCKl..4ep/43PXy2TUAc1qV5oa.', 'caritop19', 'ADMIN', '2026-02-11T19:24:24.113Z', '2026-02-11T19:24:24.113Z');
