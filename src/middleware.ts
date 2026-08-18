@@ -20,6 +20,5 @@ export const config = {
     "/briefs/:path*",
     "/client-dashboard/:path*",
     "/login",
-    "/register",
   ],
 };

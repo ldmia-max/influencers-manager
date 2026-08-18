@@ -129,33 +129,3 @@ export async function deleteUser(id: string, currentUserId: string) {
   await prisma.user.delete({ where: { id } });
 }
 
-export async function registerUser(data: {
-  name: string;
-  email: string;
-  password: string;
-}) {
-  const existingUser = await prisma.user.findUnique({
-    where: { email: data.email },
-  });
-
-  if (existingUser) {
-    throw new ValidationError("El email ya esta registrado");
-  }
-
-  const hashedPassword = await bcrypt.hash(data.password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      password: hashedPassword,
-      role: "USER",
-    },
-  });
-
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-  };
-}

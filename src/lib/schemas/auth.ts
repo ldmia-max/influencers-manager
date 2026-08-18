@@ -1,12 +1,10 @@
 import { z } from "zod";
 
-export const registerSchema = z.object({
-  name: z.string().trim().min(1, "El nombre es requerido"),
-  email: z.string().trim().email("Email inválido"),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-});
-
-export type RegisterPayload = z.infer<typeof registerSchema>;
+// El autorregistro se elimino: cualquiera podia crearse una cuenta de
+// personal desde /register y ver el catalogo completo de creadores,
+// clientes y campanas. Las cuentas se crean solo desde /admin/users,
+// que exige rol ADMIN y permite elegir el rol (ver createUserSchema en
+// schemas/user.ts).
 
 export const clientLoginSchema = z.object({
   email: z.string().trim().email("Email inválido"),

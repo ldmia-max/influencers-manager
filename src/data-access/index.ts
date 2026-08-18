@@ -75,7 +75,6 @@ export {
   createUserAdmin,
   updateUser,
   deleteUser,
-  registerUser,
 } from "./users";
 
 // --- Clients ---

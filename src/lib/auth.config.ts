@@ -37,7 +37,12 @@ declare module "next-auth" {
  * que "/brief" (formulario publico) no quede atrapado por "/briefs".
  *
  * PUBLICAS a proposito: /, /brief, /approve/[token], /client-login,
- * /client-dashboard, /login, /register y /api/public/*
+ * /login y /api/public/*
+ *
+ * NO existe autorregistro: /register y POST /api/auth/register se
+ * eliminaron porque no exigian nada y creaban cuentas con rol USER, es
+ * decir, acceso al catalogo completo de creadores con tarifas, a los
+ * clientes y a las campanas. Las cuentas se crean desde /admin/users.
  */
 const RUTAS_PRIVADAS = [
   "/dashboard",
@@ -129,8 +134,7 @@ export const authConfig: NextAuthConfig = {
         (ruta) => pathname === ruta || pathname.startsWith(`${ruta}/`)
       );
       const isOnAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
-      const isOnAuth =
-        pathname.startsWith("/login") || pathname.startsWith("/register");
+      const isOnAuth = pathname.startsWith("/login");
 
       if (esPrivada) {
         if (!isLoggedIn) return false;
