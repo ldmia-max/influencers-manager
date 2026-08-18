@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { VerificacionAcceso } from "@/components/approve/verificacion-acceso";
 import { queryKeys } from "@/lib/query-keys";
 import { apiGet, ApiError } from "@/services/api";
 import { useSubmitApproval } from "@/hooks/mutations/use-approval-mutations";
@@ -95,9 +96,30 @@ interface ApprovalState {
   >;
 }
 
+interface EstadoAcceso {
+  campaignName: string;
+  sentToName: string | null;
+  pistaCorreo: string;
+  verificado: boolean;
+}
+
 export default function ApprovePage() {
   const params = useParams();
   const token = params.token as string;
+
+  // Estado del enlace y de la verificacion. Se consulta ANTES que los
+  // datos de la campana: sin sesion verificada, la API no los entrega.
+  const {
+    data: acceso,
+    isLoading: comprobandoAcceso,
+    error: errorAcceso,
+    refetch: recomprobarAcceso,
+  } = useQuery<EstadoAcceso>({
+    queryKey: [...queryKeys.approval.data(token), "acceso"],
+    queryFn: () => apiGet<EstadoAcceso>(`/api/public/approve/${token}/verificar`),
+    enabled: !!token,
+    retry: false,
+  });
 
   const {
     data,
@@ -106,7 +128,7 @@ export default function ApprovePage() {
   } = useQuery<CampaignData>({
     queryKey: queryKeys.approval.data(token),
     queryFn: () => apiGet<CampaignData>(`/api/public/approve/${token}`),
-    enabled: !!token,
+    enabled: !!token && acceso?.verificado === true,
     retry: false,
   });
   const submitMutation = useSubmitApproval(token);
@@ -415,6 +437,51 @@ export default function ApprovePage() {
   };
 
   // Loading state
+  // 1) Comprobando el enlace y si ya hay sesion verificada.
+  if (comprobandoAcceso) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Comprobando el enlace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2) Enlace invalido, caducado o ya usado: el mensaje viene de la API.
+  if (errorAcceso) {
+    const mensaje =
+      errorAcceso instanceof ApiError
+        ? errorAcceso.message
+        : "No se pudo comprobar el enlace";
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-semibold text-gray-900">
+            Enlace no disponible
+          </h1>
+          <p className="mt-2 text-muted-foreground">{mensaje}</p>
+          <p className="mt-4 text-sm text-gray-500">
+            Escribe a tu equipo de cuenta para que te envíe uno nuevo.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 3) Enlace valido pero sin verificar: puerta de acceso.
+  if (acceso && !acceso.verificado) {
+    return (
+      <VerificacionAcceso
+        token={token}
+        campaignName={acceso.campaignName}
+        pistaCorreo={acceso.pistaCorreo}
+        onVerificado={() => recomprobarAcceso()}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

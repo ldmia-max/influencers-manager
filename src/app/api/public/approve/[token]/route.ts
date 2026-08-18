@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import {
+  COOKIE_APROBACION,
+  verificarSesionAprobacion,
+} from "@/lib/approval-session";
 import {
   getApprovalData,
   saveApprovalDecisions,
@@ -10,9 +15,34 @@ interface RouteParams {
 }
 
 // GET: Obtener datos de campaña para aprobación (público)
+/**
+ * Exige sesion de aprobacion verificada para este token.
+ *
+ * Sin esto el enlace bastaba para ver y decidir sobre la campana, y
+ * reenviar el correo entregaba ese poder a cualquiera.
+ */
+async function exigirVerificacion(token: string) {
+  const almacen = await cookies();
+  const sesion = await verificarSesionAprobacion(
+    almacen.get(COOKIE_APROBACION)?.value,
+    token
+  );
+
+  if (!sesion) {
+    return NextResponse.json(
+      { error: "Verifica tu correo para continuar", code: "SIN_VERIFICAR" },
+      { status: 401 }
+    );
+  }
+  return sesion;
+}
+
 export async function GET(req: Request, { params }: RouteParams) {
   try {
     const { token } = await params;
+
+    const sesion = await exigirVerificacion(token);
+    if (sesion instanceof NextResponse) return sesion;
 
     const data = await getApprovalData(token);
 
@@ -51,6 +81,9 @@ export async function GET(req: Request, { params }: RouteParams) {
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
     const { token } = await params;
+
+    const sesion = await exigirVerificacion(token);
+    if (sesion instanceof NextResponse) return sesion;
 
     const body = await req.json();
     await saveApprovalDecisions(token, body.decisions);

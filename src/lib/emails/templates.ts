@@ -234,3 +234,42 @@ export function campaignRejectedTemplate(params: {
 
   return { subject, html };
 }
+
+/**
+ * Codigo de un solo uso para entrar al portal de aprobacion.
+ *
+ * No lleva enlaces ni botones a proposito: el destinatario ya tiene el
+ * enlace en el correo anterior, y un correo con codigo y enlace juntos
+ * es la forma clasica de que el phishing se cuele imitandolo.
+ */
+export function codigoAprobacionTemplate(params: {
+  contactName: string | null;
+  campaignName: string;
+  codigo: string;
+  minutos: number;
+}): { subject: string; html: string } {
+  const subject = `Tu código de acceso: ${params.codigo}`;
+  const html = baseLayout(`
+    <h2 style="margin:0 0 16px;font-size:18px;color:#18181b;">Hola${
+      params.contactName ? ` ${params.contactName}` : ""
+    },</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Para revisar la campaña <strong>${params.campaignName}</strong> introduce
+      este código en la página que acabas de abrir:
+    </p>
+    <p style="margin:24px 0;text-align:center;">
+      <span style="display:inline-block;padding:14px 28px;background:#f4f4f5;border:1px solid #e4e4e7;border-radius:10px;font-family:monospace;font-size:30px;letter-spacing:8px;color:#18181b;">
+        ${params.codigo}
+      </span>
+    </p>
+    <p style="margin:0 0 12px;font-size:13px;color:#71717a;line-height:1.6;">
+      Caduca en ${params.minutos} minutos y solo puede usarse una vez.
+    </p>
+    <p style="margin:0;font-size:13px;color:#71717a;line-height:1.6;">
+      Si no has sido tú, ignora este mensaje: sin el código nadie puede
+      acceder a la campaña.
+    </p>
+  `);
+
+  return { subject, html };
+}

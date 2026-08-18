@@ -374,6 +374,22 @@ model CampaignApprovalToken {
   sentToEmail String
   sentToName  String?
 
+  // --- Verificacion por codigo al correo registrado ---
+  // El enlace por si solo ya no da acceso: si el cliente lo reenvia,
+  // quien lo reciba no puede entrar sin el codigo que llega a
+  // sentToEmail. Se guarda el hash, nunca el codigo en claro, para que
+  // leer la tabla no permita suplantar a nadie.
+  codeHash      String?
+  codeExpiresAt DateTime?
+  codeSentAt    DateTime?
+  codeAttempts  Int       @default(0)
+
+  // --- Trazabilidad ---
+  // Quien supero la verificacion y cuando. Antes solo constaba que
+  // alguien habia aprobado, no quien.
+  verifiedAt    DateTime?
+  verifiedEmail String?
+
   // Relaciones
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId String

@@ -6,7 +6,9 @@ import {
   tokenRegeneratedTemplate,
   campaignApprovedTemplate,
   campaignRejectedTemplate,
+  codigoAprobacionTemplate,
 } from "./templates";
+import { CODIGO_MINUTOS } from "@/lib/approval-session";
 
 function getBaseUrl() {
   return process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -118,4 +120,27 @@ export async function notifyApprovalResult(params: {
     sendEmail({ to: creatorEmail, ...template })
       .catch((err) => console.error("Failed to send approval email:", err));
   }
+}
+
+/**
+ * Envia el codigo de un solo uso al correo registrado en la campana.
+ *
+ * Se espera el resultado (no es lanzar y olvidar) porque si el correo
+ * no sale, el cliente se queda mirando una pantalla pidiendole un
+ * codigo que nunca va a llegar.
+ */
+export async function notifyCodigoAprobacion(params: {
+  destino: string;
+  nombre: string | null;
+  campaignName: string;
+  codigo: string;
+}): Promise<ResultadoEmail> {
+  const template = codigoAprobacionTemplate({
+    contactName: params.nombre,
+    campaignName: params.campaignName,
+    codigo: params.codigo,
+    minutos: CODIGO_MINUTOS,
+  });
+
+  return sendEmail({ to: params.destino, ...template });
 }
