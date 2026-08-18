@@ -35,6 +35,7 @@ import {
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
+import { EditarMargen } from "@/components/campaigns/editar-margen";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -58,6 +59,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // El alcance lo decide la tabla de permisos, no el rol: hoy las
   // campanas son de todo el equipo, pero si manana se restringen basta
   // con cambiar la tabla y esta comprobacion sigue valiendo.
+  const esAdmin = session.user.role === "ADMIN";
+
   if (
     exigePropiedadParaEscribir(session.user.role as Rol, "campanas") &&
     campaign.createdById !== session.user.id
@@ -350,6 +353,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                 <span className="text-gray-500">Presupuesto:</span>
                 <span className="font-bold">
                   ${formatNumber(budget.toString())}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-gray-500">
+                  Margen:
+                  {esAdmin && (
+                    <EditarMargen
+                      campaignId={campaign.id}
+                      markupActual={campaign.markupPercentage}
+                      yaEnviadaAlCliente={campaign.status !== "DRAFT"}
+                    />
+                  )}
+                </span>
+                <span className="font-medium">
+                  {Math.round(campaign.markupPercentage * 1000) / 10}%
                 </span>
               </div>
               <div className="flex justify-between">
