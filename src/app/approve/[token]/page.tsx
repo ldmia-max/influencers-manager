@@ -76,6 +76,9 @@ interface CampaignData {
           currency: string;
           isApproved: boolean;
           clientNotes?: string;
+          esCombo?: boolean;
+          comboDescripcion?: string | null;
+          /** Ausente en los combos, que no salen del tarifario. */
           profileService: {
             serviceType: {
               id: string;
@@ -431,7 +434,13 @@ export default function ApprovePage() {
       isApproved: approvalState.platforms[platform.id]?.isApproved ?? true,
       services: platform.services.map((service) => ({
         id: service.id,
-        serviceName: service.profileService.serviceType.displayName,
+        // El combo no tiene formato de origen: se compone su nombre con
+        // lo que el equipo escribio, para que el cliente sepa que aprueba.
+        serviceName: service.esCombo
+          ? service.comboDescripcion
+            ? `Combo — ${service.comboDescripcion}`
+            : "Combo"
+          : service.profileService!.serviceType.displayName,
         quantity: service.quantity,
         basePrice: Number(service.basePrice),
         currency: service.currency,
@@ -614,7 +623,9 @@ export default function ApprovePage() {
 
     cp.platforms.forEach((plat) => {
       plat.services.forEach((s) => {
-        const fname = s.profileService.serviceType.displayName;
+        const fname = s.esCombo
+          ? "Combo"
+          : s.profileService!.serviceType.displayName;
         formatCounts.set(fname, (formatCounts.get(fname) || 0) + s.quantity);
       });
       if (!accountsSeen.has(plat.socialAccount.id)) {

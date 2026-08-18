@@ -13,6 +13,7 @@ import { formatNumber, calculateReach, getReachPercentage } from "@/lib/format";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
 import { calculateMarkupPrice, calculateServiceTotal } from "@/lib/campaign-utils";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
+import { PriceInput } from "@/components/ui/price-input";
 import type {
   ProfileWithServices,
   ProfileConfig,
@@ -39,6 +40,9 @@ export function PlatformServiceSelector({
   const { data: reachRanges = [] } = useReachRanges();
   // Margen de la campana que se esta editando (o el global si es nueva).
   const markup = useCampaignWizardStore((st) => st.markup);
+  const setComboActivo = useCampaignWizardStore((st) => st.setComboActivo);
+  const setComboPrecio = useCampaignWizardStore((st) => st.setComboPrecio);
+  const setComboDescripcion = useCampaignWizardStore((st) => st.setComboDescripcion);
   const [expandedProfiles, setExpandedProfiles] = useState<string[]>([]);
 
   // Inicializar configuración cuando cambian los perfiles seleccionados
@@ -352,42 +356,91 @@ export function PlatformServiceSelector({
                                 markup
                               );
 
+                            const clave =
+                              service.profileServiceId ?? service.serviceTypeId;
+                            const activo = service.esCombo
+                              ? service.basePrice > 0
+                              : service.quantity > 0;
+
                             return (
                               <div
-                                key={service.profileServiceId}
+                                key={clave}
                                 className="grid grid-cols-12 gap-3 items-center py-2 border-b last:border-0"
                               >
                                 <div className="col-span-5 flex items-center gap-2">
                                   <Checkbox
-                                    checked={service.quantity > 0}
+                                    checked={activo}
                                     onCheckedChange={() =>
-                                      toggleService(
-                                        profileConfig.profileId,
-                                        platform.socialAccountId,
-                                        service.profileServiceId
-                                      )
+                                      service.esCombo
+                                        ? setComboActivo(
+                                            profileConfig.profileId,
+                                            platform.socialAccountId,
+                                            !activo
+                                          )
+                                        : toggleService(
+                                            profileConfig.profileId,
+                                            platform.socialAccountId,
+                                            clave
+                                          )
                                     }
                                   />
-                                  <Label className="text-sm">
-                                    {service.serviceName}
-                                  </Label>
+                                  {service.esCombo ? (
+                                    <div className="flex-1">
+                                      <Label className="text-sm">Combo</Label>
+                                      <Input
+                                        placeholder="Qué incluye (ej. Reel + 3 Stories)"
+                                        value={service.comboDescripcion ?? ""}
+                                        onChange={(e) =>
+                                          setComboDescripcion(
+                                            profileConfig.profileId,
+                                            platform.socialAccountId,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="mt-1 h-7 text-xs"
+                                        disabled={!activo}
+                                        maxLength={200}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <Label className="text-sm">
+                                      {service.serviceName}
+                                    </Label>
+                                  )}
                                 </div>
                                 <div className="col-span-2">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    value={service.quantity}
-                                    onChange={(e) =>
-                                      updateServiceQuantity(
-                                        profileConfig.profileId,
-                                        platform.socialAccountId,
-                                        service.profileServiceId,
-                                        parseInt(e.target.value, 10) || 0
-                                      )
-                                    }
-                                    className="w-20"
-                                    disabled={service.quantity === 0}
-                                  />
+                                  {service.esCombo ? (
+                                    // Un combo es un acuerdo cerrado: no lleva
+                                    // unidades, lleva el precio pactado.
+                                    <PriceInput
+                                      value={String(service.basePrice || "")}
+                                      onChange={(v) =>
+                                        setComboPrecio(
+                                          profileConfig.profileId,
+                                          platform.socialAccountId,
+                                          Number(v) || 0
+                                        )
+                                      }
+                                      placeholder="Precio"
+                                      className="w-28"
+                                    />
+                                  ) : (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={service.quantity}
+                                      onChange={(e) =>
+                                        updateServiceQuantity(
+                                          profileConfig.profileId,
+                                          platform.socialAccountId,
+                                          clave,
+                                          parseInt(e.target.value, 10) || 0
+                                        )
+                                      }
+                                      className="w-20"
+                                      disabled={service.quantity === 0}
+                                    />
+                                  )}
                                 </div>
                                 <div className="col-span-2 text-sm font-medium">
                                   ${formatNumber(markupPrice.toFixed(0))}

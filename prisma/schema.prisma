@@ -481,12 +481,27 @@ model CampaignService {
   rejectionReason String?
   reviewedAt      DateTime?
 
+  /// --- Combo ---
+  /// Acuerdo puntual que agrupa varios formatos por un precio cerrado,
+  /// normalmente menor que la suma suelta. No es una linea del tarifario
+  /// del influencer: se negocia en cada campana, asi que no tiene
+  /// ProfileService detras ni cantidad (siempre 1).
+  esCombo          Boolean @default(false)
+  /// Que incluye el combo, en texto libre ("Reel + 3 Stories"). Sin
+  /// esto el cliente veria "Combo" y un importe, sin saber que aprueba.
+  comboDescripcion String?
+
   // Relaciones
   campaignProfilePlatform   CampaignProfilePlatform @relation(fields: [campaignProfilePlatformId], references: [id], onDelete: Cascade)
   campaignProfilePlatformId String
-  profileService            ProfileService          @relation(fields: [profileServiceId], references: [id])
-  profileServiceId          String
+  /// Opcional por los combos. Para el resto de formatos sigue siendo el
+  /// origen del precio y del nombre a mostrar.
+  profileService            ProfileService?         @relation(fields: [profileServiceId], references: [id])
+  profileServiceId          String?
 
+  /// Postgres admite varios NULL en un unico, asi que esta restriccion
+  /// sigue impidiendo repetir un formato del tarifario en la misma
+  /// plataforma, pero permite mas de un combo, que es lo deseable.
   @@unique([campaignProfilePlatformId, profileServiceId])
 }
 

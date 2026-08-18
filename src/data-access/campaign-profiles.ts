@@ -2,8 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "./errors";
 
 interface ServiceInput {
-  profileServiceId: string;
+  /** Ausente en los combos: no salen del tarifario del influencer. */
+  profileServiceId?: string;
   quantity: number;
+  esCombo?: boolean;
+  /** Precio cerrado del combo, escrito a mano al armar la campana. */
+  comboPrecio?: number;
+  comboDescripcion?: string;
 }
 
 interface PlatformInput {
@@ -67,8 +72,14 @@ export async function setCampaignProfiles(
   }
 
   // Load all profile services for price lookup
+  // Los combos no tienen tarifa que consultar: su precio se escribe al
+  // armar la campana, asi que se excluyen de esta busqueda.
   const allServiceIds = profiles.flatMap((p) =>
-    p.platforms.flatMap((pl) => pl.services.map((s) => s.profileServiceId))
+    p.platforms.flatMap((pl) =>
+      pl.services
+        .filter((s) => !s.esCombo && s.profileServiceId)
+        .map((s) => s.profileServiceId!)
+    )
   );
 
   const profileServicesData = await prisma.profileService.findMany({
@@ -139,7 +150,24 @@ export async function setCampaignProfiles(
         });
 
         for (const serviceInput of platformInput.services) {
-          const profileService = profileServiceMap.get(serviceInput.profileServiceId)!;
+          if (serviceInput.esCombo) {
+            // El precio viene del formulario, no del tarifario, y la
+            // cantidad es siempre 1: un combo es un acuerdo cerrado.
+            await tx.campaignService.create({
+              data: {
+                campaignProfilePlatformId: campaignPlatform.id,
+                profileServiceId: null,
+                esCombo: true,
+                comboDescripcion: serviceInput.comboDescripcion?.trim() || null,
+                quantity: 1,
+                basePrice: serviceInput.comboPrecio ?? 0,
+                currency: "COP",
+              },
+            });
+            continue;
+          }
+
+          const profileService = profileServiceMap.get(serviceInput.profileServiceId!)!;
 
           await tx.campaignService.create({
             data: {

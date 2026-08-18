@@ -61,6 +61,9 @@ interface CampaignWizardStore {
   removeProfile: (profileId: string) => void;
   togglePlatform: (profileId: string, socialAccountId: string) => void;
   toggleService: (profileId: string, socialAccountId: string, serviceId: string) => void;
+  setComboActivo: (profileId: string, socialAccountId: string, activo: boolean) => void;
+  setComboPrecio: (profileId: string, socialAccountId: string, precio: number) => void;
+  setComboDescripcion: (profileId: string, socialAccountId: string, texto: string) => void;
   updateServiceQuantity: (
     profileId: string,
     socialAccountId: string,
@@ -214,7 +217,10 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
             return {
               ...plat,
               services: plat.services.map((s) => {
-                if (s.profileServiceId !== serviceId) return s;
+                // Los combos no tienen tarifa de origen, asi que se
+                // identifican por su serviceTypeId sintetico.
+                const clave = s.profileServiceId ?? s.serviceTypeId;
+                if (clave !== serviceId) return s;
                 return { ...s, quantity: s.quantity > 0 ? 0 : 1 };
               }),
             };
@@ -223,6 +229,73 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
       }),
     }));
   },
+
+  /**
+   * El combo se apaga poniendo su precio a 0: no hay unidades que
+   * alternar, y el precio es justo lo que decide si entra en la campana.
+   */
+  setComboActivo: (profileId, socialAccountId, activo) =>
+    set((state) => ({
+      profileConfigs: state.profileConfigs.map((pc) =>
+        pc.profileId !== profileId
+          ? pc
+          : {
+              ...pc,
+              platforms: pc.platforms.map((p) =>
+                p.socialAccountId !== socialAccountId
+                  ? p
+                  : {
+                      ...p,
+                      services: p.services.map((s) =>
+                        s.esCombo ? { ...s, basePrice: activo ? s.basePrice : 0 } : s
+                      ),
+                    }
+              ),
+            }
+      ),
+    })),
+
+  setComboPrecio: (profileId, socialAccountId, precio) =>
+    set((state) => ({
+      profileConfigs: state.profileConfigs.map((pc) =>
+        pc.profileId !== profileId
+          ? pc
+          : {
+              ...pc,
+              platforms: pc.platforms.map((p) =>
+                p.socialAccountId !== socialAccountId
+                  ? p
+                  : {
+                      ...p,
+                      services: p.services.map((s) =>
+                        s.esCombo ? { ...s, basePrice: precio, quantity: 1 } : s
+                      ),
+                    }
+              ),
+            }
+      ),
+    })),
+
+  setComboDescripcion: (profileId, socialAccountId, texto) =>
+    set((state) => ({
+      profileConfigs: state.profileConfigs.map((pc) =>
+        pc.profileId !== profileId
+          ? pc
+          : {
+              ...pc,
+              platforms: pc.platforms.map((p) =>
+                p.socialAccountId !== socialAccountId
+                  ? p
+                  : {
+                      ...p,
+                      services: p.services.map((s) =>
+                        s.esCombo ? { ...s, comboDescripcion: texto } : s
+                      ),
+                    }
+              ),
+            }
+      ),
+    })),
 
   updateServiceQuantity: (profileId, socialAccountId, serviceId, quantity) => {
     set((state) => ({
@@ -235,7 +308,10 @@ export const useCampaignWizardStore = create<CampaignWizardStore>()((set, get) =
             return {
               ...plat,
               services: plat.services.map((s) => {
-                if (s.profileServiceId !== serviceId) return s;
+                // Los combos no tienen tarifa de origen, asi que se
+                // identifican por su serviceTypeId sintetico.
+                const clave = s.profileServiceId ?? s.serviceTypeId;
+                if (clave !== serviceId) return s;
                 return { ...s, quantity: Math.max(0, quantity) };
               }),
             };

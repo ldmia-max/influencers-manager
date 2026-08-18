@@ -1,9 +1,31 @@
 import { z } from "zod";
 
-const campaignProfileServiceSchema = z.object({
-  profileServiceId: z.string().min(1),
-  quantity: z.number().int().positive(),
-});
+/**
+ * Una linea de servicio dentro de una campana.
+ *
+ * Dos formas posibles:
+ *  - Formato del tarifario: profileServiceId + cantidad.
+ *  - Combo: precio escrito a mano y sin cantidad, porque es un acuerdo
+ *    puntual que no vive en el tarifario del influencer.
+ *
+ * El refine obliga a que sea una cosa o la otra, para que no llegue un
+ * combo sin precio ni un formato sin origen.
+ */
+const campaignProfileServiceSchema = z
+  .object({
+    profileServiceId: z.string().optional(),
+    quantity: z.number().int().positive().default(1),
+    esCombo: z.boolean().default(false),
+    comboPrecio: z.number().nonnegative().optional(),
+    comboDescripcion: z.string().trim().max(200).optional(),
+  })
+  .refine(
+    (s) =>
+      s.esCombo
+        ? typeof s.comboPrecio === "number"
+        : Boolean(s.profileServiceId),
+    { message: "Un combo necesita precio; un formato necesita su tarifa de origen" }
+  );
 
 const campaignProfilePlatformSchema = z.object({
   socialAccountId: z.string().min(1),

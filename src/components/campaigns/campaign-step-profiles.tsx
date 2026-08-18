@@ -522,9 +522,11 @@ export function CampaignStepProfiles() {
                               <div className="ml-6 space-y-1">
                                 {platform.services.map((service) => {
                                   const price = calculateMarkupPrice(service.basePrice, markup);
+                                  const clave =
+                                    service.profileServiceId ?? service.serviceTypeId;
                                   return (
                                     <div
-                                      key={service.profileServiceId}
+                                      key={clave}
                                       className="flex items-center gap-2 text-sm"
                                     >
                                       <Checkbox
@@ -533,7 +535,7 @@ export function CampaignStepProfiles() {
                                           toggleService(
                                             profile.id,
                                             platform.socialAccountId,
-                                            service.profileServiceId
+                                            clave
                                           )
                                         }
                                         className="h-4 w-4"
@@ -550,7 +552,7 @@ export function CampaignStepProfiles() {
                                           updateServiceQuantity(
                                             profile.id,
                                             platform.socialAccountId,
-                                            service.profileServiceId,
+                                            clave,
                                             parseInt(e.target.value, 10) || 0
                                           )
                                         }

@@ -113,11 +113,16 @@ export interface ProfileWithServices {
 // =============================================================================
 
 export interface ServiceConfig {
-  profileServiceId: string;
+  /** Ausente en los combos: no salen del tarifario del influencer. */
+  profileServiceId: string | null;
   serviceTypeId: string;
   serviceName: string;
+  /** Los combos van siempre con 1: son un acuerdo cerrado, no unidades. */
   quantity: number;
   basePrice: number;
+  esCombo?: boolean;
+  /** Que incluye el combo, en texto libre. */
+  comboDescripcion?: string;
 }
 
 export interface PlatformConfig {

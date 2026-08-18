@@ -24,7 +24,9 @@ import { CampaignNavigationBar } from "./campaign-navigation-bar";
 import type {
   CampaignData,
   CampaignEditorProps,
+  PlatformConfig,
   ProfileConfig,
+  ServiceConfig,
   WizardStep,
 } from "@/models/campaign";
 
@@ -36,6 +38,39 @@ export type { ProfileWithServices } from "@/models/campaign";
 // Esto resuelve el race condition entre el cleanup de useEffect (que corre
 // después del paint) y la inicialización render-phase de la nueva instancia.
 let _activeEditorSessionId: string | null = null;
+
+/**
+ * Clave sintetica del combo dentro de una plataforma.
+ *
+ * El combo no sale del tarifario, asi que no tiene profileServiceId. El
+ * store identifica cada servicio por `profileServiceId ?? serviceTypeId`,
+ * y este valor ocupa ese segundo hueco.
+ */
+const COMBO_ID = "__combo__";
+
+/**
+ * Fila de combo que se anade a cada plataforma.
+ *
+ * Se inyecta en la interfaz en vez de guardarse en el tarifario del
+ * influencer: un combo es un acuerdo puntual de UNA campana, y crear
+ * una tarifa "Combo $0" en cada creador seria informacion falsa.
+ */
+function construirCombo(
+  existingPlatform: PlatformConfig | undefined
+): ServiceConfig[] {
+  const previo = existingPlatform?.services.find((s) => s.esCombo);
+  return [
+    {
+      profileServiceId: null,
+      serviceTypeId: COMBO_ID,
+      serviceName: "Combo",
+      quantity: 1,
+      basePrice: previo?.basePrice ?? 0,
+      esCombo: true,
+      comboDescripcion: previo?.comboDescripcion ?? "",
+    },
+  ];
+}
 
 export function CampaignEditor({
   campaignId: initialCampaignId,
@@ -223,7 +258,7 @@ export function CampaignEditor({
               platformName: sa.platform.displayName,
               username: sa.username,
               selected: existingPlatform?.selected ?? shouldSelectPlatform,
-              services: sa.services.map((s) => {
+              services: sa.services.map((s): ServiceConfig => {
                 const existingService = existingPlatform?.services.find(
                   (es) => es.profileServiceId === s.id
                 );
@@ -238,7 +273,7 @@ export function CampaignEditor({
                   quantity: existingService?.quantity ?? (shouldSelectService ? 1 : 0),
                   basePrice: Number(s.price),
                 };
-              }),
+              }).concat(construirCombo(existingPlatform)),
             };
           }) || [],
       };
@@ -321,10 +356,18 @@ export function CampaignEditor({
           .map((p) => ({
             socialAccountId: p.socialAccountId,
             services: p.services
-              .filter((s) => s.quantity > 0)
+              // Un combo entra si tiene precio; el resto, si tiene unidades.
+              .filter((s) => (s.esCombo ? s.basePrice > 0 : s.quantity > 0))
+              // Forma unica en vez de una union: el combo lleva precio y
+              // el resto lleva tarifa de origen, pero el tipo es el mismo.
               .map((s) => ({
-                profileServiceId: s.profileServiceId,
-                quantity: s.quantity,
+                esCombo: Boolean(s.esCombo),
+                profileServiceId: s.esCombo
+                  ? undefined
+                  : s.profileServiceId ?? undefined,
+                comboPrecio: s.esCombo ? s.basePrice : undefined,
+                comboDescripcion: s.esCombo ? s.comboDescripcion : undefined,
+                quantity: s.esCombo ? 1 : s.quantity,
               })),
           }))
           .filter((p) => p.services.length > 0),

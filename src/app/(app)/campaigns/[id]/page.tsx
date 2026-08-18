@@ -95,7 +95,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         totalCampaign +=
           calculateMarkupPrice(basePrice, campaign.markupPercentage) * cs.quantity;
         // Contar formatos
-        const fname = cs.profileService.serviceType.displayName;
+        const fname = cs.esCombo
+          ? "Combo"
+          : cs.profileService!.serviceType.displayName;
         formatCounts.set(fname, (formatCounts.get(fname) || 0) + cs.quantity);
       });
 
@@ -306,7 +308,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                                   return (
                                     <TableRow key={cs.id}>
                                       <TableCell>
-                                        {cs.profileService.serviceType.displayName}
+                                        {cs.esCombo ? (
+                                          <>
+                                            Combo
+                                            {cs.comboDescripcion && (
+                                              <span className="ml-1 text-xs text-gray-500">
+                                                ({cs.comboDescripcion})
+                                              </span>
+                                            )}
+                                          </>
+                                        ) : (
+                                          cs.profileService!.serviceType.displayName
+                                        )}
                                         {cs.clientNotes && (
                                           <p className="text-xs text-muted-foreground mt-1 italic">
                                             Tema: &ldquo;{cs.clientNotes}&rdquo;
