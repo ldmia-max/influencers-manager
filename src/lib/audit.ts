@@ -76,6 +76,8 @@ export const ACCIONES = {
   campanaEstado: "campaign.status_changed",
   campanaMargen: "campaign.markup_changed",
   campanaBorrada: "campaign.deleted",
+  campanaArchivada: "campaign.archived",
+  campanaRestaurada: "campaign.restored",
 
   aprobacionVerificada: "approval.verified",
   aprobacionEnviada: "approval.submitted",

@@ -40,6 +40,8 @@ export async function getCampaignsPaginated(params: {
    * visibilidad obligaba a tocar cada consulta.
    */
   verTodas: boolean;
+  /** Solo para la vista de archivadas de un ADMIN. */
+  incluirArchivadas?: boolean;
   search?: string;
   clientId?: string;
   status?: CampaignStatus;
@@ -50,6 +52,10 @@ export async function getCampaignsPaginated(params: {
 
   const where = {
     AND: [
+      // Las archivadas no salen en los listados salvo que se pidan
+      // expresamente. Siguen enteras en la base: archivar es quitarlas
+      // de la vista, no borrarlas.
+      params.incluirArchivadas ? {} : { archivedAt: null },
       !params.verTodas ? { createdById: params.userId } : {},
       params.search
         ? {
@@ -166,6 +172,8 @@ export async function getCampaignsForPage(params: {
   userId?: string;
   /** Ver todas o solo las propias. Lo decide la tabla de permisos. */
   verTodas: boolean;
+  /** Solo para la vista de archivadas de un ADMIN. */
+  incluirArchivadas?: boolean;
   search?: string;
   clientId?: string;
   status?: CampaignStatus;
@@ -176,6 +184,10 @@ export async function getCampaignsForPage(params: {
 
   const where = {
     AND: [
+      // Las archivadas no salen en los listados salvo que se pidan
+      // expresamente. Siguen enteras en la base: archivar es quitarlas
+      // de la vista, no borrarlas.
+      params.incluirArchivadas ? {} : { archivedAt: null },
       !params.verTodas ? { createdById: params.userId } : {},
       params.search
         ? {
@@ -311,7 +323,11 @@ export async function getCampaignForEdit(id: string) {
 export async function getDashboardCampaigns(userId: string, verTodas: boolean) {
   const [activeCampaigns, draftCampaigns] = await Promise.all([
     prisma.campaign.findMany({
-      where: { status: "ACTIVE", ...(verTodas ? {} : { createdById: userId }) },
+      where: {
+        status: "ACTIVE",
+        archivedAt: null,
+        ...(verTodas ? {} : { createdById: userId }),
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         client: { select: { companyName: true } },
@@ -319,7 +335,11 @@ export async function getDashboardCampaigns(userId: string, verTodas: boolean) {
       },
     }),
     prisma.campaign.findMany({
-      where: { status: "DRAFT", ...(verTodas ? {} : { createdById: userId }) },
+      where: {
+        status: "DRAFT",
+        archivedAt: null,
+        ...(verTodas ? {} : { createdById: userId }),
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         client: { select: { companyName: true } },
@@ -677,6 +697,8 @@ export async function getCampaignsForClientPortal(clientId: string) {
     where: {
       clientId,
       status: { not: CampaignStatus.DRAFT },
+      // Archivada significa retirada de la vista, tambien para el cliente.
+      archivedAt: null,
     },
     orderBy: { createdAt: "desc" },
     select: {
@@ -730,4 +752,31 @@ export async function setCampaignMarkup(id: string, markup: number) {
     data: { markupPercentage: markup },
     select: { id: true, markupPercentage: true },
   });
+}
+
+/**
+ * Archiva o restaura una campana.
+ *
+ * Archivar solo pone una fecha: la campana desaparece de los listados
+ * pero conserva perfiles, servicios, precios, margen y la traza de
+ * aprobacion. Es lo indicado para campanas terminadas, donde lo que
+ * estorba es el ruido en la lista y no los datos.
+ *
+ * Devuelve el nombre y el estado para que la ruta pueda escribir una
+ * anotacion de auditoria legible sin volver a consultar.
+ */
+export async function setCampaignArchivada(id: string, archivada: boolean) {
+  const existente = await prisma.campaign.findUnique({
+    where: { id },
+    select: { id: true, name: true, status: true, archivedAt: true },
+  });
+  if (!existente) throw new NotFoundError("Campaña no encontrada");
+
+  const actualizada = await prisma.campaign.update({
+    where: { id },
+    data: { archivedAt: archivada ? new Date() : null },
+    select: { id: true, name: true, status: true, archivedAt: true },
+  });
+
+  return { anterior: existente, actual: actualizada };
 }

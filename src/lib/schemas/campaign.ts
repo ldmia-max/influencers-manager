@@ -98,3 +98,10 @@ export const setMarkupSchema = z.object({
 });
 
 export type SetMarkupPayload = z.infer<typeof setMarkupSchema>;
+
+export const archivarCampanaSchema = z.object({
+  /** true archiva, false devuelve la campana a los listados. */
+  archivada: z.boolean(),
+});
+
+export type ArchivarCampanaPayload = z.infer<typeof archivarCampanaSchema>;

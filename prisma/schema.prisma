@@ -371,6 +371,16 @@ model Campaign {
   endDate          DateTime?
   activationReason String?        // Motivo opcional al activar la campaña
   activatedAt      DateTime?      // Fecha de activación
+
+  /// Fecha en que se archivo: desaparece de los listados pero la fila
+  /// se conserva entera.
+  ///
+  /// Es la alternativa al borrado definitivo para campanas terminadas,
+  /// donde lo que estorba es el ruido en la lista, no los datos: una
+  /// campana completada guarda que se contrato, a que precio, con que
+  /// margen y quien lo aprobo. Solo un ADMIN puede archivarla o
+  /// restaurarla, y ambas acciones quedan en auditoria.
+  archivedAt       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
