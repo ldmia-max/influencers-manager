@@ -137,7 +137,7 @@ Al arrancar, Next.js debe imprimir `Environments: .env`. Si entras a `/profiles`
 | `APIFY_API_TOKEN` | No | Token de Apify. Sin él, la sincronización de métricas devuelve `null` y falla en silencio. |
 | `AUTH_TRUST_HOST` | No | Solo en producción tras un proxy inverso (Nginx, Traefik, Caddy). Ponlo en `true` o NextAuth construirá mal las URLs de callback. |
 
-Estas otras están declaradas pero **ningún archivo del proyecto las lee todavía**; corresponden a funcionalidades planeadas: `ENABLE_EMAILS`, `RESEND_FROM_EMAIL`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY`.
+Estas otras están declaradas pero **ningún archivo del proyecto las lee todavía**; corresponden a funcionalidades planeadas: `ENABLE_EMAILS`, `RESEND_FROM_EMAIL`, `RESEND_API_KEY`.
 
 El archivo [.env.example](.env.example) documenta cada variable con su valor esperado en local y en producción. El `.env` real está ignorado por git y nunca debe subirse.
 
@@ -444,7 +444,7 @@ Se cargan en el servicio de la app (**Environment**), nunca en un archivo dentro
 | `AUTH_TRUST_HOST` | `true` — obligatorio detrás de Traefik |
 | `APIFY_API_TOKEN` | el mismo que en local |
 | `UPLOADS_DIR` | `/app/uploads` — ya fijado en el `Dockerfile`, solo hace falta el volumen |
-| `ANTHROPIC_API_KEY` | solo si se quiere el asistente de campañas |
+| `ANTHROPIC_API_KEY` | solo para la búsqueda de prospectos con IA (`/busqueda-ia`) |
 | `ENABLE_EMAILS`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | solo si se quieren correos |
 
 ### Almacenamiento de archivos

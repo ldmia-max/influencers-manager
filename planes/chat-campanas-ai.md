@@ -1,3 +1,11 @@
+> **OBSOLETO — funcionalidad eliminada (2026-08-19).**
+> El chat de campañas se retiró: las campañas se crean a mano. El código
+> vivía en `src/lib/ai.ts`, `src/app/api/chat/campaign/` y
+> `src/components/chat/`, y sigue disponible en el historial de git.
+> La única IA que queda en la aplicación es la búsqueda de prospectos
+> (`/busqueda-ia`). Este documento se conserva como registro de lo que se
+> intentó, no describe el estado actual.
+
 # Plan: Chat Conversacional para Crear Campañas con AI
 
 ## Resumen

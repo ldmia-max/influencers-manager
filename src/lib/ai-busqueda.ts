@@ -1,8 +1,11 @@
 import "server-only";
-import { anthropic } from "./ai";
+import Anthropic from "@anthropic-ai/sdk";
 
 /**
  * Busqueda de prospectos guiada por IA.
+ *
+ * Esta es la UNICA funcionalidad de la aplicacion que usa IA. Todo lo
+ * demas —campanas, clientes, perfiles— se hace a mano, a proposito.
  *
  * Reparto de trabajo, y conviene tenerlo claro para no esperar de cada
  * pieza lo que no puede dar:
@@ -19,6 +22,14 @@ import { anthropic } from "./ai";
  * inventados, que es justo lo contrario de lo que sirve aqui.
  */
 
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+/**
+ * Haiku, y no un modelo mayor, porque las dos tareas que se le piden son
+ * acotadas: pasar una frase a criterios y descartar biografias que no
+ * son del nicho. Ademas van dentro de una busqueda que ya espera a
+ * Apify, asi que la latencia del modelo se nota.
+ */
 const MODELO = "claude-haiku-4-5-20251001";
 
 /** Plataformas en las que hoy se puede DESCUBRIR, no solo consultar. */

@@ -117,13 +117,4 @@ export const queryKeys = {
         data: (token: string) =>
             [...queryKeys.approval.all, token] as const,
     },
-
-    // =========================================================================
-    // Chat
-    // =========================================================================
-    chat: {
-        all: ["chat"] as const,
-        campaign: (campaignId: string) =>
-            [...queryKeys.chat.all, "campaign", campaignId] as const,
-    },
 } as const;

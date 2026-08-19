@@ -65,7 +65,7 @@ Invalidation uses Next 16's two-arg form, `revalidateTag("profiles", "hours")` �
 
 **Gotchas that are live right now:**
 - Only `profiles`, `categories`, and `reach-ranges` are ever revalidated. The admin CRUD for **platforms, service types, locations, and genders never calls `revalidateTag`**, so those edits take up to an hour to show up in forms and filters.
-- `src/app/api/chat/campaign/route.ts` calls `revalidateTag("campaigns", "max")`, but nothing tags `campaigns` — campaign reads in `src/data-access/campaigns.ts` are uncached, so that call does nothing.
+- `src/app/api/campaigns/[id]/markup/route.ts` calls `revalidateTag("campaigns", "hours")`, but nothing tags `campaigns` — campaign reads in `src/data-access/campaigns.ts` are uncached, so that call does nothing.
 
 Because `"use cache"` functions can't read the session, anything session-dependent must be passed in as an argument (and thereby becomes part of the cache key).
 
@@ -86,7 +86,7 @@ A `BOTH` profile therefore sees everything on the platform whatever `profileType
 
 Location is a three-level chain `Country → Department → City`, all optional on `Profile`. `ReachRange` (nano/micro/mid/macro/mega) is a lookup table with a `reachPercentage` used for estimated-reach math.
 
-`SocialAccount` also carries AI columns — `embedding vector(1536)` (pgvector, `Unsupported`), `aiSummary`, `aiMetadata`. The pipeline that would fill them is `src/services/social-processor.ts`, which **is not imported anywhere yet**; treat it as unfinished.
+`SocialAccount` still carries AI columns — `embedding vector(1536)` (pgvector, `Unsupported`), `aiSummary`, `aiMetadata` — but **nothing writes them any more.** The pipeline that would have filled them (`src/services/social-processor.ts`) never ran and was removed along with the campaign chat; the columns stayed because dropping them is a migration nobody has asked for. Treat them as dead until that decision is made.
 
 **Campaigns and clients cannot be deleted from the app.** There is no `DELETE` endpoint and no UI for either — removing them is a deliberate database operation, because a campaign is commercial history (what was contracted, at what price, with which markup, and who approved it) and a client drags its contacts and portal access with it. `Campaign.clientId` is `ON DELETE RESTRICT`, so the database refuses to drop a client that still has campaigns. Profiles and categories *can* still be deleted from the app, and those deletions are audited.
 
@@ -100,7 +100,7 @@ The client approves at every level: `CampaignProfile.status` and `CampaignProfil
 
 Status flow is `DRAFT → REVIEW → PENDING/ACTIVE → COMPLETED/CANCELLED`; the allowed transitions are declared in `USER_VALID_TRANSITIONS` in `src/lib/campaign-utils.ts` and enforced by `transitionCampaignStatus` in `src/data-access/campaigns.ts`.
 
-**Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and both the cart store and the AI chat apply the markup before displaying anything.
+**Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
 
 ### Public (unauthenticated) surfaces
 
@@ -148,11 +148,9 @@ Sync runs inline during `POST /api/profiles` (per account, errors swallowed so c
 
 The YouTube actor returns **one row per video**, each repeating the channel info, so `getYouTubeProfile` reads the profile from the first item and averages `viewCount` across the rest — `YOUTUBE_VIDEOS_PARA_MEDIA` caps how many are fetched, since every extra video costs Apify credit. It exposes no likes, so `avgLikes` and `engagementRate` stay null for YouTube rather than being filled with a computed proxy that would sit next to Instagram's real engagement rate in the same filters.
 
-### AI campaign chat
+### AI prospect search (`/busqueda-ia`) — the only AI in the app
 
-`src/lib/ai.ts` holds the Anthropic client, the Spanish system prompt, and a tool set (`search_clients`, `select_client`, `search_profiles`, `select_profiles_auto`, `add_profile_to_campaign`, `create_campaign`, …). `src/app/api/chat/campaign/route.ts` runs the tool loop, executes each tool against Prisma, and threads a `CampaignState` object through the request/response instead of storing conversation state server-side. The model is pinned to `claude-haiku-4-5-20251001`. Without `ANTHROPIC_API_KEY` the chat fails.
-
-### AI prospect search (`/busqueda-ia`)
+Campaigns, clients and profiles are built by hand, deliberately: an AI campaign assistant existed under `/api/chat/campaign` and was removed, because creating commercial records from a chat transcript was never wanted. If you are about to add a second AI surface, that is the decision you are reversing.
 
 Finds creators who are **not yet in the database**, from a phrase in natural language. Three stages in `src/app/api/busqueda-ia/route.ts`:
 
@@ -241,7 +239,7 @@ The production DB must run a PostgreSQL image that ships pgvector — the first 
 
 See `.env.example` for the annotated list. Required: `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`. Behind a reverse proxy also set `AUTH_TRUST_HOST=true`.
 
-Optional / feature-gating: `APIFY_API_TOKEN` (sync returns `null` without it), `ANTHROPIC_API_KEY` (AI chat), `BLOB_READ_WRITE_TOKEN` (Vercel Blob uploads), `RESEND_API_KEY` + `RESEND_FROM_EMAIL` + `ENABLE_EMAILS=true` (email is off unless all three are set).
+Optional / feature-gating: `APIFY_API_TOKEN` (sync returns `null` without it), `ANTHROPIC_API_KEY` (AI prospect search; `/busqueda-ia` answers 503 without it), `BLOB_READ_WRITE_TOKEN` (Vercel Blob uploads), `RESEND_API_KEY` + `RESEND_FROM_EMAIL` + `ENABLE_EMAILS=true` (email is off unless all three are set).
 
 Seeded admin: `admin@example.com` / `admin123`.
 
