@@ -87,6 +87,21 @@ export interface TikTokProfileData {
   verified: boolean;
 }
 
+export interface YouTubeProfileData {
+  /** Handle sin arroba, tal y como se guarda en SocialAccount.username. */
+  username: string;
+  channelName: string;
+  description: string;
+  channelUrl: string;
+  subscribers: number;
+  totalVideos: number;
+  /** Media de visualizaciones de los ultimos videos analizados. */
+  avgViews: number | null;
+  avatarUrl: string;
+  avatarLocalPath?: string;
+  verified: boolean;
+}
+
 export async function getInstagramProfile(
   username: string
 ): Promise<InstagramProfileData | null> {
@@ -169,8 +184,77 @@ export async function getTikTokProfile(
   }
 }
 
+/** Cuantos videos recientes se piden para promediar visualizaciones. */
+const YOUTUBE_VIDEOS_PARA_MEDIA = 10;
+
+/**
+ * Datos de un canal de YouTube.
+ *
+ * Usa streamers/youtube-channel-scraper. El actor devuelve una fila por
+ * video, y cada fila repite la informacion del canal; de ahi que los
+ * datos del perfil se lean del primer elemento y las visualizaciones se
+ * promedien entre todos.
+ *
+ * Se piden pocos videos a proposito: solo hacen falta para la media, y
+ * cada video de mas es consumo de la cuenta de Apify.
+ *
+ * @param handle Handle del canal, con o sin arroba (por ejemplo
+ *               "MrBeast" o "@MrBeast").
+ */
+export async function getYouTubeProfile(
+  handle: string
+): Promise<YouTubeProfileData | null> {
+  try {
+    const limpio = handle.trim().replace(/^@/, "");
+
+    const run = await client.actor("streamers/youtube-channel-scraper").call({
+      startUrls: [{ url: `https://www.youtube.com/@${limpio}` }],
+      maxResults: YOUTUBE_VIDEOS_PARA_MEDIA,
+      maxResultsShorts: 0,
+      maxResultStreams: 0,
+    });
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+    if (items.length === 0) return null;
+
+    const primero = items[0] as Record<string, unknown>;
+
+    // Media de visualizaciones de los videos devueltos. Es mas util que
+    // el total historico del canal, que crece siempre y no dice nada
+    // del rendimiento actual.
+    const vistas = items
+      .map((i) => Number((i as Record<string, unknown>).viewCount))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const avgViews = vistas.length
+      ? Math.round(vistas.reduce((a, b) => a + b, 0) / vistas.length)
+      : null;
+
+    const avatarUrl = String(primero.channelAvatarUrl || "");
+    const nombreCanal = String(primero.channelUsername || limpio);
+    const avatarLocalPath = avatarUrl
+      ? await downloadProfilePicture(avatarUrl, nombreCanal)
+      : null;
+
+    return {
+      username: nombreCanal,
+      channelName: String(primero.channelName || ""),
+      description: String(primero.channelDescription || ""),
+      channelUrl: String(primero.channelUrl || ""),
+      subscribers: Number(primero.numberOfSubscribers || 0),
+      totalVideos: Number(primero.channelTotalVideos || 0),
+      avgViews,
+      avatarUrl,
+      avatarLocalPath: avatarLocalPath || undefined,
+      verified: Boolean(primero.isChannelVerified),
+    };
+  } catch (error) {
+    console.error("Error fetching YouTube profile:", error);
+    return null;
+  }
+}
+
 export async function syncSocialAccountMetrics(
-  platform: "instagram" | "tiktok",
+  platform: "instagram" | "tiktok" | "youtube",
   username: string
 ) {
   if (platform === "instagram") {
@@ -202,6 +286,26 @@ export async function syncSocialAccountMetrics(
       following: data.followingCount,
       posts: data.videoCount,
       avgLikes: data.heartCount,
+    };
+  }
+
+  if (platform === "youtube") {
+    const data = await getYouTubeProfile(username);
+    if (!data) return null;
+
+    return {
+      fullName: data.channelName,
+      biography: data.description,
+      verified: data.verified,
+      profilePicUrl: data.avatarLocalPath || null,
+      profileUrl: data.channelUrl,
+      followers: data.subscribers,
+      posts: data.totalVideos,
+      avgViews: data.avgViews,
+      // Sin avgLikes ni engagementRate: este actor devuelve
+      // visualizaciones por video pero no "me gusta", y calcular un
+      // engagement inventado lo dejaria comparandose de tu a tu con el
+      // de Instagram, que si es real.
     };
   }
 

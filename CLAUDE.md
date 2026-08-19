@@ -138,9 +138,11 @@ When changing visibility rules, change both the cached read and the API route or
 
 ### Apify sync
 
-`src/lib/apify.ts` — actors `apify/instagram-profile-scraper` and `clockworks/tiktok-profile-scraper`. `syncSocialAccountMetrics(platform, username)` normalizes both into `SocialAccount` field names and **uploads the profile picture to Vercel Blob** (`put()`), storing the returned URL in `profilePicUrl`. `next.config.ts` allowlists `*.public.blob.vercel-storage.com` for `next/image`.
+`src/lib/apify.ts` — actors `apify/instagram-profile-scraper`, `clockworks/tiktok-profile-scraper` and `streamers/youtube-channel-scraper`. `syncSocialAccountMetrics(platform, username)` normalizes both into `SocialAccount` field names and **uploads the profile picture to Vercel Blob** (`put()`), storing the returned URL in `profilePicUrl`. `next.config.ts` allowlists `*.public.blob.vercel-storage.com` for `next/image`.
 
-Sync runs inline during `POST /api/profiles` (per account, errors swallowed so creation still succeeds) and on demand via `POST /api/profiles/[id]/sync`. Dispatch is by lowercased `platform.name` — a platform whose name isn't `instagram`/`tiktok` is silently skipped.
+Sync runs inline during `POST /api/profiles` (per account, errors swallowed so creation still succeeds) and on demand via `POST /api/profiles/[id]/sync`. Dispatch is by lowercased `platform.name` — a platform whose name isn't `instagram`/`tiktok`/`youtube` is silently skipped (Kick is seeded but has no actor yet).
+
+The YouTube actor returns **one row per video**, each repeating the channel info, so `getYouTubeProfile` reads the profile from the first item and averages `viewCount` across the rest — `YOUTUBE_VIDEOS_PARA_MEDIA` caps how many are fetched, since every extra video costs Apify credit. It exposes no likes, so `avgLikes` and `engagementRate` stay null for YouTube rather than being filled with a computed proxy that would sit next to Instagram's real engagement rate in the same filters.
 
 ### AI campaign chat
 

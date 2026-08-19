@@ -65,9 +65,11 @@ export async function POST(req: Request) {
       try {
         const platformName = account.platform.name.toLowerCase();
 
-        if (platformName === "instagram" || platformName === "tiktok") {
+        if (platformName === "instagram" ||
+          platformName === "tiktok" ||
+          platformName === "youtube") {
           const metrics = await syncSocialAccountMetrics(
-            platformName as "instagram" | "tiktok",
+            platformName as "instagram" | "tiktok" | "youtube",
             account.username
           );
 

@@ -631,6 +631,9 @@ export async function updateSocialAccountMetrics(
     posts?: number | null;
     engagementRate?: number | null;
     avgLikes?: number | null;
+    avgViews?: number | null;
+    /** YouTube trae la URL del canal; Instagram y TikTok no la envian. */
+    profileUrl?: string | null;
   }
 ) {
   await prisma.socialAccount.update({
