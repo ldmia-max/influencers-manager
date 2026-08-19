@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { revalidateTag } from "next/cache";
 import type { Prisma, Profile, ProfileType } from "@prisma/client";
 import { ValidationError, NotFoundError } from "./errors";
+import { normalizarUsuarioSocial } from "@/lib/social-handles";
 
 // --- Types ---
 
@@ -381,6 +382,36 @@ export async function getProfileCount(where?: Prisma.ProfileWhereInput) {
 
 // --- Mutations ---
 
+
+/**
+ * Deja el identificador de cada cuenta social como debe guardarse.
+ *
+ * Quien da de alta un creador copia la URL desde la propia plataforma,
+ * porque es donde tiene el perfil delante. Se normaliza AQUI, en la
+ * unica puerta por la que pasan todas las escrituras, y no en cada ruta
+ * o formulario: asi ninguna via puede colarse sin limpiar.
+ *
+ * Importa mas de lo que parece: ese texto no solo alimenta a Apify,
+ * tambien construye los enlaces al perfil que ve el cliente en el
+ * portal de aprobacion.
+ */
+async function normalizarCuentas<T extends { platformId: string; username: string }>(
+  cuentas: T[]
+): Promise<T[]> {
+  if (cuentas.length === 0) return cuentas;
+
+  const plataformas = await prisma.socialPlatform.findMany({
+    where: { id: { in: cuentas.map((c) => c.platformId) } },
+    select: { id: true, name: true },
+  });
+  const nombrePorId = new Map(plataformas.map((p) => [p.id, p.name]));
+
+  return cuentas.map((c) => ({
+    ...c,
+    username: normalizarUsuarioSocial(nombrePorId.get(c.platformId) ?? "", c.username),
+  }));
+}
+
 export async function createProfile(data: {
   name: string;
   email?: string | null;
@@ -402,6 +433,8 @@ export async function createProfile(data: {
   }[];
   categoryIds: string[];
 }) {
+  const socialAccounts = await normalizarCuentas(data.socialAccounts);
+
   const profile = await prisma.profile.create({
     data: {
       name: data.name,
@@ -414,7 +447,7 @@ export async function createProfile(data: {
       genderId: data.genderId || null,
       createdById: data.createdById,
       socialAccounts: {
-        create: data.socialAccounts.map((sa) => ({
+        create: socialAccounts.map((sa) => ({
           username: sa.username,
           platformId: sa.platformId,
           services: {
@@ -517,7 +550,11 @@ export async function updateProfile(
       }
     }
 
-    for (const sa of data.socialAccounts) {
+    // Mismo tratamiento que al crear: el identificador se guarda limpio
+    // aunque llegue como URL.
+    const cuentasNormalizadas = await normalizarCuentas(data.socialAccounts);
+
+    for (const sa of cuentasNormalizadas) {
       const existingAccount = existingAccounts.find(
         (acc) => acc.platformId === sa.platformId
       );

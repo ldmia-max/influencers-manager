@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { directorioUploads, RUTA_PUBLICA_UPLOADS } from "./uploads";
+import { esIdDeCanalYouTube, normalizarUsuarioSocial } from "./social-handles";
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN,
@@ -97,6 +98,17 @@ export interface YouTubeProfileData {
   totalVideos: number;
   /** Media de visualizaciones de los ultimos videos analizados. */
   avgViews: number | null;
+  avatarUrl: string;
+  avatarLocalPath?: string;
+  verified: boolean;
+}
+
+export interface KickProfileData {
+  username: string;
+  displayName: string;
+  bio: string;
+  channelUrl: string;
+  followers: number;
   avatarUrl: string;
   avatarLocalPath?: string;
   verified: boolean;
@@ -205,10 +217,17 @@ export async function getYouTubeProfile(
   handle: string
 ): Promise<YouTubeProfileData | null> {
   try {
-    const limpio = handle.trim().replace(/^@/, "");
+    // Acepta identificador suelto, con arroba o URL completa. Los
+    // canales identificados por id (UC...) no admiten la forma con
+    // arroba y necesitan /channel/.
+    const limpio = normalizarUsuarioSocial("youtube", handle);
+    if (!limpio) return null;
+    const url = esIdDeCanalYouTube(limpio)
+      ? `https://www.youtube.com/channel/${limpio}`
+      : `https://www.youtube.com/@${limpio}`;
 
     const run = await client.actor("streamers/youtube-channel-scraper").call({
-      startUrls: [{ url: `https://www.youtube.com/@${limpio}` }],
+      startUrls: [{ url }],
       maxResults: YOUTUBE_VIDEOS_PARA_MEDIA,
       maxResultsShorts: 0,
       maxResultStreams: 0,
@@ -253,8 +272,59 @@ export async function getYouTubeProfile(
   }
 }
 
+/**
+ * Datos de un canal de Kick.
+ *
+ * Usa aitooolsmax/kick-data-scraper en modo "channels". Hace falta un
+ * actor porque la API publica de kick.com responde 403 a cualquier
+ * peticion de servidor: la protege Cloudflare.
+ *
+ * Kick no expone publicaciones ni visualizaciones agregadas, asi que
+ * solo se rellenan seguidores, nombre, biografia, verificacion y
+ * avatar. El resto se deja vacio en lugar de inventarlo.
+ */
+export async function getKickProfile(
+  slug: string
+): Promise<KickProfileData | null> {
+  try {
+    const limpio = normalizarUsuarioSocial("kick", slug);
+    if (!limpio) return null;
+
+    const run = await client.actor("aitooolsmax/kick-data-scraper").call({
+      mode: "channels",
+      channelSlugs: [limpio],
+      maxItems: 1,
+    });
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+    if (items.length === 0) return null;
+
+    const canal = items[0] as Record<string, unknown>;
+
+    const avatarUrl = String(canal.profileImage || "");
+    const nombre = String(canal.slug || limpio);
+    const avatarLocalPath = avatarUrl
+      ? await downloadProfilePicture(avatarUrl, nombre)
+      : null;
+
+    return {
+      username: nombre,
+      displayName: String(canal.displayName || ""),
+      bio: String(canal.bio || ""),
+      channelUrl: String(canal.channelUrl || ""),
+      followers: Number(canal.followersCount || 0),
+      avatarUrl,
+      avatarLocalPath: avatarLocalPath || undefined,
+      verified: Boolean(canal.verified),
+    };
+  } catch (error) {
+    console.error("Error fetching Kick profile:", error);
+    return null;
+  }
+}
+
 export async function syncSocialAccountMetrics(
-  platform: "instagram" | "tiktok" | "youtube",
+  platform: "instagram" | "tiktok" | "youtube" | "kick",
   username: string
 ) {
   if (platform === "instagram") {
@@ -306,6 +376,22 @@ export async function syncSocialAccountMetrics(
       // visualizaciones por video pero no "me gusta", y calcular un
       // engagement inventado lo dejaria comparandose de tu a tu con el
       // de Instagram, que si es real.
+    };
+  }
+
+  if (platform === "kick") {
+    const data = await getKickProfile(username);
+    if (!data) return null;
+
+    return {
+      fullName: data.displayName,
+      biography: data.bio,
+      verified: data.verified,
+      profilePicUrl: data.avatarLocalPath || null,
+      profileUrl: data.channelUrl,
+      followers: data.followers,
+      // Kick no publica numero de emisiones ni visualizaciones
+      // agregadas, asi que posts, avgViews y engagement quedan vacios.
     };
   }
 

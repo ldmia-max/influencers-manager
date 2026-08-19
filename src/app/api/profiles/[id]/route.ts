@@ -60,9 +60,10 @@ export async function PUT(
 
           if (platformName === "instagram" ||
           platformName === "tiktok" ||
-          platformName === "youtube") {
+          platformName === "youtube" ||
+          platformName === "kick") {
             const metrics = await syncSocialAccountMetrics(
-              platformName as "instagram" | "tiktok" | "youtube",
+              platformName as "instagram" | "tiktok" | "youtube" | "kick",
               account.username
             );
 

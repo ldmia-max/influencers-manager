@@ -8,6 +8,11 @@ const profileServiceSchema = z.object({
 
 const socialAccountSchema = z.object({
   platformId: z.string().min(1, "La plataforma es requerida"),
+  // El identificador se guarda limpio venga como venga: suelto, con
+  // arroba o pegado como URL desde la propia plataforma, que es lo que
+  // hace en la practica quien da de alta un creador. Sin esto, una URL
+  // rompia la sincronizacion en silencio y ademas dejaba enlaces rotos
+  // en el portal que ve el cliente.
   username: z.string().trim().min(1, "El usuario es requerido"),
   services: z.array(profileServiceSchema).default([]),
 });
