@@ -397,3 +397,75 @@ export async function syncSocialAccountMetrics(
 
   return null;
 }
+
+export interface ProspectoTikTok {
+  username: string;
+  nombre: string;
+  bio: string;
+  profileUrl: string;
+  avatarUrl: string;
+  verificado: boolean;
+  seguidores: number;
+  siguiendo: number;
+  meGusta: number;
+  videos: number;
+  cuentaPrivada: boolean;
+}
+
+/**
+ * Busca CUENTAS de TikTok por palabras clave.
+ *
+ * A diferencia de los scrapers de perfil, este actor descubre: se le dan
+ * terminos y devuelve cuentas que encajan, con sus metricas ya incluidas.
+ * Eso evita un segundo scraping por candidato, que multiplicaria el
+ * coste de cada busqueda.
+ *
+ * Cada llamada consume credito de Apify, de ahi que el limite por
+ * consulta sea un parametro y no un valor generoso por defecto.
+ */
+export async function buscarProspectosTikTok(
+  consultas: string[],
+  maxPorConsulta = 10
+): Promise<ProspectoTikTok[]> {
+  const limpias = consultas.map((c) => c.trim()).filter(Boolean);
+  if (limpias.length === 0) return [];
+
+  try {
+    const run = await client.actor("clockworks/tiktok-user-search-scraper").call({
+      searchQueries: limpias,
+      maxProfilesPerQuery: maxPorConsulta,
+    });
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+    // Varias consultas pueden traer la misma cuenta.
+    const vistos = new Set<string>();
+    const prospectos: ProspectoTikTok[] = [];
+
+    for (const bruto of items) {
+      const it = bruto as Record<string, unknown>;
+      const username = String(it.name || "");
+      if (!username || vistos.has(username.toLowerCase())) continue;
+      vistos.add(username.toLowerCase());
+
+      prospectos.push({
+        username,
+        nombre: String(it.nickName || ""),
+        bio: String(it.signature || ""),
+        profileUrl: String(it.profileUrl || `https://www.tiktok.com/@${username}`),
+        avatarUrl: String(it.avatar || ""),
+        verificado: Boolean(it.verified),
+        seguidores: Number(it.fans || 0),
+        siguiendo: Number(it.following || 0),
+        meGusta: Number(it.heart || 0),
+        videos: Number(it.video || 0),
+        cuentaPrivada: Boolean(it.privateAccount),
+      });
+    }
+
+    return prospectos;
+  } catch (error) {
+    console.error("Error buscando prospectos en TikTok:", error);
+    return [];
+  }
+}

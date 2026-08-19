@@ -45,6 +45,12 @@ import type { ProfileType } from "@prisma/client";
 import type { Platform, ServiceType, Category, Gender, Country, Department, City } from "@/models/admin";
 
 interface ProfileFormProps {
+  /**
+   * Datos de partida para un perfil NUEVO, que llegan de la busqueda con
+   * IA. Distinto de initialData: eso significa "estas editando" y cambia
+   * la mutacion a actualizar. Aqui solo se siembran los campos.
+   */
+  prefill?: { nombre?: string; usuario?: string; plataforma?: string };
   platforms: Platform[];
   serviceTypes: ServiceType[];
   categories: Category[];
@@ -89,6 +95,7 @@ const TYPE_LABELS: Record<ProfileType, string> = {
 };
 
 export function ProfileForm({
+  prefill,
   platforms,
   serviceTypes,
   categories,
@@ -119,7 +126,7 @@ export function ProfileForm({
   const genderError = genderMutation.error?.message || null;
 
   // Form state
-  const [name, setName] = useState(initialData?.name || "");
+  const [name, setName] = useState(initialData?.name || prefill?.nombre || "");
   const [email, setEmail] = useState(initialData?.email || "");
   const [phone, setPhone] = useState(initialData?.phone || "");
   const [type, setType] = useState<ProfileType>(initialData?.type || "INFLUENCER");
@@ -131,8 +138,17 @@ export function ProfileForm({
   const { data: cities = [], isLoading: loadingCities } = useCities(departmentId);
   const [cityId, setCityId] = useState<string>(initialData?.cityId || "");
   const [genderId, setGenderId] = useState<string>(initialData?.genderId || "");
+  // Con prefill se preselecciona la plataforma que venia del prospecto,
+  // buscando su id por el nombre que llego en la URL.
+  const idPlataformaPrefill = prefill?.plataforma
+    ? platforms.find(
+        (p) => p.name.toLowerCase() === prefill.plataforma!.toLowerCase()
+      )?.id
+    : undefined;
+
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
-    initialData?.socialAccounts.map((sa) => sa.platformId) || []
+    initialData?.socialAccounts.map((sa) => sa.platformId) ||
+      (idPlataformaPrefill ? [idPlataformaPrefill] : [])
   );
   const [socialAccounts, setSocialAccounts] = useState<SocialAccountInput[]>(
     initialData?.socialAccounts.map((sa) => ({
@@ -142,7 +158,18 @@ export function ProfileForm({
         serviceTypeId: s.serviceTypeId,
         price: s.price.toString(),
       })),
-    })) || []
+    })) ||
+      (idPlataformaPrefill && prefill?.usuario
+        ? [
+            {
+              platformId: idPlataformaPrefill,
+              username: prefill.usuario,
+              services: serviceTypes
+                .filter((st) => st.platformId === idPlataformaPrefill)
+                .map((st) => ({ serviceTypeId: st.id, price: "" })),
+            },
+          ]
+        : [])
   );
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialData?.categoryIds || []

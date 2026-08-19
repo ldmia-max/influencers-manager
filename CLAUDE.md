@@ -152,6 +152,22 @@ The YouTube actor returns **one row per video**, each repeating the channel info
 
 `src/lib/ai.ts` holds the Anthropic client, the Spanish system prompt, and a tool set (`search_clients`, `select_client`, `search_profiles`, `select_profiles_auto`, `add_profile_to_campaign`, `create_campaign`, …). `src/app/api/chat/campaign/route.ts` runs the tool loop, executes each tool against Prisma, and threads a `CampaignState` object through the request/response instead of storing conversation state server-side. The model is pinned to `claude-haiku-4-5-20251001`. Without `ANTHROPIC_API_KEY` the chat fails.
 
+### AI prospect search (`/busqueda-ia`)
+
+Finds creators who are **not yet in the database**, from a phrase in natural language. Three stages in `src/app/api/busqueda-ia/route.ts`:
+
+1. `extraerCriterios()` (`src/lib/ai-busqueda.ts`) turns the phrase into `CriteriosBusqueda` — keyword queries plus follower range, place, category — as strict JSON, no tool loop.
+2. `buscarProspectosTikTok()` (`src/lib/apify.ts`) runs `clockworks/tiktok-user-search-scraper` on those queries and dedupes by username.
+3. The **follower range is filtered in code**, not by the model, and `valorarProspectos()` only judges what a keyword search can't: whether bio and name really match the niche. If that call fails it returns an empty map and everything is shown rather than nothing.
+
+Two properties worth keeping: **the model never invents accounts** — every result comes from Apify — and Apify searches by keyword, not by meaning, so the noise is high and the AI pass is what makes the list usable.
+
+Only TikTok is in `PLATAFORMAS_BUSCABLES`; the other platforms have profile scrapers but no usable discovery actor, and the route answers with an `aviso` instead of failing. Anthropic failures are translated by `ErrorIA` — the raw API error is never sent to the browser.
+
+Results link to `/profiles/new?nombre=&usuario=&plataforma=`, which feeds `ProfileForm`'s `prefill` prop. `prefill` is **not** `initialData`: that one means "editing" and switches the mutation to update.
+
+Each search costs Apify credit (up to 3 queries × 10 profiles) plus two Haiku calls.
+
 ### Email
 
 `src/lib/emails/resend.ts` — `sendEmail()` is a **no-op unless `ENABLE_EMAILS === "true"`**, and warns-and-returns when `RESEND_API_KEY` is missing. Templates are plain HTML string builders in `templates.ts`, wrapped by `campaign-notifications.ts` / `brief-notifications.ts`.
