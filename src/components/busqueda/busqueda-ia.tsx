@@ -51,6 +51,11 @@ interface Respuesta {
   aviso?: string;
 }
 
+/**
+ * Ejemplos de redaccion. Son texto, no botones: estan para ensenar la
+ * forma de la frase —plataforma, nicho, lugar, seguidores—, no para
+ * lanzar busquedas ajenas a lo que el usuario venia a buscar.
+ */
 const EJEMPLOS = [
   "Influencers de fitness en Medellín en TikTok con más de 50 mil seguidores",
   "Creadoras de cocina colombiana en TikTok, entre 10k y 100k seguidores",
@@ -131,21 +136,15 @@ export function BusquedaIA() {
             </Button>
           </form>
 
-          <div className="flex flex-wrap gap-2">
-            {EJEMPLOS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => {
-                  setPrompt(e);
-                  buscar(e);
-                }}
-                disabled={cargando}
-                className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:border-violet-300 hover:text-violet-700 disabled:opacity-50"
-              >
-                {e}
-              </button>
-            ))}
+          <div className="text-xs text-gray-500">
+            <p className="font-medium text-gray-600">Ejemplos:</p>
+            <ul className="mt-1 space-y-0.5">
+              {EJEMPLOS.map((e) => (
+                <li key={e} className="italic">
+                  «{e}»
+                </li>
+              ))}
+            </ul>
           </div>
         </CardContent>
       </Card>
