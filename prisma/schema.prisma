@@ -188,15 +188,6 @@ model SocialAccount {
   engagementRate Float?
   lastSyncAt     DateTime?
 
-  // IA - Embedding vectorial para búsqueda semántica (OpenAI/Cohere 1536 dims)
-  embedding  Unsupported("vector(1536)")?
-
-  // IA - Resumen semántico generado por IA (usado para generar el embedding)
-  aiSummary  String? @db.Text
-
-  // IA - Metadata estructurada de IA (tags, brandSafe, sentiment, etc.)
-  aiMetadata Json?
-
   // Relaciones
   profile           Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId         String

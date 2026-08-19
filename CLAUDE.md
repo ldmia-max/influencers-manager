@@ -86,7 +86,7 @@ A `BOTH` profile therefore sees everything on the platform whatever `profileType
 
 Location is a three-level chain `Country → Department → City`, all optional on `Profile`. `ReachRange` (nano/micro/mid/macro/mega) is a lookup table with a `reachPercentage` used for estimated-reach math.
 
-`SocialAccount` still carries AI columns — `embedding vector(1536)` (pgvector, `Unsupported`), `aiSummary`, `aiMetadata` — but **nothing writes them any more.** The pipeline that would have filled them (`src/services/social-processor.ts`) never ran and was removed along with the campaign chat; the columns stayed because dropping them is a migration nobody has asked for. Treat them as dead until that decision is made.
+`SocialAccount` used to carry AI columns — `embedding vector(1536)`, `aiSummary`, `aiMetadata` — filled by a pipeline that never ran. Both were removed (`20260819220000_eliminar_columnas_ia`), so **the table holds only Apify metrics now.** The `vector` and `pg_trgm` extensions stay declared in `schema.prisma` and created by the init migration even though nothing uses them: retiring them would mean editing that first migration, so a fresh database still needs a PostgreSQL image that ships pgvector.
 
 **Campaigns and clients cannot be deleted from the app.** There is no `DELETE` endpoint and no UI for either — removing them is a deliberate database operation, because a campaign is commercial history (what was contracted, at what price, with which markup, and who approved it) and a client drags its contacts and portal access with it. `Campaign.clientId` is `ON DELETE RESTRICT`, so the database refuses to drop a client that still has campaigns. Profiles and categories *can* still be deleted from the app, and those deletions are audited.
 
