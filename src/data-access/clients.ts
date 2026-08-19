@@ -302,15 +302,6 @@ export async function updateClient(
   });
 }
 
-export async function deleteClient(id: string) {
-  const client = await prisma.client.findUnique({ where: { id } });
-
-  if (!client) {
-    throw new NotFoundError("Cliente no encontrado");
-  }
-
-  await prisma.client.delete({ where: { id } });
-}
 
 // === Client Access ===
 

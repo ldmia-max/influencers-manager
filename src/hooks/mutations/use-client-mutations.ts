@@ -1,10 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { queryKeys } from "@/lib/query-keys";
 import {
   createClient,
   updateClient,
-  deleteClient,
   createClientAccess,
   revokeClientAccess,
 } from "@/services/client";
@@ -54,18 +52,6 @@ export function useUpdateClient() {
 // Delete Client
 // =============================================================================
 
-export function useDeleteClient() {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-
-  return useMutation({
-    mutationFn: (clientId: string) => deleteClient(clientId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
-      router.refresh();
-    },
-  });
-}
 
 // =============================================================================
 // Create Client Access (set portal password)

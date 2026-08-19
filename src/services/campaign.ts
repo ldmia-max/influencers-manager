@@ -3,7 +3,7 @@
  */
 
 import type { CampaignStatus } from "@prisma/client";
-import { apiPost, apiPut, apiPatch, apiDelete } from "./api";
+import { apiPost, apiPut, apiPatch } from "./api";
 import type {
   CreateCampaignPayload,
   UpdateCampaignPayload,
@@ -60,14 +60,6 @@ export async function updateCampaign(
   return apiPut<CreateCampaignResponse>(`/api/campaigns/${campaignId}`, payload);
 }
 
-/**
- * Delete a draft campaign (hard delete)
- */
-export async function deleteCampaign(
-  campaignId: string
-): Promise<{ success: boolean }> {
-  return apiDelete(`/api/campaigns/${campaignId}`);
-}
 
 // =============================================================================
 // Campaign Profiles

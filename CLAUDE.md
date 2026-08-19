@@ -88,6 +88,8 @@ Location is a three-level chain `Country → Department → City`, all optional 
 
 `SocialAccount` also carries AI columns — `embedding vector(1536)` (pgvector, `Unsupported`), `aiSummary`, `aiMetadata`. The pipeline that would fill them is `src/services/social-processor.ts`, which **is not imported anywhere yet**; treat it as unfinished.
 
+**Campaigns and clients cannot be deleted from the app.** There is no `DELETE` endpoint and no UI for either — removing them is a deliberate database operation, because a campaign is commercial history (what was contracted, at what price, with which markup, and who approved it) and a client drags its contacts and portal access with it. `Campaign.clientId` is `ON DELETE RESTRICT`, so the database refuses to drop a client that still has campaigns. Profiles and categories *can* still be deleted from the app, and those deletions are audited.
+
 Cascade deletes: `Profile` → `SocialAccount` → `ProfileService`; `Client` → `ClientContact`/`ClientUser`; `Campaign` → `CampaignProfile` → `CampaignProfilePlatform` → `CampaignService`, plus `CampaignApprovalToken`. `ServiceType`, `SocialPlatform`, `Category`, and the location tables are never cascaded (deleting them requires clearing references first).
 
 ### Campaigns are four levels deep, and approval happens at three of them

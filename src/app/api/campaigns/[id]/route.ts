@@ -2,14 +2,12 @@ import { NextResponse } from "next/server";
 import {
   getCampaignById,
   updateCampaign,
-  deleteCampaign,
 } from "@/data-access/campaigns";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { updateCampaignSchema } from "@/lib/schemas/campaign";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
-import { auditar, ACCIONES } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -90,43 +88,12 @@ export async function PUT(req: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(req: Request, { params }: RouteParams) {
-  try {
-    const sesion = await exigirPermiso("campanas", "borrar");
-    if (sesion instanceof NextResponse) return sesion;
-
-    const { id } = await params;
-    const existing = await getCampaignById(id);
-
-    const sinPermiso = exigirPropiedad(sesion, "campanas", existing.createdById);
-    if (sinPermiso) return sinPermiso;
-
-    await deleteCampaign(id);
-
-    await auditar({
-      action: ACCIONES.campanaBorrada,
-      entity: "Campaign",
-      entityId: id,
-      actorType: "USER",
-      actorId: sesion.userId,
-      actorEmail: sesion.email,
-      summary: `Eliminó la campaña "${existing.name}"`,
-      metadata: { nombre: existing.name, estado: existing.status },
-      req,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    if (error instanceof NotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-    console.error("Error deleting campaign:", error);
-    return NextResponse.json(
-      { error: "Error al eliminar campaña" },
-      { status: 500 }
-    );
-  }
-}
+/**
+ * El borrado de campanas NO se expone por la API.
+ *
+ * Decision del negocio: una campana es historial comercial (que se
+ * contrato, a que precio, con que margen y quien lo aprobo), asi que
+ * eliminarla es una operacion deliberada que se hace desde el gestor de
+ * base de datos, no desde la aplicacion. Antes habia un DELETE aqui y
+ * un boton en la ficha de borradores.
+ */

@@ -4,7 +4,6 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   createCampaign,
   updateCampaign,
-  deleteCampaign,
   saveCampaignProfiles,
   updateCampaignStatus,
   regenerateApprovalToken,
@@ -60,18 +59,6 @@ export function useUpdateCampaign() {
 // Delete Campaign
 // =============================================================================
 
-export function useDeleteCampaign() {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-
-  return useMutation({
-    mutationFn: (campaignId: string) => deleteCampaign(campaignId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.campaigns.all });
-      router.refresh();
-    },
-  });
-}
 
 // =============================================================================
 // Save Campaign Profiles

@@ -86,7 +86,6 @@ export {
   getClientForEdit,
   createClient,
   updateClient,
-  deleteClient,
   createOrUpdateClientAccess,
   deleteClientAccess,
   loginClient,
@@ -121,7 +120,6 @@ export {
   getDashboardCampaigns,
   createCampaign,
   updateCampaign,
-  deleteCampaign,
   transitionCampaignStatus,
   regenerateApprovalToken,
 } from "./campaigns";

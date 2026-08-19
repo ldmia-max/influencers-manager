@@ -42,12 +42,6 @@ export async function updateClient(clientId: string, payload: UpdateClientPayloa
   return apiPut<ClientResponse>(`/api/clients/${clientId}`, payload);
 }
 
-/**
- * Delete a client
- */
-export async function deleteClient(clientId: string): Promise<{ success: boolean }> {
-  return apiDelete(`/api/clients/${clientId}`);
-}
 
 /**
  * Create client portal access (set password)

@@ -36,14 +36,13 @@ import {
   Copy,
   Check,
   Link2,
-  Trash2,
   AlertTriangle,
 } from "lucide-react";
 import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_COLORS,
 } from "@/lib/campaign-utils";
-import { updateCampaignStatus, deleteCampaign } from "@/services/campaign";
+import { updateCampaignStatus } from "@/services/campaign";
 import type { CampaignStatus } from "@prisma/client";
 
 interface CampaignStatusActionsProps {
@@ -124,20 +123,6 @@ export function CampaignStatusActions({
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
       setLoading(null);
-    }
-  };
-
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    setError("");
-    try {
-      await deleteCampaign(campaignId);
-      router.push("/campaigns");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-      setDeleting(false);
     }
   };
 
@@ -432,40 +417,6 @@ export function CampaignStatusActions({
           </AlertDialog>
         )}
 
-        {/* Eliminar (solo desde DRAFT) */}
-        {currentStatus === "DRAFT" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" disabled={loading !== null || deleting}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Eliminar Campaña</AlertDialogTitle>
-                <AlertDialogDescription>
-                  ¿Estás seguro de que deseas eliminar esta campaña permanentemente?
-                  Se eliminarán todos los perfiles y servicios asociados.
-                  <br /><br />
-                  <strong className="text-red-600">
-                    Esta acción no se puede deshacer.
-                  </strong>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>No, volver</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {deleting ? "Eliminando..." : "Sí, eliminar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
       </div>
 
       {/* Mensaje cuando no hay acciones */}

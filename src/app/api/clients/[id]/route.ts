@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { getClientById, updateClient, deleteClient } from "@/data-access/clients";
+import { getClientById, updateClient } from "@/data-access/clients";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { parseBody } from "@/lib/validate-request";
 import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { updateClientSchema } from "@/lib/schemas/client";
-import { auditar, ACCIONES } from "@/lib/audit";
 
 export async function GET(
   req: Request,
@@ -71,40 +70,11 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const sesion = await exigirPermiso("clientes", "borrar");
-    if (sesion instanceof NextResponse) return sesion;
-
-    const { id } = await params;
-
-    const cliente = await getClientById(id);
-    await deleteClient(id);
-
-    await auditar({
-      action: ACCIONES.clienteBorrado,
-      entity: "Client",
-      entityId: id,
-      actorType: "USER",
-      actorId: sesion.userId,
-      actorEmail: sesion.email,
-      summary: `Eliminó el cliente "${cliente.companyName}"`,
-      metadata: { empresa: cliente.companyName, email: cliente.email },
-      req,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-    console.error("Error deleting client:", error);
-    return NextResponse.json(
-      { error: "Error al eliminar cliente" },
-      { status: 500 }
-    );
-  }
-}
+/**
+ * El borrado de clientes NO se expone por la API.
+ *
+ * Un cliente con campanas ya lo impedia la base de datos (la clave
+ * foranea es RESTRICT) y devolvia un 500 opaco. Ahora la decision es
+ * explicita: eliminar un cliente se hace desde el gestor de base de
+ * datos, porque arrastra sus contactos y su acceso al portal.
+ */

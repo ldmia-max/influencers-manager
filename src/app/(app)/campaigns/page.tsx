@@ -20,7 +20,6 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Eye, Megaphone } from "lucide-react";
-import { AccionesEliminarCampana } from "@/components/campaigns/acciones-eliminar-campana";
 import { formatNumber, formatCompactNumber, calculateReach } from "@/lib/format";
 import {
   CAMPAIGN_STATUS_LABELS,
@@ -37,8 +36,6 @@ interface SearchParams {
   status?: string;
   page?: string;
   pageSize?: string;
-  /** "1" muestra las archivadas en lugar de las activas. Solo ADMIN. */
-  archivadas?: string;
 }
 
 export default async function CampaignsPage({
@@ -53,11 +50,6 @@ export default async function CampaignsPage({
   const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
   const skip = (page - 1) * pageSize;
   // El alcance lo decide la tabla de permisos, no el rol.
-  const esAdmin = session?.user.role === "ADMIN";
-  // Solo un ADMIN puede pedir la vista de archivadas; para el resto se
-  // ignora el parametro.
-  const verArchivadas = esAdmin && params.archivadas === "1";
-
   const verTodas = !exigePropiedadParaLeer(
     (session?.user.role ?? "USER") as Rol,
     "campanas"
@@ -66,9 +58,6 @@ export default async function CampaignsPage({
   const where = {
     AND: [
       verTodas ? {} : { createdById: session?.user.id },
-      // Archivar retira del listado; la vista de archivadas hace lo
-      // contrario y muestra solo esas.
-      verArchivadas ? { archivedAt: { not: null } } : { archivedAt: null },
       // Filtro por búsqueda
       params.search
         ? {
@@ -180,25 +169,10 @@ export default async function CampaignsPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {verArchivadas ? "Campañas archivadas" : "Campañas"}
-        </h1>
-        <div className="flex items-center gap-2">
-          {/* Sin esta puerta, archivar seria un viaje de ida: la campana
-              desapareceria del listado y solo se podria recuperar por SQL. */}
-          {esAdmin && (
-            <Link href={verArchivadas ? "/campaigns" : "/campaigns?archivadas=1"}>
-              <Button variant="outline">
-                {verArchivadas ? "Ver activas" : "Ver archivadas"}
-              </Button>
-            </Link>
-          )}
-          {!verArchivadas && (
-            <Link href="/campaigns/new">
-              <Button>Nueva Campaña</Button>
-            </Link>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
+        <Link href="/campaigns/new">
+          <Button>Nueva Campaña</Button>
+        </Link>
       </div>
 
       <Card>
@@ -326,17 +300,6 @@ export default async function CampaignsPage({
                                     Editar
                                   </Link>
                                 </DropdownMenuItem>
-                              )}
-                              {/* Archivar y eliminar: solo ADMIN, y en
-                                  cualquier estado. Antes solo se ofrecia
-                                  borrar borradores, asi que una campana
-                                  terminada no tenia forma de retirarse. */}
-                              {esAdmin && (
-                                <AccionesEliminarCampana
-                                  campaignId={campaign.id}
-                                  campaignName={campaign.name}
-                                  archivada={verArchivadas}
-                                />
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>

@@ -18,10 +18,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Building2 } from "lucide-react";
-import { DeleteClientDialog } from "@/components/clients/delete-client-dialog";
 import { ManageAccessDialog } from "@/components/clients/manage-access-dialog";
 
 interface SearchParams {
@@ -205,18 +203,6 @@ export default async function ClientsPage({
                                     Editar
                                   </Link>
                                 </DropdownMenuItem>
-                                {isAdmin && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    {/* Trae su propio DropdownMenuItem: el
-                                        dialogo NO puede colgar del menu o se
-                                        desmonta al cerrarse este. */}
-                                    <DeleteClientDialog
-                                      clientId={client.id}
-                                      clientName={client.companyName}
-                                    />
-                                  </>
-                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
