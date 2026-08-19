@@ -57,17 +57,14 @@ export function ProfileCardWithCart({ profile, isAdmin }: ProfileCardWithCartPro
             {isAdmin && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <div className="flex items-center gap-2 w-full">
-                    <DeleteProfileDialog
-                      profileId={profile.id}
-                      profileName={profile.name}
-                      variant="ghost"
-                      size="sm"
-                      redirectTo="/profiles"
-                    />
-                  </div>
-                </DropdownMenuItem>
+                {/* Trae su propio DropdownMenuItem: el dialogo no puede
+                    colgar del menu o se desmonta al cerrarse este. */}
+                <DeleteProfileDialog
+                  profileId={profile.id}
+                  profileName={profile.name}
+                  redirectTo="/profiles"
+                  asMenuItem
+                />
               </>
             )}
           </DropdownMenuContent>

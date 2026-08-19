@@ -208,14 +208,13 @@ export default async function ClientsPage({
                                 {isAdmin && (
                                   <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                      <div className="flex items-center gap-2 w-full">
-                                        <DeleteClientDialog
-                                          clientId={client.id}
-                                          clientName={client.companyName}
-                                        />
-                                      </div>
-                                    </DropdownMenuItem>
+                                    {/* Trae su propio DropdownMenuItem: el
+                                        dialogo NO puede colgar del menu o se
+                                        desmonta al cerrarse este. */}
+                                    <DeleteClientDialog
+                                      clientId={client.id}
+                                      clientName={client.companyName}
+                                    />
                                   </>
                                 )}
                               </DropdownMenuContent>
