@@ -145,6 +145,15 @@ export {
   formatosHistoricosDeInfluencer,
 } from "./entregas";
 
+// --- Metricas del contenido entregado ---
+export {
+  entregasParaRefrescar,
+  refrescarMetricas,
+  refrescarMetricasDeCampana,
+  historicoDeCampana,
+  DIAS_DE_SEGUIMIENTO,
+} from "./metricas";
+
 // --- Campaign Approval ---
 export {
   getApprovalData,

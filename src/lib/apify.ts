@@ -625,3 +625,144 @@ async function buscarEnYouTube(
 
   return prospectos;
 }
+
+
+// =============================================================================
+// Metricas de publicaciones ya entregadas
+// =============================================================================
+
+/**
+ * Lo que una plataforma publica de una publicacion concreta.
+ *
+ * Null significa "esta red no da ese dato", que no es cero. Los
+ * compartidos solo existen en TikTok; ni Instagram ni YouTube los
+ * exponen, porque solo los ve el creador en su panel. Y los guardados,
+ * igual. Rellenarlos con cero pintaria un grafico plano que se leeria
+ * como "nadie lo compartio".
+ */
+export interface MetricasPublicacion {
+  url: string;
+  vistas: number | null;
+  meGusta: number | null;
+  comentarios: number | null;
+  compartidos: number | null;
+  guardados: number | null;
+}
+
+/** De que red es un link, mirando su dominio. */
+export function plataformaDeUrl(url: string): string | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  if (host === "instagram.com") return "instagram";
+  if (host === "tiktok.com" || host === "vm.tiktok.com") return "tiktok";
+  if (host === "youtube.com" || host === "youtu.be") return "youtube";
+  if (host === "kick.com") return "kick";
+  return null;
+}
+
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+/**
+ * Lee las metricas de varias publicaciones de la MISMA red.
+ *
+ * Se agrupa por plataforma y se manda una sola llamada con todas las
+ * URLs: cada arranque de actor tiene su coste fijo, asi que pedirlas de
+ * una es bastante mas barato que una llamada por link.
+ *
+ * Devuelve un mapa por URL. Las que el actor no consiga leer —un post
+ * borrado, una cuenta que se hizo privada— simplemente no aparecen, en
+ * vez de guardarse como ceros que falsearian el historico.
+ */
+export async function obtenerMetricasDePublicaciones(
+  plataforma: string,
+  urls: string[]
+): Promise<Map<string, MetricasPublicacion>> {
+  const mapa = new Map<string, MetricasPublicacion>();
+  const limpias = [...new Set(urls.map((u) => u.trim()).filter(Boolean))];
+  if (limpias.length === 0) return mapa;
+
+  try {
+    if (plataforma === "tiktok") {
+      const run = await client.actor("clockworks/tiktok-video-scraper").call({
+        postURLs: limpias,
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+      });
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      for (const bruto of items) {
+        const it = bruto as Record<string, unknown>;
+        const url = String(it.webVideoUrl || it.url || "");
+        if (!url) continue;
+        mapa.set(url, {
+          url,
+          vistas: num(it.playCount),
+          meGusta: num(it.diggCount),
+          comentarios: num(it.commentCount),
+          compartidos: num(it.shareCount),
+          guardados: num(it.collectCount),
+        });
+      }
+      return mapa;
+    }
+
+    if (plataforma === "instagram") {
+      const run = await client.actor("apify/instagram-scraper").call({
+        directUrls: limpias,
+        resultsType: "posts",
+        resultsLimit: limpias.length,
+        addParentData: false,
+      });
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      for (const bruto of items) {
+        const it = bruto as Record<string, unknown>;
+        const url = String(it.url || it.inputUrl || "");
+        if (!url) continue;
+        mapa.set(url, {
+          url,
+          vistas: num(it.videoPlayCount) ?? num(it.videoViewCount),
+          meGusta: num(it.likesCount),
+          comentarios: num(it.commentsCount),
+          // Instagram no publica compartidos ni guardados.
+          compartidos: null,
+          guardados: null,
+        });
+      }
+      return mapa;
+    }
+
+    if (plataforma === "youtube") {
+      const run = await client.actor("streamers/youtube-scraper").call({
+        startUrls: limpias.map((url) => ({ url })),
+        maxResults: limpias.length,
+        maxResultsShorts: 0,
+        maxResultStreams: 0,
+      });
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      for (const bruto of items) {
+        const it = bruto as Record<string, unknown>;
+        const url = String(it.url || "");
+        if (!url) continue;
+        mapa.set(url, {
+          url,
+          vistas: num(it.viewCount),
+          meGusta: num(it.likes),
+          comentarios: num(it.commentsCount),
+          compartidos: null,
+          guardados: null,
+        });
+      }
+      return mapa;
+    }
+
+    // Kick no tiene actor de publicaciones sueltas.
+    return mapa;
+  } catch (error) {
+    console.error(`Error leyendo métricas de ${plataforma}:`, error);
+    return mapa;
+  }
+}

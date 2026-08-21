@@ -38,6 +38,8 @@ import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card"
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
+import { MetricasCampana } from "@/components/campaigns/metricas-campana";
+import { historicoDeCampana } from "@/data-access/metricas";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -120,6 +122,25 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const isOverBudget = totalCampaign > budget;
 
   // Contar estados de perfiles
+  // Historico de metricas para las graficas. Se aplana aqui: el
+  // componente solo necesita saber de que influencer y plataforma es
+  // cada captura, no toda la cadena de relaciones.
+  const capturas = (await historicoDeCampana(id)).map((m) => {
+    const cpp = m.entrega.campaignService.campaignProfilePlatform;
+    return {
+      capturadoEn: m.capturadoEn.toISOString(),
+      vistas: m.vistas,
+      meGusta: m.meGusta,
+      comentarios: m.comentarios,
+      compartidos: m.compartidos,
+      guardados: m.guardados,
+      entregaId: m.entrega.id,
+      influencer: cpp.campaignProfile.profile.name,
+      plataforma: cpp.socialAccount.platform.displayName,
+      username: cpp.socialAccount.username,
+    };
+  });
+
   // Datos del bloque de entregas. Se aplana aqui, en el servidor, para
   // que el componente cliente reciba justo lo que pinta y las fechas
   // viajen ya como texto.
@@ -238,6 +259,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campaignId={id}
           perfiles={perfilesEntregas}
           puedeEditar={campaign.status === "ACTIVE" || campaign.status === "PENDING"}
+        />
+      )}
+
+      {/* Impacto: solo cuando ya hay contenido publicado que medir. */}
+      {campaign.status !== "DRAFT" && campaign.status !== "REVIEW" && (
+        <MetricasCampana
+          campaignId={id}
+          capturas={capturas}
+          puedeRefrescar={campaign.status === "ACTIVE" || campaign.status === "COMPLETED"}
         />
       )}
 
