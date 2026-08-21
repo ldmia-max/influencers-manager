@@ -398,74 +398,230 @@ export async function syncSocialAccountMetrics(
   return null;
 }
 
-export interface ProspectoTikTok {
+/** Plataformas en las que se puede DESCUBRIR cuentas, no solo consultarlas. */
+export const PLATAFORMAS_BUSCABLES = ["tiktok", "instagram", "youtube"] as const;
+export type PlataformaBuscable = (typeof PLATAFORMAS_BUSCABLES)[number];
+
+export function esPlataformaBuscable(valor: string): valor is PlataformaBuscable {
+  return (PLATAFORMAS_BUSCABLES as readonly string[]).includes(valor);
+}
+
+/**
+ * Una cuenta candidata, ya normalizada, venga de la red que venga.
+ *
+ * Los campos opcionales son null cuando la plataforma no publica el dato,
+ * no cuando vale cero: Instagram no expone el total de me gusta y YouTube
+ * no dice cuantos videos tiene un canal ni a cuantos esta suscrito.
+ * Distinguirlo importa porque la interfaz oculta lo que no existe en vez
+ * de pintar un cero, que se leeria como "no tiene ninguno".
+ */
+export interface Prospecto {
+  plataforma: PlataformaBuscable;
   username: string;
   nombre: string;
   bio: string;
   profileUrl: string;
-  avatarUrl: string;
+  avatarUrl: string | null;
   verificado: boolean;
   seguidores: number;
-  siguiendo: number;
-  meGusta: number;
-  videos: number;
+  siguiendo: number | null;
+  meGusta: number | null;
+  publicaciones: number | null;
   cuentaPrivada: boolean;
+  /** Por que aparecio: en YouTube, el video que coincidio con la busqueda. */
+  contexto: string | null;
 }
 
 /**
- * Busca CUENTAS de TikTok por palabras clave.
+ * Busca cuentas por palabras clave en la plataforma indicada.
  *
- * A diferencia de los scrapers de perfil, este actor descubre: se le dan
- * terminos y devuelve cuentas que encajan, con sus metricas ya incluidas.
- * Eso evita un segundo scraping por candidato, que multiplicaria el
- * coste de cada busqueda.
+ * Cada red necesita su propio actor porque ninguno cubre varias, y lo que
+ * devuelven no se parece: TikTok e Instagram tienen buscador de cuentas,
+ * mientras que en YouTube hay que buscar videos y quedarse con sus
+ * canales. Esa diferencia se resuelve aqui; quien llama recibe siempre la
+ * misma forma.
  *
- * Cada llamada consume credito de Apify, de ahi que el limite por
- * consulta sea un parametro y no un valor generoso por defecto.
+ * Nunca lanza: si el actor falla se registra y se devuelve lista vacia.
+ * Una busqueda sin resultados es un mal resultado, pero un error a mitad
+ * de la peticion deja al usuario sin nada que mirar.
  */
-export async function buscarProspectosTikTok(
+export async function buscarProspectos(
+  plataforma: PlataformaBuscable,
   consultas: string[],
   maxPorConsulta = 10
-): Promise<ProspectoTikTok[]> {
+): Promise<Prospecto[]> {
   const limpias = consultas.map((c) => c.trim()).filter(Boolean);
   if (limpias.length === 0) return [];
 
   try {
-    const run = await client.actor("clockworks/tiktok-user-search-scraper").call({
-      searchQueries: limpias,
-      maxProfilesPerQuery: maxPorConsulta,
-    });
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
-
-    // Varias consultas pueden traer la misma cuenta.
-    const vistos = new Set<string>();
-    const prospectos: ProspectoTikTok[] = [];
-
-    for (const bruto of items) {
-      const it = bruto as Record<string, unknown>;
-      const username = String(it.name || "");
-      if (!username || vistos.has(username.toLowerCase())) continue;
-      vistos.add(username.toLowerCase());
-
-      prospectos.push({
-        username,
-        nombre: String(it.nickName || ""),
-        bio: String(it.signature || ""),
-        profileUrl: String(it.profileUrl || `https://www.tiktok.com/@${username}`),
-        avatarUrl: String(it.avatar || ""),
-        verificado: Boolean(it.verified),
-        seguidores: Number(it.fans || 0),
-        siguiendo: Number(it.following || 0),
-        meGusta: Number(it.heart || 0),
-        videos: Number(it.video || 0),
-        cuentaPrivada: Boolean(it.privateAccount),
-      });
+    switch (plataforma) {
+      case "tiktok":
+        return await buscarEnTikTok(limpias, maxPorConsulta);
+      case "instagram":
+        return await buscarEnInstagram(limpias, maxPorConsulta);
+      case "youtube":
+        return await buscarEnYouTube(limpias, maxPorConsulta);
     }
-
-    return prospectos;
   } catch (error) {
-    console.error("Error buscando prospectos en TikTok:", error);
+    console.error(`Error buscando prospectos en ${plataforma}:`, error);
     return [];
   }
+}
+
+/**
+ * TikTok: buscador de cuentas. Devuelve el perfil con sus metricas ya
+ * incluidas, asi que no hace falta un segundo scraping por candidato.
+ */
+async function buscarEnTikTok(
+  consultas: string[],
+  maxPorConsulta: number
+): Promise<Prospecto[]> {
+  const run = await client.actor("clockworks/tiktok-user-search-scraper").call({
+    searchQueries: consultas,
+    maxProfilesPerQuery: maxPorConsulta,
+  });
+
+  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+  const vistos = new Set<string>();
+  const prospectos: Prospecto[] = [];
+
+  for (const bruto of items) {
+    const it = bruto as Record<string, unknown>;
+    const username = String(it.name || "");
+    if (!username || vistos.has(username.toLowerCase())) continue;
+    vistos.add(username.toLowerCase());
+
+    prospectos.push({
+      plataforma: "tiktok",
+      username,
+      nombre: String(it.nickName || ""),
+      bio: String(it.signature || ""),
+      profileUrl: String(it.profileUrl || `https://www.tiktok.com/@${username}`),
+      avatarUrl: String(it.avatar || "") || null,
+      verificado: Boolean(it.verified),
+      seguidores: Number(it.fans || 0),
+      siguiendo: Number(it.following || 0),
+      meGusta: Number(it.heart || 0),
+      publicaciones: Number(it.video || 0),
+      cuentaPrivada: Boolean(it.privateAccount),
+      contexto: null,
+    });
+  }
+
+  return prospectos;
+}
+
+/**
+ * Instagram: buscador de cuentas, una consulta por llamada.
+ *
+ * El actor acepta `search` como cadena y no como lista, de modo que las
+ * consultas se lanzan en paralelo y se juntan despues. Instagram no
+ * publica el total de me gusta de una cuenta, asi que ese dato queda en
+ * null en vez de inventarse.
+ */
+async function buscarEnInstagram(
+  consultas: string[],
+  maxPorConsulta: number
+): Promise<Prospecto[]> {
+  const tandas = await Promise.all(
+    consultas.map(async (consulta) => {
+      const run = await client.actor("apify/instagram-search-scraper").call({
+        search: consulta,
+        searchType: "user",
+        searchLimit: maxPorConsulta,
+      });
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      return items;
+    })
+  );
+
+  const vistos = new Set<string>();
+  const prospectos: Prospecto[] = [];
+
+  for (const bruto of tandas.flat()) {
+    const it = bruto as Record<string, unknown>;
+    const username = String(it.username || "");
+    if (!username || vistos.has(username.toLowerCase())) continue;
+    vistos.add(username.toLowerCase());
+
+    prospectos.push({
+      plataforma: "instagram",
+      username,
+      nombre: String(it.fullName || ""),
+      bio: String(it.biography || ""),
+      profileUrl: String(it.url || `https://www.instagram.com/${username}`),
+      avatarUrl: String(it.profilePicUrl || it.profilePicUrlHD || "") || null,
+      verificado: Boolean(it.verified),
+      seguidores: Number(it.followersCount || 0),
+      siguiendo: Number(it.followsCount || 0),
+      meGusta: null,
+      publicaciones: Number(it.postsCount || 0),
+      cuentaPrivada: Boolean(it.private),
+      contexto: null,
+    });
+  }
+
+  return prospectos;
+}
+
+/**
+ * YouTube: no hay buscador de canales, asi que se buscan VIDEOS y se
+ * recogen sus canales.
+ *
+ * Sale ganando el resultado: aparece quien de verdad publico algo sobre
+ * el tema, no quien lleva la palabra en el nombre. A cambio, el actor
+ * devuelve una fila por video y varias pueden ser del mismo canal, de ahi
+ * la deduplicacion por channelId.
+ *
+ * Como no trae la descripcion del canal ni su avatar, se usa el video que
+ * coincidio: su titulo va en `contexto` y su descripcion hace de bio para
+ * que la IA pueda juzgar el nicho.
+ */
+async function buscarEnYouTube(
+  consultas: string[],
+  maxPorConsulta: number
+): Promise<Prospecto[]> {
+  const run = await client.actor("streamers/youtube-scraper").call({
+    searchQueries: consultas,
+    maxResults: maxPorConsulta,
+    maxResultsShorts: 0,
+    maxResultStreams: 0,
+  });
+
+  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+  const vistos = new Set<string>();
+  const prospectos: Prospecto[] = [];
+
+  for (const bruto of items) {
+    const it = bruto as Record<string, unknown>;
+    const canalId = String(it.channelId || "");
+    // El handle es lo legible, pero algunos canales solo tienen id.
+    const username = String(it.channelUsername || canalId || "");
+    const clave = (canalId || username).toLowerCase();
+    if (!username || !clave || vistos.has(clave)) continue;
+    vistos.add(clave);
+
+    prospectos.push({
+      plataforma: "youtube",
+      username,
+      nombre: String(it.channelName || username),
+      bio: String(it.text || "").slice(0, 300),
+      profileUrl: String(
+        it.channelUrl ||
+          (it.channelUsername
+            ? `https://www.youtube.com/@${String(it.channelUsername)}`
+            : `https://www.youtube.com/channel/${canalId}`)
+      ),
+      avatarUrl: null,
+      verificado: false,
+      seguidores: Number(it.numberOfSubscribers || 0),
+      siguiendo: null,
+      meGusta: null,
+      publicaciones: null,
+      cuentaPrivada: false,
+      contexto: it.title ? `Apareció por el vídeo «${String(it.title)}»` : null,
+    });
+  }
+
+  return prospectos;
 }

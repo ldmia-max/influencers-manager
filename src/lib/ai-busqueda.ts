@@ -32,9 +32,13 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  */
 const MODELO = "claude-haiku-4-5-20251001";
 
-/** Plataformas en las que hoy se puede DESCUBRIR, no solo consultar. */
-export const PLATAFORMAS_BUSCABLES = ["tiktok"] as const;
-export type PlataformaBuscable = (typeof PLATAFORMAS_BUSCABLES)[number];
+/** Nombre para mostrar de cada plataforma, para los avisos al usuario. */
+export const NOMBRE_PLATAFORMA: Record<string, string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  kick: "Kick",
+};
 
 /**
  * Traduce un fallo del API de Anthropic a algo que el usuario entienda.
@@ -126,7 +130,12 @@ Devuelve UNICAMENTE un objeto JSON, sin texto alrededor ni bloques de codigo, co
 
 Reglas:
 - "consultas" son terminos de busqueda literales para un buscador de cuentas, como los escribiria alguien en el buscador de la red. Entre una y tres. Combina nicho y lugar cuando el usuario lo mencione ("fitness medellin"). No uses operadores ni comillas.
-- Si el usuario no dice la plataforma, deja "plataforma" en "".
+- LA PLATAFORMA ES EL DATO MAS IMPORTANTE. Reconocela aunque venga mal escrita, separada, abreviada o mencionada de pasada:
+  - tiktok: "tiktok", "tik tok", "tik-tok", "TikTok", "tt"
+  - instagram: "instagram", "insta", "ig", "reels", "reel"
+  - youtube: "youtube", "you tube", "yt", "shorts", "canal de youtube", "youtuber"
+  - kick: "kick", "kick.com"
+- Si el usuario no menciona ninguna plataforma, deja "plataforma" en "". No la adivines a partir del tema.
 - Interpreta cantidades en lenguaje natural: "50k" son 50000, "mas de 100 mil" es minSeguidores 100000, "entre 10k y 50k" son ambos limites.
 - "micro influencers" suele ser 10000-100000 seguidores; "nano" menos de 10000; "macro" mas de 500000. Usalo solo si el usuario emplea esos terminos.
 - No inventes nombres de cuentas ni de personas. Solo criterios.`;

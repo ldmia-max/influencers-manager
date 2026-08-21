@@ -6,9 +6,13 @@ import {
   extraerCriterios,
   valorarProspectos,
   ErrorIA,
-  PLATAFORMAS_BUSCABLES,
+  NOMBRE_PLATAFORMA,
 } from "@/lib/ai-busqueda";
-import { buscarProspectosTikTok } from "@/lib/apify";
+import {
+  buscarProspectos,
+  esPlataformaBuscable,
+  PLATAFORMAS_BUSCABLES,
+} from "@/lib/apify";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -17,9 +21,10 @@ import { prisma } from "@/lib/prisma";
  * Busca creadores que todavia no estan en la aplicacion, a partir de una
  * frase en lenguaje natural.
  *
- * Tres pasos: la IA traduce la frase a criterios, Apify busca cuentas
- * reales con esas palabras clave, y la IA valora cuales encajan. El
- * filtro por numero de seguidores lo hace el codigo, que es exacto.
+ * Tres pasos: la IA traduce la frase a criterios —incluida la plataforma,
+ * que decide donde se busca—, Apify busca cuentas reales con esas
+ * palabras clave, y la IA valora cuales encajan. El filtro por numero de
+ * seguidores lo hace el codigo, que es exacto.
  *
  * Exige permiso de LEER perfiles, que tienen tanto USER como ADMIN:
  * buscar prospectos no crea nada, solo consulta.
@@ -27,6 +32,9 @@ import { prisma } from "@/lib/prisma";
 
 /** Tope por consulta. Cada resultado de mas es consumo de Apify. */
 const MAX_POR_CONSULTA = 10;
+
+/** Donde se busca cuando el usuario no dice la plataforma. */
+const PLATAFORMA_POR_DEFECTO = "tiktok";
 
 export async function POST(req: Request) {
   try {
@@ -55,42 +63,64 @@ export async function POST(req: Request) {
       });
     }
 
-    const plataforma = criterios.plataforma || "tiktok";
-    if (!PLATAFORMAS_BUSCABLES.includes(plataforma as "tiktok")) {
+    // --- 2. Decidir la plataforma ---
+    // Sin plataforma se busca en la de por defecto, pero se dice cual ha
+    // sido: el usuario no tiene por que adivinar donde se ha buscado.
+    const pedida = criterios.plataforma;
+    const plataforma = pedida || PLATAFORMA_POR_DEFECTO;
+
+    if (!esPlataformaBuscable(plataforma)) {
+      const nombre = NOMBRE_PLATAFORMA[plataforma] ?? plataforma;
+      const disponibles = PLATAFORMAS_BUSCABLES.map(
+        (p) => NOMBRE_PLATAFORMA[p]
+      ).join(", ");
       return NextResponse.json({
-        criterios,
+        criterios: { ...criterios, plataforma },
         prospectos: [],
-        aviso: `Por ahora solo se puede descubrir creadores nuevos en TikTok. En ${plataforma} se pueden traer datos de una cuenta concreta, pero no buscar por tema.`,
+        aviso: `En ${nombre} se pueden traer los datos de una cuenta concreta, pero no buscar creadores por tema. Puedes buscar en: ${disponibles}.`,
       });
     }
 
-    // --- 2. Buscar cuentas reales ---
-    const encontrados = await buscarProspectosTikTok(
+    // --- 3. Buscar cuentas reales ---
+    const encontrados = await buscarProspectos(
+      plataforma,
       criterios.consultas,
       MAX_POR_CONSULTA
     );
 
+    const nombrePlataforma = NOMBRE_PLATAFORMA[plataforma];
+
     if (encontrados.length === 0) {
       return NextResponse.json({
-        criterios,
+        criterios: { ...criterios, plataforma },
         prospectos: [],
-        aviso: "La búsqueda no devolvió cuentas. Prueba con otros términos.",
+        aviso: `La búsqueda en ${nombrePlataforma} no devolvió cuentas. Prueba con otros términos.`,
       });
     }
 
-    // --- 3. Filtrar por lo comprobable, antes de gastar tokens ---
+    // --- 4. Filtrar por lo comprobable, antes de gastar tokens ---
     const porSeguidores = encontrados.filter((p) => {
       if (criterios.minSeguidores && p.seguidores < criterios.minSeguidores) return false;
       if (criterios.maxSeguidores && p.seguidores > criterios.maxSeguidores) return false;
       return true;
     });
 
-    // --- 4. Marcar los que ya estan dados de alta ---
+    if (porSeguidores.length === 0) {
+      return NextResponse.json({
+        criterios: { ...criterios, plataforma },
+        prospectos: [],
+        aviso: `Se encontraron ${encontrados.length} cuentas en ${nombrePlataforma}, pero ninguna dentro del rango de seguidores pedido.`,
+      });
+    }
+
+    // --- 5. Marcar los que ya estan dados de alta ---
+    // La comparacion es por plataforma ademas de por usuario: el mismo
+    // handle en dos redes son dos cuentas distintas.
     const usuarios = porSeguidores.map((p) => p.username);
     const yaExisten = await prisma.socialAccount.findMany({
       where: {
         username: { in: usuarios, mode: "insensitive" },
-        platform: { name: "tiktok" },
+        platform: { name: plataforma },
       },
       select: { username: true, profileId: true },
     });
@@ -98,7 +128,7 @@ export async function POST(req: Request) {
       yaExisten.map((c) => [c.username.toLowerCase(), c.profileId])
     );
 
-    // --- 5. Valoracion de la IA sobre lo que queda ---
+    // --- 6. Valoracion de la IA sobre lo que queda ---
     const valoraciones = await valorarProspectos(
       body.prompt,
       criterios,
@@ -115,7 +145,6 @@ export async function POST(req: Request) {
         const v = valoraciones.get(p.username.toLowerCase());
         return {
           ...p,
-          plataforma: "tiktok",
           encaja: v ? v.encaja : true,
           motivo: v?.motivo ?? "",
           yaRegistrado: existentes.get(p.username.toLowerCase()) ?? null,
@@ -126,7 +155,15 @@ export async function POST(req: Request) {
         a.encaja === b.encaja ? b.seguidores - a.seguidores : a.encaja ? -1 : 1
       );
 
-    return NextResponse.json({ criterios, prospectos });
+    return NextResponse.json({
+      criterios: { ...criterios, plataforma },
+      prospectos,
+      // Solo se avisa cuando la plataforma no se pidio: si el usuario la
+      // nombro, ya sabe donde se busco.
+      aviso: pedida
+        ? undefined
+        : `No indicaste plataforma, así que se buscó en ${nombrePlataforma}. Escríbela en la frase para buscar en otra.`,
+    });
   } catch (error) {
     console.error("Error en busqueda-ia:", error);
 

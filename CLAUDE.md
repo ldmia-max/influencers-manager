@@ -154,17 +154,27 @@ Campaigns, clients and profiles are built by hand, deliberately: an AI campaign 
 
 Finds creators who are **not yet in the database**, from a phrase in natural language. Three stages in `src/app/api/busqueda-ia/route.ts`:
 
-1. `extraerCriterios()` (`src/lib/ai-busqueda.ts`) turns the phrase into `CriteriosBusqueda` — keyword queries plus follower range, place, category — as strict JSON, no tool loop.
-2. `buscarProspectosTikTok()` (`src/lib/apify.ts`) runs `clockworks/tiktok-user-search-scraper` on those queries and dedupes by username.
+1. `extraerCriterios()` (`src/lib/ai-busqueda.ts`) turns the phrase into `CriteriosBusqueda` — keyword queries plus follower range, place, category, and **which platform to search**, as strict JSON, no tool loop.
+2. `buscarProspectos(plataforma, consultas)` (`src/lib/apify.ts`) dispatches to that platform's actor and returns one normalized `Prospecto[]`.
 3. The **follower range is filtered in code**, not by the model, and `valorarProspectos()` only judges what a keyword search can't: whether bio and name really match the niche. If that call fails it returns an empty map and everything is shown rather than nothing.
 
-Two properties worth keeping: **the model never invents accounts** — every result comes from Apify — and Apify searches by keyword, not by meaning, so the noise is high and the AI pass is what makes the list usable.
+Two properties worth keeping: **the model never invents accounts** — every result comes from Apify — and the search engines match keywords, not meaning, so the noise is high and the AI pass is what makes the list usable.
 
-Only TikTok is in `PLATAFORMAS_BUSCABLES`; the other platforms have profile scrapers but no usable discovery actor, and the route answers with an `aviso` instead of failing. Anthropic failures are translated by `ErrorIA` — the raw API error is never sent to the browser.
+**The platform comes from the phrase.** "en Tik Tok", "en IG", "reels", "shorts", "youtubers" all resolve — the enumeration of spellings lives in the `extraerCriterios` system prompt, and a detection suite of 11 phrasings passed. When no platform is named the route falls back to `PLATAFORMA_POR_DEFECTO` (TikTok) and says so in `aviso`, rather than guessing silently.
 
-Results link to `/profiles/new?nombre=&usuario=&plataforma=`, which feeds `ProfileForm`'s `prefill` prop. `prefill` is **not** `initialData`: that one means "editing" and switches the mutation to update.
+The three searchable platforms each need a different strategy, which is why `buscarProspectos` has one branch per network rather than one actor with a parameter:
 
-Each search costs Apify credit (up to 3 queries × 10 profiles) plus two Haiku calls.
+| | Actor | Searches | Notes |
+|---|---|---|---|
+| TikTok | `clockworks/tiktok-user-search-scraper` | accounts | weakest signal — matches handles and bios, so a 3-follower account scores like a real creator |
+| Instagram | `apify/instagram-search-scraper` (`searchType: "user"`) | accounts | one call per query (`search` is a string, not a list), run in parallel |
+| YouTube | `streamers/youtube-scraper` | **videos**, deduped by `channelId` | finds who actually published on the topic; `contexto` carries the matching video title |
+
+`Prospecto` uses `null`, not `0`, for what a platform doesn't publish — Instagram has no total-likes figure, YouTube gives neither a channel avatar nor a video count — and the UI hides those tiles instead of rendering a zero that would read as "has none". Kick has profile scraping but no discovery actor, so it is absent from `PLATAFORMAS_BUSCABLES` and the route answers with an `aviso` instead of failing. Anthropic failures are translated by `ErrorIA` — the raw API error is never sent to the browser.
+
+Results link to `/profiles/new?nombre=&usuario=&plataforma=`, which feeds `ProfileForm`'s `prefill` prop and preselects the platform by name. `prefill` is **not** `initialData`: that one means "editing" and switches the mutation to update.
+
+Each search costs Apify credit (up to 3 queries × 10 results) plus two Haiku calls.
 
 ### Email
 

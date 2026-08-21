@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   BadgeCheck,
   ExternalLink,
+  FileText,
   Heart,
   Search,
   Sparkles,
@@ -27,18 +28,19 @@ import { formatCompactNumber } from "@/lib/format";
 import { apiPost } from "@/services/api";
 
 interface Prospecto {
+  plataforma: string;
   username: string;
   nombre: string;
   bio: string;
   profileUrl: string;
-  avatarUrl: string;
+  avatarUrl: string | null;
   verificado: boolean;
   seguidores: number;
-  siguiendo: number;
-  meGusta: number;
-  videos: number;
+  siguiendo: number | null;
+  meGusta: number | null;
+  publicaciones: number | null;
   cuentaPrivada: boolean;
-  plataforma: string;
+  contexto: string | null;
   encaja: boolean;
   motivo: string;
   /** Id del perfil si ya esta dado de alta; null si es un prospecto nuevo. */
@@ -46,7 +48,7 @@ interface Prospecto {
 }
 
 interface Respuesta {
-  criterios: { interpretacion: string; consultas: string[] };
+  criterios: { plataforma: string; interpretacion: string; consultas: string[] };
   prospectos: Prospecto[];
   aviso?: string;
 }
@@ -55,12 +57,47 @@ interface Respuesta {
  * Ejemplos de redaccion. Son texto, no botones: estan para ensenar la
  * forma de la frase —plataforma, nicho, lugar, seguidores—, no para
  * lanzar busquedas ajenas a lo que el usuario venia a buscar.
+ *
+ * Uno por plataforma, para que se vea que la red se elige escribiendola.
  */
 const EJEMPLOS = [
   "Influencers de fitness en Medellín en TikTok con más de 50 mil seguidores",
-  "Creadoras de cocina colombiana en TikTok, entre 10k y 100k seguidores",
-  "Micro influencers de moda en Bogotá en TikTok",
+  "Creadoras de cocina colombiana en Instagram, entre 10k y 100k seguidores",
+  "Canales de YouTube sobre tecnología en Colombia",
 ];
+
+/** Etiqueta y color por plataforma, para distinguirlas de un vistazo. */
+const PLATAFORMAS: Record<string, { nombre: string; clase: string }> = {
+  tiktok: { nombre: "TikTok", clase: "bg-gray-900 text-white" },
+  instagram: { nombre: "Instagram", clase: "bg-pink-100 text-pink-800" },
+  youtube: { nombre: "YouTube", clase: "bg-red-100 text-red-800" },
+  kick: { nombre: "Kick", clase: "bg-green-100 text-green-800" },
+};
+
+function etiquetaPlataforma(id: string) {
+  return PLATAFORMAS[id] ?? { nombre: id, clase: "bg-gray-100 text-gray-800" };
+}
+
+/** Avatar con reserva: YouTube no devuelve la foto del canal. */
+function Avatar({ p, tam }: { p: Prospecto; tam: string }) {
+  if (p.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={p.avatarUrl}
+        alt=""
+        className={`${tam} shrink-0 rounded-full object-cover`}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${tam} flex shrink-0 items-center justify-center rounded-full bg-violet-100 font-semibold text-violet-700`}
+    >
+      {(p.nombre || p.username).charAt(0).toUpperCase()}
+    </div>
+  );
+}
 
 export function BusquedaIA() {
   const [prompt, setPrompt] = useState("");
@@ -109,8 +146,8 @@ export function BusquedaIA() {
               <p className="mt-1">
                 Indica <strong>plataforma</strong>, <strong>categoría</strong>,{" "}
                 <strong>ciudad o país</strong> y, si quieres, un rango de
-                seguidores. Hoy la búsqueda de creadores nuevos funciona en
-                TikTok.
+                seguidores. Se busca en la red que escribas: TikTok, Instagram o
+                YouTube.
               </p>
             </div>
           </div>
@@ -153,7 +190,7 @@ export function BusquedaIA() {
         <div className="py-10 text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-violet-600" />
           <p className="mt-3 text-sm text-gray-500">
-            Interpretando la búsqueda y consultando TikTok…
+            Interpretando la búsqueda y consultando la plataforma…
           </p>
           <p className="text-xs text-gray-400">Suele tardar entre 15 y 40 segundos.</p>
         </div>
@@ -168,16 +205,26 @@ export function BusquedaIA() {
       {datos && !cargando && (
         <div className="space-y-4">
           {datos.criterios.interpretacion && (
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Se buscó:</span>{" "}
-              {datos.criterios.interpretacion}
-              {datos.criterios.consultas.length > 0 && (
-                <span className="text-gray-400">
-                  {" "}
-                  — términos: {datos.criterios.consultas.join(", ")}
-                </span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+              {datos.criterios.plataforma && (
+                <Badge
+                  variant="secondary"
+                  className={etiquetaPlataforma(datos.criterios.plataforma).clase}
+                >
+                  {etiquetaPlataforma(datos.criterios.plataforma).nombre}
+                </Badge>
               )}
-            </p>
+              <span>
+                <span className="font-medium">Se buscó:</span>{" "}
+                {datos.criterios.interpretacion}
+                {datos.criterios.consultas.length > 0 && (
+                  <span className="text-gray-400">
+                    {" "}
+                    — términos: {datos.criterios.consultas.join(", ")}
+                  </span>
+                )}
+              </span>
+            </div>
           )}
 
           {datos.aviso && (
@@ -189,7 +236,7 @@ export function BusquedaIA() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {datos.prospectos.map((p) => (
               <button
-                key={p.username}
+                key={`${p.plataforma}-${p.username}`}
                 type="button"
                 onClick={() => setDetalle(p)}
                 className={`rounded-xl border p-4 text-left transition hover:shadow-md ${
@@ -197,12 +244,7 @@ export function BusquedaIA() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.avatarUrl}
-                    alt=""
-                    className="h-12 w-12 shrink-0 rounded-full object-cover"
-                  />
+                  <Avatar p={p} tam="h-12 w-12" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1">
                       <span className="truncate font-medium text-gray-900">
@@ -225,17 +267,27 @@ export function BusquedaIA() {
                     <Users className="h-3.5 w-3.5" />
                     {formatCompactNumber(p.seguidores)}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Heart className="h-3.5 w-3.5" />
-                    {formatCompactNumber(p.meGusta)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Video className="h-3.5 w-3.5" />
-                    {formatCompactNumber(p.videos)}
-                  </span>
+                  {p.meGusta !== null && (
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5" />
+                      {formatCompactNumber(p.meGusta)}
+                    </span>
+                  )}
+                  {p.publicaciones !== null && (
+                    <span className="flex items-center gap-1">
+                      <Video className="h-3.5 w-3.5" />
+                      {formatCompactNumber(p.publicaciones)}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1">
+                  <Badge
+                    variant="secondary"
+                    className={etiquetaPlataforma(p.plataforma).clase}
+                  >
+                    {etiquetaPlataforma(p.plataforma).nombre}
+                  </Badge>
                   {p.yaRegistrado ? (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                       Ya está en la aplicación
@@ -265,12 +317,7 @@ export function BusquedaIA() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={detalle.avatarUrl}
-                    alt=""
-                    className="h-14 w-14 rounded-full object-cover"
-                  />
+                  <Avatar p={detalle} tam="h-14 w-14" />
                   <div>
                     <DialogTitle className="flex items-center gap-1">
                       {detalle.nombre || detalle.username}
@@ -278,12 +325,22 @@ export function BusquedaIA() {
                         <BadgeCheck className="h-4 w-4 text-blue-500" />
                       )}
                     </DialogTitle>
-                    <DialogDescription>@{detalle.username} · TikTok</DialogDescription>
+                    <DialogDescription>
+                      @{detalle.username} ·{" "}
+                      {etiquetaPlataforma(detalle.plataforma).nombre}
+                    </DialogDescription>
                   </div>
                 </div>
               </DialogHeader>
 
               <div className="space-y-4">
+                {detalle.contexto && (
+                  <p className="flex items-start gap-2 text-xs text-gray-500">
+                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {detalle.contexto}
+                  </p>
+                )}
+
                 {detalle.bio && (
                   <p className="whitespace-pre-line text-sm text-gray-700">
                     {detalle.bio}
@@ -298,19 +355,24 @@ export function BusquedaIA() {
                 )}
 
                 <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  {[
-                    ["Seguidores", detalle.seguidores],
-                    ["Me gusta", detalle.meGusta],
-                    ["Vídeos", detalle.videos],
-                    ["Siguiendo", detalle.siguiendo],
-                  ].map(([etiqueta, valor]) => (
-                    <div key={etiqueta as string} className="rounded-lg bg-gray-50 p-2">
-                      <p className="text-xs text-gray-500">{etiqueta as string}</p>
-                      <p className="font-semibold text-gray-900">
-                        {formatCompactNumber(valor as number)}
-                      </p>
-                    </div>
-                  ))}
+                  {(
+                    [
+                      ["Seguidores", detalle.seguidores],
+                      ["Me gusta", detalle.meGusta],
+                      ["Publicaciones", detalle.publicaciones],
+                      ["Siguiendo", detalle.siguiendo],
+                    ] as [string, number | null][]
+                  )
+                    // Solo lo que la plataforma publica de verdad.
+                    .filter(([, valor]) => valor !== null)
+                    .map(([etiqueta, valor]) => (
+                      <div key={etiqueta} className="rounded-lg bg-gray-50 p-2">
+                        <p className="text-xs text-gray-500">{etiqueta}</p>
+                        <p className="font-semibold text-gray-900">
+                          {formatCompactNumber(valor as number)}
+                        </p>
+                      </div>
+                    ))}
                 </div>
 
                 {detalle.cuentaPrivada && (
@@ -328,7 +390,7 @@ export function BusquedaIA() {
                   >
                     <Button variant="outline" className="w-full">
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Ver en TikTok
+                      Ver en {etiquetaPlataforma(detalle.plataforma).nombre}
                     </Button>
                   </a>
 

@@ -25,10 +25,9 @@ async function main() {
   const platforms = [
     { name: "instagram", displayName: "Instagram", icon: "instagram" },
     { name: "tiktok", displayName: "TikTok", icon: "tiktok" },
-    // YouTube y Kick no tienen sincronizacion con Apify: el despacho de
-    // src/lib/apify.ts solo contempla instagram y tiktok, y cualquier
-    // otra plataforma se salta en silencio. Sus cuentas se crean y se
-    // les pone precio a mano, pero no traen metricas ni foto.
+    // Las cuatro sincronizan con Apify. Descubrir creadores nuevos desde
+    // /busqueda-ia solo funciona en las tres primeras: Kick no tiene un
+    // actor de busqueda por tema.
     { name: "youtube", displayName: "YouTube", icon: "youtube" },
     { name: "kick", displayName: "Kick", icon: "kick" },
   ];
