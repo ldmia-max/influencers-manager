@@ -735,3 +735,93 @@ export async function setCampaignMarkup(id: string, markup: number) {
   });
 }
 
+
+/**
+ * Resultados de UNA campana para el portal del cliente.
+ *
+ * `clientId` va en el where ademas del id de campana: ese filtro es lo
+ * unico que impide que un cliente lea la campana de otro poniendo un id
+ * en la barra de direcciones, y tiene que venir siempre de la cookie
+ * firmada, nunca de la peticion.
+ *
+ * Devuelve null en vez de lanzar cuando no hay coincidencia, para que la
+ * pagina responda 404 sin distinguir entre "no existe" y "no es tuya":
+ * un mensaje distinto en cada caso confirmaria a un curioso que la
+ * campana existe.
+ *
+ * Se deja fuera lo interno: los retirados no aparecen —el cliente no ve
+ * ni quien decidio el retiro ni por que, y sus importes ya no cuentan—,
+ * y de las entregas solo viaja el link y sus metricas, sin notas ni
+ * quien las registro.
+ */
+export async function getCampaignResultsForClient(
+  clientId: string,
+  campaignId: string
+) {
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: campaignId,
+      clientId,
+      status: { not: CampaignStatus.DRAFT },
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      profiles: {
+        where: { participacion: "ACTIVO" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          profile: { select: { id: true, name: true } },
+          platforms: {
+            select: {
+              socialAccount: {
+                select: {
+                  username: true,
+                  followers: true,
+                  platform: { select: { name: true, displayName: true } },
+                },
+              },
+              services: {
+                select: {
+                  id: true,
+                  quantity: true,
+                  esCombo: true,
+                  comboDescripcion: true,
+                  profileService: {
+                    select: { serviceType: { select: { displayName: true } } },
+                  },
+                  entregas: {
+                    orderBy: { entregadoEn: "asc" },
+                    select: {
+                      id: true,
+                      url: true,
+                      publicadoEn: true,
+                      metricas: {
+                        orderBy: { capturadoEn: "asc" },
+                        select: {
+                          capturadoEn: true,
+                          vistas: true,
+                          meGusta: true,
+                          comentarios: true,
+                          compartidos: true,
+                          guardados: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return campaign;
+}

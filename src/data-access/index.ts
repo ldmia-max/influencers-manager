@@ -122,6 +122,7 @@ export {
   updateCampaign,
   transitionCampaignStatus,
   regenerateApprovalToken,
+  getCampaignResultsForClient,
 } from "./campaigns";
 
 // --- Campaign Profiles ---

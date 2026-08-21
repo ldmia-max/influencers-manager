@@ -90,7 +90,7 @@ Location is a three-level chain `Country → Department → City`, all optional 
 
 **Campaigns and clients cannot be deleted from the app.** There is no `DELETE` endpoint and no UI for either — removing them is a deliberate database operation, because a campaign is commercial history (what was contracted, at what price, with which markup, and who approved it) and a client drags its contacts and portal access with it. `Campaign.clientId` is `ON DELETE RESTRICT`, so the database refuses to drop a client that still has campaigns. Profiles and categories *can* still be deleted from the app, and those deletions are audited.
 
-Cascade deletes: `Profile` → `SocialAccount` → `ProfileService`; `Client` → `ClientContact`/`ClientUser`; `Campaign` → `CampaignProfile` → `CampaignProfilePlatform` → `CampaignService`, plus `CampaignApprovalToken`. `ServiceType`, `SocialPlatform`, `Category`, and the location tables are never cascaded (deleting them requires clearing references first).
+Cascade deletes: `Profile` → `SocialAccount` → `ProfileService`; `Client` → `ClientContact`/`ClientUser`; `Campaign` → `CampaignProfile` → `CampaignProfilePlatform` → `CampaignService` → `CampaignEntrega` → `CampaignEntregaMetrica`, plus `CampaignApprovalToken`. `ServiceType`, `SocialPlatform`, `Category`, and the location tables are never cascaded (deleting them requires clearing references first).
 
 ### Campaigns are four levels deep, and approval happens at three of them
 
@@ -101,6 +101,26 @@ The client approves at every level: `CampaignProfile.status` and `CampaignProfil
 Status flow is `DRAFT → REVIEW → PENDING/ACTIVE → COMPLETED/CANCELLED`; the allowed transitions are declared in `USER_VALID_TRANSITIONS` in `src/lib/campaign-utils.ts` and enforced by `transitionCampaignStatus` in `src/data-access/campaigns.ts`.
 
 **Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
+
+### Content delivery, withdrawal and impact
+
+Three things hang off an active campaign, added together because they share the same data.
+
+**Deliveries.** `CampaignService` (a format) gains `fechaLimite`, and `CampaignEntrega` holds one published link each — several per format. Expected count is `quantity`; a combo only needs one, because its contents are free text and guessing a number from it would create false breaches. Influencers have no account: agency staff paste the links, which is why `CampaignEntrega.registradoPorId` points at a `User`.
+
+**No delivery state is stored.** `src/lib/entregas.ts` derives PENDIENTE / INCUMPLIDO / A_TIEMPO / CON_RETRASO / SIN_PLAZO from `fechaLimite` vs `entregadoEn`. A stored flag would need a job to keep it current, and the day that job failed the data would lie silently. Same reasoning for `nivelDeCumplimiento()`, an influencer's reliability across all campaigns — it only counts formats whose deadline has passed, so nobody is penalised for work still in play.
+
+`transitionCampaignStatus` refuses `ACTIVE → COMPLETED` while any link is missing, naming who owes what.
+
+**Withdrawal.** `CampaignProfile.participacion` is `ACTIVO | RETIRADO`, **separate from `status`** — that one means "did the client approve them", this one "are they still contracted", and they are independent axes. A retired profile stops counting toward the total, freeing budget; the row is kept because it is commercial history and their past deliveries still feed their reliability. Withdrawal is audited (`ACCIONES.influencerRetirado`).
+
+**Every persisted campaign total must go through `calcularTotalCampana()`** (`src/lib/campaign-utils.ts`) — the campaigns list page, the API list, and the detail page all call it. It is the only place that knows retired profiles do not count, and it also returns `liberado`, the freed budget. The cart and wizard stores keep `calculateSelectionTotal` instead: those are selections that do not exist in the database yet and have no `participacion`.
+
+**Impact.** `CampaignEntregaMetrica` stores one row per capture, never overwriting — without history you can only draw today's number, and what the client needs to see is the curve. `src/data-access/metricas.ts` follows each post for `DIAS_DE_SEGUIMIENTO` (30) days from publication, at most every 20 hours (under 24 so a daily job never skips a day by starting a few minutes early). Actors: `clockworks/tiktok-video-scraper`, `apify/instagram-scraper` (`resultsType: "posts"`), `streamers/youtube-scraper`. **Shares and saves exist only on TikTok** — Instagram and YouTube do not publish them — so they are stored as `null` and the UI drops the tile rather than rendering a zero. Anything an actor fails to read is not written at all: a deleted post would leave zeros that later read as a real audience collapse.
+
+Refresh is `POST /api/cron/metricas`, authenticated with `CRON_SECRET` in the `Authorization` header because the caller is a machine; without that secret the route answers 503 rather than sitting open, since it triggers paid scraping. Schedule it daily. `POST /api/campaigns/[id]/metricas` does the same on demand.
+
+Clients see results at `/client-dashboard/[campaignId]` via `getCampaignResultsForClient(clientId, campaignId)` — **`clientId` in the where clause is the only thing separating one client's results from another's**, and it must come from the signed cookie. Retired profiles and `motivoRetiro` never reach that query. Note the page awaits `params` *inside* the `<Suspense>` boundary: with `cacheComponents`, route params count as uncached data just like cookies, and awaiting them in the page component fails the build.
 
 ### Public (unauthenticated) surfaces
 
@@ -249,7 +269,7 @@ The production DB must run a PostgreSQL image that ships pgvector — the first 
 
 See `.env.example` for the annotated list. Required: `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`. Behind a reverse proxy also set `AUTH_TRUST_HOST=true`.
 
-Optional / feature-gating: `APIFY_API_TOKEN` (sync returns `null` without it), `ANTHROPIC_API_KEY` (AI prospect search; `/busqueda-ia` answers 503 without it), `BLOB_READ_WRITE_TOKEN` (Vercel Blob uploads), `RESEND_API_KEY` + `RESEND_FROM_EMAIL` + `ENABLE_EMAILS=true` (email is off unless all three are set).
+Optional / feature-gating: `CRON_SECRET` (the metrics refresh job; 503 without it), `APIFY_API_TOKEN` (sync returns `null` without it), `ANTHROPIC_API_KEY` (AI prospect search; `/busqueda-ia` answers 503 without it), `BLOB_READ_WRITE_TOKEN` (Vercel Blob uploads), `RESEND_API_KEY` + `RESEND_FROM_EMAIL` + `ENABLE_EMAILS=true` (email is off unless all three are set).
 
 Seeded admin: `admin@example.com` / `admin123`.
 

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Building2, CalendarDays, Users } from "lucide-react";
@@ -83,7 +84,15 @@ async function ContenidoPortal() {
                 <li key={campaign.id} className="py-4 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900">{campaign.name}</p>
+                      {/* Enlace a los resultados: links publicados y su
+                          impacto. La pagina vuelve a comprobar que la
+                          campana sea de este cliente. */}
+                      <Link
+                        href={`/client-dashboard/${campaign.id}`}
+                        className="font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                      >
+                        {campaign.name}
+                      </Link>
                       {campaign.description && (
                         <p className="mt-1 text-sm text-gray-500">
                           {campaign.description}
