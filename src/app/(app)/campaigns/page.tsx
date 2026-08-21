@@ -28,7 +28,7 @@ import {
 import { getCachedReachRanges } from "@/lib/cache";
 import { CampaignStatus } from "@prisma/client";
 import { exigePropiedadParaLeer, type Rol } from "@/lib/permissions";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
+import { calcularTotalCampana } from "@/lib/campaign-utils";
 
 interface SearchParams {
   search?: string;
@@ -130,16 +130,18 @@ export default async function CampaignsPage({
 
   // Calcular totales para cada campaña
   const campaignsWithTotals = campaigns.map((campaign) => {
-    let totalBase = 0;
+    // El importe lo da calcularTotalCampana, que descuenta a los
+    // retirados. Aqui solo queda el alcance.
+    const totales = calcularTotalCampana(campaign.profiles, campaign.markupPercentage);
+    const totalBase = totales.base;
     let totalReach = 0;
     const accountsProcessed = new Set<string>();
 
     campaign.profiles.forEach((cp) => {
-      cp.platforms.forEach((cpp) => {
-        cpp.services.forEach((cs) => {
-          totalBase += Number(cs.basePrice) * cs.quantity;
-        });
+      // Quien se retiro ya no aporta alcance a la campana.
+      if (cp.participacion !== "ACTIVO") return;
 
+      cp.platforms.forEach((cpp) => {
         // Sumar alcance por cuenta (una vez por cuenta)
         if (!accountsProcessed.has(cpp.socialAccountId)) {
           accountsProcessed.add(cpp.socialAccountId);
@@ -150,10 +152,7 @@ export default async function CampaignsPage({
       });
     });
 
-    const totalWithMarkup = calculateMarkupPrice(
-      totalBase,
-      campaign.markupPercentage
-    );
+    const totalWithMarkup = totales.conMargen;
 
     return {
       ...campaign,

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
+import { entregasPendientesDeCampana } from "./entregas";
 import { calcularTotalCampana, calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
@@ -545,6 +546,20 @@ export async function transitionCampaignStatus(
         where: { campaignId },
         data: { status: "APPROVED", reviewedAt: new Date() },
       });
+    }
+  }
+
+  // Una campana no se cierra mientras falten links por registrar. Los
+  // retirados no cuentan: ya no deben nada.
+  if (newStatus === "COMPLETED") {
+    const pendientes = await entregasPendientesDeCampana(campaignId);
+    if (pendientes.length > 0) {
+      const detalle = pendientes
+        .map((p) => `${p.influencer} (${p.entregados} de ${p.esperados})`)
+        .join(", ");
+      throw new ValidationError(
+        `No se puede completar la campaña: faltan entregas de ${detalle}.`
+      );
     }
   }
 

@@ -131,6 +131,20 @@ export {
   removeCampaignProfiles,
 } from "./campaign-profiles";
 
+// --- Entregas de contenido y participacion ---
+export {
+  getEntregasDeCampana,
+  registrarEntrega,
+  actualizarEntrega,
+  eliminarEntrega,
+  fijarFechaLimite,
+  fijarFechaLimiteDeCampana,
+  retirarInfluencer,
+  reactivarInfluencer,
+  entregasPendientesDeCampana,
+  formatosHistoricosDeInfluencer,
+} from "./entregas";
+
 // --- Campaign Approval ---
 export {
   getApprovalData,

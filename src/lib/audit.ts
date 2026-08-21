@@ -88,4 +88,9 @@ export const ACCIONES = {
 
   accesoPortalConcedido: "client.access_granted",
   accesoPortalRevocado: "client.access_revoked",
+
+  /// Retirar a un influencer cambia lo que cuesta la campana, asi que
+  /// deja rastro igual que el margen.
+  influencerRetirado: "campaign.influencer_withdrawn",
+  influencerReactivado: "campaign.influencer_reinstated",
 } as const;
