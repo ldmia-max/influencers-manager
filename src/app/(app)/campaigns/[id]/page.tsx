@@ -37,6 +37,7 @@ import { CampaignStatusActions } from "@/components/campaigns/campaign-status-ac
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
+import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -119,6 +120,45 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const isOverBudget = totalCampaign > budget;
 
   // Contar estados de perfiles
+  // Datos del bloque de entregas. Se aplana aqui, en el servidor, para
+  // que el componente cliente reciba justo lo que pinta y las fechas
+  // viajen ya como texto.
+  const perfilesEntregas = campaign.profiles.map((cp) => ({
+    id: cp.id,
+    nombre: cp.profile.name,
+    participacion: cp.participacion,
+    origenRetiro: cp.origenRetiro,
+    motivoRetiro: cp.motivoRetiro,
+    retiradoEn: cp.retiradoEn?.toISOString() ?? null,
+    plataformas: cp.platforms.map((cpp) => ({
+      id: cpp.id,
+      plataforma: cpp.socialAccount.platform.displayName,
+      username: cpp.socialAccount.username,
+      formatos: cpp.services.map((cs) => ({
+        id: cs.id,
+        quantity: cs.quantity,
+        esCombo: cs.esCombo,
+        comboDescripcion: cs.comboDescripcion,
+        fechaLimite: cs.fechaLimite?.toISOString() ?? null,
+        nombre: cs.esCombo
+          ? "Combo"
+          : cs.profileService?.serviceType.displayName ?? "Formato",
+        entregas: cs.entregas.map((e) => ({
+          id: e.id,
+          url: e.url,
+          entregadoEn: e.entregadoEn.toISOString(),
+          publicadoEn: e.publicadoEn?.toISOString() ?? null,
+          notas: e.notas,
+          registradoPor: e.registradoPor,
+          metricas: e.metricas.map((m) => ({
+            ...m,
+            capturadoEn: m.capturadoEn.toISOString(),
+          })),
+        })),
+      })),
+    })),
+  }));
+
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
     total: activos.length,
@@ -188,6 +228,16 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campaignId={id}
           tokens={campaign.approvalTokens}
           campaignStatus={campaign.status}
+        />
+      )}
+
+      {/* Entregas: solo tiene sentido cuando la campana ya esta en marcha.
+          En borrador o revision los formatos aun pueden cambiar. */}
+      {campaign.status !== "DRAFT" && campaign.status !== "REVIEW" && (
+        <EntregasCampana
+          campaignId={id}
+          perfiles={perfilesEntregas}
+          puedeEditar={campaign.status === "ACTIVE" || campaign.status === "PENDING"}
         />
       )}
 

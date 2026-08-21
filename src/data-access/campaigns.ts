@@ -3,7 +3,7 @@ import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
 import { entregasPendientesDeCampana } from "./entregas";
-import { calcularTotalCampana, calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import { calcularTotalCampana, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
@@ -250,6 +250,18 @@ export async function getCampaignDetail(id: string) {
               services: {
                 include: {
                   profileService: { include: { serviceType: true } },
+                  // Los links entregados y su ultima captura de metricas:
+                  // la ficha los pinta junto a cada formato.
+                  entregas: {
+                    orderBy: { entregadoEn: "asc" },
+                    include: {
+                      registradoPor: { select: { id: true, name: true } },
+                      metricas: {
+                        orderBy: { capturadoEn: "desc" },
+                        take: 1,
+                      },
+                    },
+                  },
                 },
               },
             },
