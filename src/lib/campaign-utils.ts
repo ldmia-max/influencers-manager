@@ -101,6 +101,82 @@ export function calculateServiceTotal(
   return { baseTotal, markupTotal };
 }
 
+// =============================================================================
+// Total de una campana ya guardada
+// =============================================================================
+
+/**
+ * Forma minima que necesita el calculo. Se declara con lo justo para que
+ * sirva tanto a una consulta completa como a un `select` reducido.
+ */
+export interface PerfilFacturable {
+  participacion: string;
+  platforms: {
+    services: { basePrice: number | Decimal | string; quantity: number }[];
+  }[];
+}
+
+/**
+ * Suma lo que cuesta una campana YA GUARDADA.
+ *
+ * Existe porque este calculo estaba repetido en el listado, en la ficha y
+ * en el portal de aprobacion, y ahora tiene una regla que es facil de
+ * olvidar en uno de esos sitios: **los influencers retirados no suman**.
+ * Si un sitio la aplicara y otro no, el presupuesto que ve el cliente no
+ * cuadraria con el que ve la agencia. Ya paso algo asi con el margen, que
+ * estaba duplicado en tres ficheros.
+ *
+ * Cuenta aparte lo retirado, porque esa cifra es justo la que interesa al
+ * reasignar: es el presupuesto que ha quedado libre.
+ *
+ * No sirve para el carrito ni para el asistente de campanas: alli se
+ * manejan selecciones que todavia no existen en base de datos y no tienen
+ * participacion. Para eso esta calculateSelectionTotal.
+ */
+export function calcularTotalCampana(
+  perfiles: PerfilFacturable[],
+  markup: number = MARKUP_PERCENTAGE
+): {
+  /** Coste para la agencia, sin margen, solo de los activos. */
+  base: number;
+  /** Lo que paga el cliente, con margen, solo de los activos. */
+  conMargen: number;
+  /** Lo que sumarian los retirados: el presupuesto liberado. */
+  liberado: number;
+  perfilesActivos: number;
+  perfilesRetirados: number;
+} {
+  let base = 0;
+  let conMargen = 0;
+  let liberado = 0;
+  let perfilesActivos = 0;
+  let perfilesRetirados = 0;
+
+  for (const perfil of perfiles) {
+    const activo = perfil.participacion === "ACTIVO";
+    if (activo) perfilesActivos++;
+    else perfilesRetirados++;
+
+    for (const plataforma of perfil.platforms) {
+      for (const servicio of plataforma.services) {
+        const { baseTotal, markupTotal } = calculateServiceTotal(
+          Number(servicio.basePrice),
+          servicio.quantity,
+          markup
+        );
+        if (activo) {
+          base += baseTotal;
+          conMargen += markupTotal;
+        } else {
+          liberado += markupTotal;
+        }
+      }
+    }
+  }
+
+  return { base, conMargen, liberado, perfilesActivos, perfilesRetirados };
+}
+
 /**
  * Valida si el total con markup no excede el presupuesto
  */

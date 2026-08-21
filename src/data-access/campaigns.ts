@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
-import { calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import { calcularTotalCampana, calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
@@ -75,8 +75,15 @@ export async function getCampaignsPaginated(params: {
         clientContact: { select: { id: true, firstName: true, lastName: true, email: true } },
         createdBy: { select: { id: true, name: true } },
         profiles: {
-          include: {
+          select: {
+            id: true,
+            participacion: true,
             profile: { select: { id: true, name: true } },
+            platforms: {
+              select: {
+                services: { select: { basePrice: true, quantity: true } },
+              },
+            },
           },
         },
       },
@@ -84,38 +91,18 @@ export async function getCampaignsPaginated(params: {
     prisma.campaign.count({ where }),
   ]);
 
-  // Batch load services to avoid N+1
-  const campaignIds = campaigns.map((c) => c.id);
-  const allServices = await prisma.campaignService.findMany({
-    where: {
-      campaignProfilePlatform: {
-        campaignProfile: { campaignId: { in: campaignIds } },
-      },
-    },
-    include: {
-      campaignProfilePlatform: {
-        select: { campaignProfile: { select: { campaignId: true } } },
-      },
-    },
-  });
-
-  const servicesByCampaign = new Map<string, { basePrice: unknown; quantity: number }[]>();
-  for (const service of allServices) {
-    const campaignId = service.campaignProfilePlatform.campaignProfile.campaignId;
-    if (!servicesByCampaign.has(campaignId)) {
-      servicesByCampaign.set(campaignId, []);
-    }
-    servicesByCampaign.get(campaignId)!.push(service);
-  }
-
+  // El total lo calcula calcularTotalCampana y no un reduce local: es la
+  // unica que sabe que los retirados no suman, y esa regla tiene que ser
+  // la misma aqui, en la ficha y en el portal del cliente.
   const campaignsWithTotals = campaigns.map((campaign) => {
-    const services = servicesByCampaign.get(campaign.id) || [];
-    const totalBase = services.reduce((sum, s) => sum + Number(s.basePrice) * s.quantity, 0);
+    const totales = calcularTotalCampana(campaign.profiles, campaign.markupPercentage);
     return {
       ...campaign,
-      totalBase,
-      totalWithMarkup: calculateMarkupPrice(totalBase, campaign.markupPercentage),
-      profileCount: campaign.profiles.length,
+      totalBase: totales.base,
+      totalWithMarkup: totales.conMargen,
+      presupuestoLiberado: totales.liberado,
+      profileCount: totales.perfilesActivos,
+      perfilesRetirados: totales.perfilesRetirados,
     };
   });
 
@@ -676,7 +663,9 @@ export async function getCampaignsForClientPortal(clientId: string) {
       startDate: true,
       endDate: true,
       createdAt: true,
-      _count: { select: { profiles: true } },
+      // Solo los que siguen contratados: al cliente no le sirve un
+      // recuento que incluya a quien ya se retiro de la campana.
+      _count: { select: { profiles: { where: { participacion: "ACTIVO" } } } },
     },
   });
 

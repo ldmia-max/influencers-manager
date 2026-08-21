@@ -45,6 +45,9 @@ model User {
   createdCategories Category[]
   createdClients    Client[]
   campaigns         Campaign[]
+
+  /// Links de campana que ha registrado esta persona.
+  entregasRegistradas CampaignEntrega[]
 }
 
 // ============ GENEROS ============
@@ -331,6 +334,25 @@ enum CampaignStatus {
   CANCELLED  // Campaña cancelada
 }
 
+/// Si un influencer sigue contratado en la campana.
+///
+/// Va aparte de CampaignProfileStatus a proposito: ese dice si el CLIENTE
+/// lo aprobo, y este si SIGUE DENTRO. Son cosas distintas y pueden darse
+/// a la vez —un influencer aprobado que despues se retira—, asi que
+/// meterlas en la misma columna haria indistinguible al que se cayo del
+/// que el cliente rechazo antes de contratarlo.
+enum ParticipacionCampana {
+  ACTIVO    // Contratado: sus importes cuentan en el total
+  RETIRADO  // Fuera de la campana: no suma y libera presupuesto
+}
+
+/// Quien decidio el retiro. El cliente no ve este dato.
+enum OrigenRetiro {
+  INFLUENCER // Se retiro por voluntad propia
+  CLIENTE    // Lo pidio el cliente
+  AGENCIA    // Decision interna
+}
+
 enum CampaignProfileStatus {
   PENDING   // Esperando revisión del cliente
   APPROVED  // Aprobado por el cliente
@@ -432,6 +454,16 @@ model CampaignProfile {
   profile    Profile  @relation(fields: [profileId], references: [id])
   profileId  String
 
+  /// --- Participacion ---
+  /// Si esta RETIRADO, sus servicios dejan de sumar en el total de la
+  /// campana, liberando presupuesto para contratar a otro. El registro
+  /// no se borra: es historia comercial de lo que se llego a acordar.
+  participacion ParticipacionCampana @default(ACTIVO)
+  origenRetiro  OrigenRetiro?
+  /// Interno. Nunca se envia al portal del cliente.
+  motivoRetiro  String?
+  retiradoEn    DateTime?
+
   // Plataformas seleccionadas para este perfil en esta campaña
   platforms CampaignProfilePlatform[]
 
@@ -489,6 +521,17 @@ model CampaignService {
   /// origen del precio y del nombre a mostrar.
   profileService            ProfileService?         @relation(fields: [profileServiceId], references: [id])
   profileServiceId          String?
+
+  /// --- Entrega del contenido ---
+  /// Fecha tope para registrar los links de ESTE formato. Va aqui y no en
+  /// la campana porque el reel puede vencer el dia 1 y las stories el 5.
+  /// Nula mientras la campana no se active.
+  fechaLimite DateTime?
+
+  /// Los links entregados. Para un formato normal se esperan `quantity`;
+  /// para un combo basta uno, porque su contenido es texto libre y no hay
+  /// forma de saber cuantas piezas incluye.
+  entregas CampaignEntrega[]
 
   /// Postgres admite varios NULL en un unico, asi que esta restriccion
   /// sigue impidiendo repetir un formato del tarifario en la misma
@@ -642,4 +685,69 @@ model AuditLog {
   @@index([entity, entityId, createdAt])
   @@index([createdAt])
   @@index([actorEmail, createdAt])
+}
+
+
+/// Un link publicado por el influencer para un formato de la campana.
+///
+/// El retraso NO se guarda: se calcula comparando `entregadoEn` con la
+/// `fechaLimite` del formato. Una columna de estado obligaria a un
+/// proceso que la mantuviera al dia, y el dia que ese proceso fallara
+/// los datos mentirian sin que nadie se enterara.
+model CampaignEntrega {
+  id String @id @default(cuid())
+
+  /// El link de la publicacion.
+  url String
+  /// Cuando se registro el link. Es lo que se compara con la fecha
+  /// limite, porque el plazo pactado es para ENTREGAR los links.
+  entregadoEn DateTime @default(now())
+  /// Cuando se publico el contenido, si se sabe. Marca el arranque de la
+  /// ventana de un mes en la que se refrescan las metricas.
+  publicadoEn DateTime?
+  notas       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignService   CampaignService @relation(fields: [campaignServiceId], references: [id], onDelete: Cascade)
+  campaignServiceId String
+
+  /// Quien lo registro. Los influencers no tienen cuenta: los links los
+  /// pega el personal de la agencia.
+  registradoPor   User?   @relation(fields: [registradoPorId], references: [id])
+  registradoPorId String?
+
+  metricas CampaignEntregaMetrica[]
+
+  /// El mismo link no se registra dos veces para el mismo formato.
+  @@unique([campaignServiceId, url])
+  @@index([campaignServiceId])
+}
+
+/// Una foto de las metricas de un link en un instante.
+///
+/// Se acumulan filas en vez de sobrescribir una sola: sin historico solo
+/// se puede enseniar el numero de hoy, y lo que el cliente necesita ver
+/// es la evolucion —que un reel siguio creciendo dos semanas despues de
+/// publicarse—.
+///
+/// Los campos son opcionales porque no todas las redes publican lo
+/// mismo: los compartidos solo existen en TikTok, y guardados tampoco
+/// los dan Instagram ni YouTube. Null significa "la plataforma no lo
+/// publica", que no es lo mismo que cero.
+model CampaignEntregaMetrica {
+  id          String   @id @default(cuid())
+  capturadoEn DateTime @default(now())
+
+  vistas      Int?
+  meGusta     Int?
+  comentarios Int?
+  compartidos Int?
+  guardados   Int?
+
+  entrega   CampaignEntrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  entregaId String
+
+  @@index([entregaId, capturadoEn])
 }

@@ -31,6 +31,7 @@ import {
   PROFILE_STATUS_LABELS,
   PROFILE_STATUS_COLORS,
   calculateMarkupPrice,
+  calcularTotalCampana,
 } from "@/lib/campaign-utils";
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
@@ -70,8 +71,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
   const reachRanges = await getCachedReachRanges();
 
-  // Calcular totales
-  let totalCampaign = 0;
+  // El importe lo calcula calcularTotalCampana, que es la unica que sabe
+  // que los retirados no suman. Este bucle solo reune alcance, formatos y
+  // demografia.
+  const totales = calcularTotalCampana(campaign.profiles, campaign.markupPercentage);
+  const totalCampaign = totales.conMargen;
   let totalReach = 0;
   const accountsProcessed = new Set<string>();
   const formatCounts = new Map<string, number>();
@@ -79,6 +83,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const departmentCounts = new Map<string, number>();
 
   campaign.profiles.forEach((cp) => {
+    // Un retirado ya no aporta alcance ni cuenta en la demografia: sigue
+    // listado mas abajo, pero fuera de las cifras de la campana.
+    if (cp.participacion !== "ACTIVO") return;
+
     // Contar géneros y departamentos
     if (cp.profile.gender) {
       const g = cp.profile.gender.displayName;
@@ -91,9 +99,6 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
     cp.platforms.forEach((cpp) => {
       cpp.services.forEach((cs) => {
-        const basePrice = Number(cs.basePrice);
-        totalCampaign +=
-          calculateMarkupPrice(basePrice, campaign.markupPercentage) * cs.quantity;
         // Contar formatos
         const fname = cs.esCombo
           ? "Combo"
@@ -114,11 +119,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const isOverBudget = totalCampaign > budget;
 
   // Contar estados de perfiles
+  const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
-    total: campaign.profiles.length,
-    approved: campaign.profiles.filter((p) => p.status === "APPROVED").length,
-    rejected: campaign.profiles.filter((p) => p.status === "REJECTED").length,
-    pending: campaign.profiles.filter((p) => p.status === "PENDING").length,
+    total: activos.length,
+    approved: activos.filter((p) => p.status === "APPROVED").length,
+    rejected: activos.filter((p) => p.status === "REJECTED").length,
+    pending: activos.filter((p) => p.status === "PENDING").length,
   };
 
   const getPlatformIcon = (platformName: string) => {
