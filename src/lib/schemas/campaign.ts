@@ -99,3 +99,32 @@ export const setMarkupSchema = z.object({
 
 export type SetMarkupPayload = z.infer<typeof setMarkupSchema>;
 
+
+/**
+ * Alta de un influencer en una campana ya en marcha.
+ *
+ * Los precios NO viajan: se leen del tarifario en el servidor. Aceptar
+ * el importe que mande el navegador seria dejar que se contrate a
+ * cualquier precio.
+ */
+export const agregarInfluencerSchema = z.object({
+  profileId: z.string().min(1, "Selecciona un influencer"),
+  platforms: z
+    .array(
+      z.object({
+        socialAccountId: z.string().min(1),
+        services: z
+          .array(
+            z.object({
+              profileServiceId: z.string().optional(),
+              quantity: z.number().int().min(1),
+              esCombo: z.boolean().optional(),
+              comboPrecio: z.number().min(0).optional(),
+              comboDescripcion: z.string().max(300).optional(),
+            })
+          )
+          .min(1, "Selecciona al menos un formato"),
+      })
+    )
+    .min(1, "Selecciona al menos una plataforma"),
+});

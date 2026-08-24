@@ -130,6 +130,9 @@ export {
   getCampaignProfiles,
   setCampaignProfiles,
   removeCampaignProfiles,
+  agregarInfluencerACampana,
+  aprobarInfluencerDeCampana,
+  influencersPendientesDeAprobacion,
 } from "./campaign-profiles";
 
 // --- Entregas de contenido y participacion ---

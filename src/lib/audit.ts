@@ -93,4 +93,7 @@ export const ACCIONES = {
   /// deja rastro igual que el margen.
   influencerRetirado: "campaign.influencer_withdrawn",
   influencerReactivado: "campaign.influencer_reinstated",
+  influencerAnadido: "campaign.influencer_added",
+  /// Aprobar en nombre del cliente un gasto que el no ha visto.
+  influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
 } as const;

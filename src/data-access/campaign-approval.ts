@@ -28,10 +28,20 @@ function validateToken(approvalToken: {
     throw new ValidationError("USED_TOKEN");
   }
 
-  if (approvalToken.campaign.status !== "REVIEW") {
+  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(approvalToken.campaign.status)) {
     throw new ValidationError("INVALID_STATUS");
   }
 }
+
+/**
+ * Estados en los que un enlace de aprobacion sirve.
+ *
+ * REVIEW es la revision inicial de toda la campana. ACTIVE se admite
+ * porque a una campana en marcha se le puede sumar un reemplazo cuando
+ * alguien se retira, y ese influencer nuevo necesita el visto bueno del
+ * cliente sin reabrir lo que ya decidio.
+ */
+const ESTADOS_QUE_ADMITEN_APROBACION = ["REVIEW", "ACTIVE"];
 
 export async function getApprovalData(token: string) {
   const approvalToken = await prisma.campaignApprovalToken.findUnique({
@@ -104,7 +114,7 @@ export async function getApprovalData(token: string) {
     throw new ValidationError("USED_TOKEN");
   }
 
-  if (approvalToken.campaign.status !== "REVIEW") {
+  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(approvalToken.campaign.status)) {
     throw new ValidationError("INVALID_STATUS");
   }
 
@@ -272,12 +282,16 @@ export async function submitApproval(
       finalDecisions.platforms.some((p) => p.status === "REJECTED") ||
       finalDecisions.services.some((s) => !s.isApproved);
 
-    const newStatus = hasRejections ? "PENDING" : "ACTIVE";
-
-    await tx.campaign.update({
-      where: { id: approvalToken!.campaignId },
-      data: { status: newStatus },
-    });
+    // Una campana que ya estaba en marcha no retrocede porque el cliente
+    // rechace a un reemplazo: el resto del trabajo sigue su curso y hay
+    // contenido publicado que no se puede poner en pausa. Solo queda ese
+    // influencer marcado como rechazado, para buscar otro.
+    if (approvalToken!.campaign.status !== "ACTIVE") {
+      await tx.campaign.update({
+        where: { id: approvalToken!.campaignId },
+        data: { status: hasRejections ? "PENDING" : "ACTIVE" },
+      });
+    }
   });
 
   const summary = {

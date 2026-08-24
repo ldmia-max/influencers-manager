@@ -38,6 +38,7 @@ import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card"
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
+import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
 import { MetricasCampana } from "@/components/campaigns/metricas-campana";
 import { historicoDeCampana } from "@/data-access/metricas";
 
@@ -184,6 +185,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     })),
   }));
 
+  // Influencers anadidos a la campana en marcha que esperan decision.
+  const pendientesDeAprobacion = campaign.profiles
+    .filter((cp) => cp.participacion === "ACTIVO" && cp.status === "PENDING")
+    .map((cp) => ({ campaignProfileId: cp.id, nombre: cp.profile.name }));
+
+  const idsEnCampana = campaign.profiles.map((cp) => cp.profile.id);
+
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
     total: activos.length,
@@ -263,6 +271,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campaignId={id}
           perfiles={perfilesEntregas}
           puedeEditar={campaign.status === "ACTIVE" || campaign.status === "PENDING"}
+        />
+      )}
+
+      {/* Sustituciones: solo con la campana en marcha. Antes de activarla
+          los cambios se hacen en el editor, que permite mucho mas. */}
+      {campaign.status === "ACTIVE" && (
+        <ReemplazarInfluencer
+          campaignId={id}
+          presupuestoLiberado={totales.liberado}
+          pendientes={pendientesDeAprobacion}
+          yaEnCampana={idsEnCampana}
+          markup={campaign.markupPercentage}
         />
       )}
 

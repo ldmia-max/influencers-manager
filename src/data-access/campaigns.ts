@@ -630,10 +630,24 @@ export async function regenerateApprovalToken(campaignId: string) {
     throw new NotFoundError("Campaña no encontrada");
   }
 
-  if (campaign.status !== "REVIEW") {
+  // ACTIVE tambien vale: a una campana en marcha se le puede sumar un
+  // reemplazo cuando alguien se retira, y ese influencer nuevo necesita
+  // que el cliente lo apruebe sin reabrir el resto de la campana.
+  if (campaign.status !== "REVIEW" && campaign.status !== "ACTIVE") {
     throw new ValidationError(
-      "Solo se puede regenerar el token cuando la campaña está en revisión"
+      "Solo se puede generar un enlace cuando la campaña está en revisión o activa"
     );
+  }
+
+  if (campaign.status === "ACTIVE") {
+    const pendientes = await prisma.campaignProfile.count({
+      where: { campaignId, status: "PENDING", participacion: "ACTIVO" },
+    });
+    if (pendientes === 0) {
+      throw new ValidationError(
+        "No hay ningún influencer pendiente de aprobación en esta campaña"
+      );
+    }
   }
 
   const token = generateApprovalToken();

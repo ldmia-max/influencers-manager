@@ -114,7 +114,9 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
     return days;
   };
 
-  if (tokens.length === 0 && campaignStatus !== "REVIEW") {
+  const admiteEnlace = campaignStatus === "REVIEW" || campaignStatus === "ACTIVE";
+
+  if (tokens.length === 0 && !admiteEnlace) {
     return null;
   }
 
@@ -135,7 +137,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         )}
 
         {/* Botón para regenerar cuando no hay token activo */}
-        {!activeToken && campaignStatus === "REVIEW" && (
+        {!activeToken && admiteEnlace && (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
             <p className="text-sm text-yellow-800">
               No hay un enlace de aprobación activo. El enlace anterior ha expirado o ya fue utilizado.
@@ -161,7 +163,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         )}
 
         {/* URL activa para copiar */}
-        {activeToken && campaignStatus === "REVIEW" && (
+        {activeToken && admiteEnlace && (
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground">
               URL activa para el cliente
