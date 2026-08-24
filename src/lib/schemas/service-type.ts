@@ -7,6 +7,11 @@ export const createServiceTypeSchema = z.object({
   profileTypes: z
     .array(z.enum(["INFLUENCER", "UGC", "BOTH"]))
     .min(1, "Al menos un tipo de perfil es requerido"),
+  /**
+   * Contenido que no deja enlace permanente. Cambia como se entrega: en
+   * vez de pegar un link se confirma la fecha de emision.
+   */
+  esEfimero: z.boolean().optional(),
 });
 
 export type CreateServiceTypePayload = z.infer<typeof createServiceTypeSchema>;
@@ -18,6 +23,7 @@ export const updateServiceTypeSchema = z.object({
     .array(z.enum(["INFLUENCER", "UGC", "BOTH"]))
     .min(1)
     .optional(),
+  esEfimero: z.boolean().optional(),
 });
 
 export type UpdateServiceTypePayload = z.infer<typeof updateServiceTypeSchema>;

@@ -793,7 +793,11 @@ export async function getCampaignResultsForClient(
                   esCombo: true,
                   comboDescripcion: true,
                   profileService: {
-                    select: { serviceType: { select: { displayName: true } } },
+                    select: {
+                      serviceType: {
+                        select: { displayName: true, esEfimero: true },
+                      },
+                    },
                   },
                   entregas: {
                     orderBy: { entregadoEn: "asc" },
@@ -801,6 +805,7 @@ export async function getCampaignResultsForClient(
                       id: true,
                       url: true,
                       publicadoEn: true,
+                      entregadoEn: true,
                       metricas: {
                         orderBy: { capturadoEn: "asc" },
                         select: {

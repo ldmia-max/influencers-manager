@@ -70,6 +70,7 @@ async function main() {
       displayName: "Story",
       platformName: "instagram",
       profileTypes: [ProfileType.INFLUENCER, ProfileType.UGC, ProfileType.BOTH],
+      esEfimero: true,
     },
     {
       name: "carrusel",
@@ -108,6 +109,7 @@ async function main() {
       displayName: "Live",
       platformName: "tiktok",
       profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+      esEfimero: true,
     },
     // TikTok - UGC (tambien disponible para BOTH)
     {
@@ -154,12 +156,14 @@ async function main() {
       displayName: "Live",
       platformName: "kick",
       profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+      esEfimero: true,
     },
     {
       name: "mencion_live",
       displayName: "Mencion en Live",
       platformName: "kick",
       profileTypes: [ProfileType.INFLUENCER, ProfileType.BOTH],
+      esEfimero: true,
     },
     {
       name: "clip",
@@ -187,12 +191,16 @@ async function main() {
           platformId: platform.id,
         },
       },
-      update: {},
+      // Se actualiza esEfimero incluso en formatos que ya existian: es
+      // una marca tecnica que decide como se entrega, no una preferencia
+      // del equipo, y una base sembrada antes la tendria mal.
+      update: { esEfimero: serviceType.esEfimero ?? false },
       create: {
         name: serviceType.name,
         displayName: serviceType.displayName,
         platformId: platform.id,
         profileTypes: serviceType.profileTypes,
+        esEfimero: serviceType.esEfimero ?? false,
       },
     });
     console.log(

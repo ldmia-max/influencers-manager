@@ -8,7 +8,12 @@ import { z } from "zod";
  */
 export const registrarEntregaSchema = z.object({
   campaignServiceId: z.string().min(1, "Falta el formato"),
-  url: z.string().min(1, "Pega el link de la publicación"),
+  /**
+   * Vacia en los formatos efimeros. Que se exija o no lo decide la capa
+   * de datos, que es la unica que sabe si el formato deja enlace; aqui
+   * no se puede comprobar sin consultar la base.
+   */
+  url: z.string().nullish(),
   publicadoEn: z.coerce.date().nullish(),
   notas: z.string().max(500, "Máximo 500 caracteres").nullish(),
 });

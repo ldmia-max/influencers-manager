@@ -161,6 +161,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         esCombo: cs.esCombo,
         comboDescripcion: cs.comboDescripcion,
         fechaLimite: cs.fechaLimite?.toISOString() ?? null,
+        // Un combo agrupa formatos con enlace, asi que nunca es efimero.
+        esEfimero: cs.esCombo
+          ? false
+          : cs.profileService?.serviceType.esEfimero ?? false,
         nombre: cs.esCombo
           ? "Combo"
           : cs.profileService?.serviceType.displayName ?? "Formato",

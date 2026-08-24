@@ -93,7 +93,9 @@ export async function getEntregasDeCampana(campaignId: string) {
                   comboDescripcion: true,
                   fechaLimite: true,
                   profileService: {
-                    select: { serviceType: { select: { displayName: true } } },
+                    select: {
+                      serviceType: { select: { displayName: true, esEfimero: true } },
+                    },
                   },
                   entregas: {
                     orderBy: { entregadoEn: "asc" },
@@ -131,20 +133,29 @@ export async function getEntregasDeCampana(campaignId: string) {
   return campana;
 }
 
-/** Registra un link para un formato. */
+/**
+ * Registra una entrega de un formato.
+ *
+ * Con enlace en los formatos normales, y con solo la fecha de emision en
+ * los efimeros —stories y directos—, donde la plataforma no publica
+ * ninguna URL permanente. En esos la prueba es la confirmacion de quien
+ * la registra, que queda guardada en `registradoPorId`.
+ */
 export async function registrarEntrega(datos: {
   campaignServiceId: string;
-  url: string;
+  url?: string | null;
   publicadoEn?: Date | null;
   notas?: string | null;
   usuarioId: string;
 }) {
-  const url = validarUrl(datos.url);
-
   const servicio = await prisma.campaignService.findUnique({
     where: { id: datos.campaignServiceId },
     select: {
       id: true,
+      esCombo: true,
+      profileService: {
+        select: { serviceType: { select: { esEfimero: true, displayName: true } } },
+      },
       campaignProfilePlatform: {
         select: {
           campaignProfile: {
@@ -159,6 +170,28 @@ export async function registrarEntrega(datos: {
   });
 
   if (!servicio) throw new NotFoundError("Formato no encontrado");
+
+  // Un combo nunca es efimero: agrupa formatos con enlace.
+  const esEfimero = servicio.profileService?.serviceType.esEfimero ?? false;
+
+  let url: string | null = null;
+  if (esEfimero) {
+    // Aceptar un link aqui seria aceptar uno que caduca en horas, y el
+    // cliente encontraria un enlace roto donde deberia haber una prueba.
+    if (datos.url?.trim()) {
+      throw new ValidationError(
+        `«${servicio.profileService?.serviceType.displayName}» no deja enlace permanente: confirma la emisión con su fecha, sin link.`
+      );
+    }
+    if (!datos.publicadoEn) {
+      throw new ValidationError("Indica la fecha en que se emitió");
+    }
+  } else {
+    if (!datos.url?.trim()) {
+      throw new ValidationError("Pega el link de la publicación");
+    }
+    url = validarUrl(datos.url);
+  }
 
   const perfil = servicio.campaignProfilePlatform.campaignProfile;
 
@@ -176,14 +209,18 @@ export async function registrarEntrega(datos: {
     );
   }
 
-  const existente = await prisma.campaignEntrega.findUnique({
-    where: {
-      campaignServiceId_url: { campaignServiceId: datos.campaignServiceId, url },
-    },
-    select: { id: true },
-  });
-  if (existente) {
-    throw new ValidationError("Ese link ya está registrado en este formato");
+  // Solo se comprueba el duplicado cuando hay link. En los efimeros cada
+  // fila es una emision distinta y repetir fecha es legitimo.
+  if (url) {
+    const existente = await prisma.campaignEntrega.findUnique({
+      where: {
+        campaignServiceId_url: { campaignServiceId: datos.campaignServiceId, url },
+      },
+      select: { id: true },
+    });
+    if (existente) {
+      throw new ValidationError("Ese link ya está registrado en este formato");
+    }
   }
 
   return prisma.campaignEntrega.create({
@@ -209,7 +246,10 @@ export async function actualizarEntrega(
   });
   if (!entrega) throw new NotFoundError("Entrega no encontrada");
 
-  const url = datos.url !== undefined ? validarUrl(datos.url) : undefined;
+  const url =
+    datos.url !== undefined && datos.url !== null && datos.url.trim()
+      ? validarUrl(datos.url)
+      : undefined;
 
   if (url) {
     const choque = await prisma.campaignEntrega.findUnique({

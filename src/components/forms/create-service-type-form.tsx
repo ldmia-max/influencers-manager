@@ -23,6 +23,7 @@ export function CreateServiceTypeForm({ platforms }: CreateServiceTypeFormProps)
   const formRef = useRef<HTMLFormElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [profileTypes, setProfileTypes] = useState<("INFLUENCER" | "UGC" | "BOTH")[]>(["INFLUENCER"]);
+  const [esEfimero, setEsEfimero] = useState(false);
 
   const createMutation = useCreateServiceType();
   const loading = createMutation.isPending;
@@ -52,7 +53,7 @@ export function CreateServiceTypeForm({ platforms }: CreateServiceTypeFormProps)
     }
 
     createMutation.mutate(
-      { displayName, name, platformId, profileTypes },
+      { displayName, name, platformId, profileTypes, esEfimero },
       {
         onSuccess: () => {
           formRef.current?.reset();
@@ -144,6 +145,29 @@ export function CreateServiceTypeForm({ platforms }: CreateServiceTypeFormProps)
           </div>
         </div>
       </div>
+
+      {/* Sin esta marca, un formato como una story pediria un link que la
+          plataforma no publica, y la campana no se podria cerrar nunca. */}
+      <div className="rounded-lg border border-gray-200 p-3">
+        <div className="flex items-start space-x-2">
+          <Checkbox
+            id="es-efimero"
+            checked={esEfimero}
+            onCheckedChange={(v) => setEsEfimero(v === true)}
+          />
+          <div>
+            <Label htmlFor="es-efimero" className="cursor-pointer">
+              No deja enlace permanente
+            </Label>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Márcalo en stories, directos y menciones en directo. La entrega se
+              confirmará con la fecha de emisión en lugar de con un link, y no
+              se le podrán leer métricas.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Creando..." : "Crear Formato"}
       </Button>

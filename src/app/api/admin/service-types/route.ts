@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     const body = await parseBody(req, createServiceTypeSchema);
     if (body instanceof NextResponse) return body;
-    const serviceType = await createServiceType({ name: body.name, displayName: body.displayName, platformId: body.platformId, profileTypes: body.profileTypes });
+    const serviceType = await createServiceType({ name: body.name, displayName: body.displayName, platformId: body.platformId, profileTypes: body.profileTypes, esEfimero: body.esEfimero });
     return NextResponse.json(serviceType, { status: 201 });
   } catch (error) {
     if (error instanceof ValidationError) {

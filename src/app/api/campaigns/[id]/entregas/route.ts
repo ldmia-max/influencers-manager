@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     const entrega = await registrarEntrega({
       campaignServiceId: body.campaignServiceId,
-      url: body.url,
+      url: body.url ?? null,
       publicadoEn: body.publicadoEn ?? null,
       notas: body.notas ?? null,
       usuarioId: sesion.userId,

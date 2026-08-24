@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, Users } from "lucide-react";
 import {
   COOKIE_SESION_CLIENTE,
   verificarSesionCliente,
@@ -16,6 +16,14 @@ import { formatCompactNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricasCampana } from "@/components/campaigns/metricas-campana";
+
+function formatearFecha(fecha: Date | string): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(fecha));
+}
 
 interface PageProps {
   params: Promise<{ campaignId: string }>;
@@ -164,19 +172,37 @@ async function Contenido({ params }: PageProps) {
                         </p>
                       ) : (
                         <ul className="mt-1 space-y-1">
-                          {cs.entregas.map((e) => (
-                            <li key={e.id}>
-                              <a
-                                href={e.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline"
+                          {cs.entregas.map((e) =>
+                            e.url ? (
+                              <li key={e.id}>
+                                <a
+                                  href={e.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Ver publicación
+                                </a>
+                              </li>
+                            ) : (
+                              // Stories y directos no dejan enlace. Se dice
+                              // cuando se emitió en vez de ofrecer un link
+                              // roto, que es lo que veria el cliente al
+                              // entrar dias despues.
+                              <li
+                                key={e.id}
+                                className="inline-flex items-center gap-1 text-xs text-gray-600"
                               >
-                                <ExternalLink className="h-3 w-3" />
-                                Ver publicación
-                              </a>
-                            </li>
-                          ))}
+                                <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                Emitido el{" "}
+                                {formatearFecha(e.publicadoEn ?? e.entregadoEn)}
+                                <span className="text-gray-400">
+                                  · sin enlace permanente
+                                </span>
+                              </li>
+                            )
+                          )}
                         </ul>
                       )}
                     </div>

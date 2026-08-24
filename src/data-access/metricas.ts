@@ -37,6 +37,9 @@ export async function entregasParaRefrescar(limite = 200) {
 
   const candidatas = await prisma.campaignEntrega.findMany({
     where: {
+      // Sin URL no hay nada que consultar: los formatos efimeros se
+      // confirman a mano y sus cifras solo las ve el creador.
+      url: { not: null },
       OR: [{ publicadoEn: { gte: desde } }, { publicadoEn: null, entregadoEn: { gte: desde } }],
     },
     orderBy: { entregadoEn: "desc" },
@@ -70,15 +73,16 @@ export async function entregasParaRefrescar(limite = 200) {
  * leerian como una caida real de audiencia.
  */
 export async function refrescarMetricas(
-  entregas: { id: string; url: string }[]
+  entregas: { id: string; url: string | null }[]
 ): Promise<{ consultadas: number; guardadas: number; porPlataforma: Record<string, number> }> {
   const porPlataforma = new Map<string, { id: string; url: string }[]>();
 
   for (const entrega of entregas) {
+    if (!entrega.url) continue;
     const plataforma = plataformaDeUrl(entrega.url);
     if (!plataforma || plataforma === "kick") continue;
     const lista = porPlataforma.get(plataforma) ?? [];
-    lista.push(entrega);
+    lista.push({ id: entrega.id, url: entrega.url });
     porPlataforma.set(plataforma, lista);
   }
 
@@ -120,6 +124,7 @@ export async function refrescarMetricas(
 export async function refrescarMetricasDeCampana(campaignId: string) {
   const entregas = await prisma.campaignEntrega.findMany({
     where: {
+      url: { not: null },
       campaignService: {
         campaignProfilePlatform: {
           campaignProfile: { campaignId, participacion: "ACTIVO" },

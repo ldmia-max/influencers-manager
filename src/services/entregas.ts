@@ -2,14 +2,15 @@ import { apiPost, apiPatch, apiDelete } from "./api";
 
 export interface RegistrarEntregaPayload {
   campaignServiceId: string;
-  url: string;
+  /** Vacia en los formatos efimeros, que se confirman con la fecha. */
+  url?: string | null;
   publicadoEn?: string | null;
   notas?: string | null;
 }
 
 export interface EntregaCreada {
   id: string;
-  url: string;
+  url: string | null;
   entregadoEn: string;
 }
 

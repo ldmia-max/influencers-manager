@@ -30,6 +30,7 @@ export async function createServiceType(data: {
   displayName: string;
   platformId: string;
   profileTypes: ProfileType[];
+  esEfimero?: boolean;
 }) {
   const existing = await prisma.serviceType.findUnique({
     where: {
@@ -52,6 +53,7 @@ export async function createServiceType(data: {
       displayName: data.displayName,
       platformId: data.platformId,
       profileTypes: data.profileTypes,
+      esEfimero: data.esEfimero ?? false,
     },
     include: {
       platform: true,
@@ -65,7 +67,12 @@ export async function createServiceType(data: {
 
 export async function updateServiceType(
   id: string,
-  data: { isActive?: boolean; displayName?: string; profileTypes?: ProfileType[] }
+  data: {
+    isActive?: boolean;
+    displayName?: string;
+    profileTypes?: ProfileType[];
+    esEfimero?: boolean;
+  }
 ) {
   const resultado = await prisma.serviceType.update({
     where: { id },
@@ -73,6 +80,7 @@ export async function updateServiceType(
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
       ...(data.displayName && { displayName: data.displayName }),
       ...(data.profileTypes && { profileTypes: data.profileTypes }),
+      ...(typeof data.esEfimero === "boolean" && { esEfimero: data.esEfimero }),
     },
   });
   // Sin esto el cambio tarda hasta una hora en aparecer en los

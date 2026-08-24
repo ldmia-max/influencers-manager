@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
+  CheckCircle2,
   ExternalLink,
   Link2,
   Loader2,
@@ -51,7 +52,8 @@ import {
 
 export interface EntregaVista {
   id: string;
-  url: string;
+  /** Vacia en los formatos efímeros: ahí la prueba es la fecha. */
+  url: string | null;
   entregadoEn: string;
   publicadoEn: string | null;
   notas: string | null;
@@ -72,6 +74,8 @@ export interface FormatoVista {
   esCombo: boolean;
   comboDescripcion: string | null;
   fechaLimite: string | null;
+  /** Story, directo o mención en directo: no deja enlace que pegar. */
+  esEfimero: boolean;
   nombre: string;
   entregas: EntregaVista[];
 }
@@ -124,6 +128,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nuevoLink, setNuevoLink] = useState<Record<string, string>>({});
+  const [fechaEmision, setFechaEmision] = useState<Record<string, string>>({});
   const [retirando, setRetirando] = useState<PerfilVista | null>(null);
   const [origen, setOrigen] = useState<string>("");
   const [motivo, setMotivo] = useState("");
@@ -296,6 +301,14 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                               >
                                 {ETIQUETA_ENTREGA[estado.estado]}
                               </Badge>
+                              {formato.esEfimero && (
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-sky-100 text-sky-800"
+                                >
+                                  Sin enlace
+                                </Badge>
+                              )}
                               <span className="text-xs text-gray-500">
                                 {estado.entregados} de {estado.esperados}
                               </span>
@@ -335,15 +348,32 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   key={entrega.id}
                                   className="flex items-center gap-2 text-xs"
                                 >
-                                  <a
-                                    href={entrega.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex min-w-0 flex-1 items-center gap-1 truncate text-violet-700 hover:underline"
-                                  >
-                                    <ExternalLink className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{entrega.url}</span>
-                                  </a>
+                                  {entrega.url ? (
+                                    <a
+                                      href={entrega.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex min-w-0 flex-1 items-center gap-1 truncate text-violet-700 hover:underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{entrega.url}</span>
+                                    </a>
+                                  ) : (
+                                    // Sin enlace, lo que respalda la entrega es
+                                    // quien la confirmó: se dice su nombre.
+                                    <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-gray-700">
+                                      <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" />
+                                      <span className="truncate">
+                                        Emitido
+                                        {entrega.publicadoEn
+                                          ? ` el ${fechaCorta(entrega.publicadoEn)}`
+                                          : ""}
+                                        {entrega.registradoPor
+                                          ? ` · confirmado por ${entrega.registradoPor.name}`
+                                          : ""}
+                                      </span>
+                                    </span>
+                                  )}
                                   <span className="shrink-0 text-gray-400">
                                     {fechaCorta(entrega.entregadoEn)}
                                   </span>
@@ -366,45 +396,99 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                             </ul>
                           )}
 
-                          {puedeEditar && (
-                            <div className="mt-2 flex gap-2">
-                              <Input
-                                placeholder="https://… link de la publicación"
-                                value={nuevoLink[formato.id] ?? ""}
-                                onChange={(e) =>
-                                  setNuevoLink((v) => ({
-                                    ...v,
-                                    [formato.id]: e.target.value,
-                                  }))
-                                }
-                                className="h-8 text-xs"
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 shrink-0"
-                                disabled={
-                                  ocupado === formato.id ||
-                                  !(nuevoLink[formato.id] ?? "").trim()
-                                }
-                                onClick={() =>
-                                  conError(formato.id, async () => {
-                                    await registrarEntrega(campaignId, {
-                                      campaignServiceId: formato.id,
-                                      url: nuevoLink[formato.id],
-                                    });
-                                    setNuevoLink((v) => ({ ...v, [formato.id]: "" }));
-                                  })
-                                }
-                              >
-                                {ocupado === formato.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Plus className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            </div>
-                          )}
+                          {puedeEditar &&
+                            (formato.esEfimero ? (
+                              // Stories y directos no dejan enlace: la
+                              // entrega se confirma con la fecha en que se
+                              // emitió, y queda registrado quién lo dice.
+                              <div className="mt-2">
+                                <p className="mb-1 text-[11px] text-gray-500">
+                                  Este formato no deja enlace. Confirma la fecha
+                                  en que se emitió.
+                                </p>
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="date"
+                                    value={fechaEmision[formato.id] ?? ""}
+                                    onChange={(e) =>
+                                      setFechaEmision((v) => ({
+                                        ...v,
+                                        [formato.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 shrink-0"
+                                    disabled={
+                                      ocupado === formato.id ||
+                                      !(fechaEmision[formato.id] ?? "")
+                                    }
+                                    onClick={() =>
+                                      conError(formato.id, async () => {
+                                        await registrarEntrega(campaignId, {
+                                          campaignServiceId: formato.id,
+                                          publicadoEn: new Date(
+                                            fechaEmision[formato.id]
+                                          ).toISOString(),
+                                        });
+                                        setFechaEmision((v) => ({
+                                          ...v,
+                                          [formato.id]: "",
+                                        }));
+                                      })
+                                    }
+                                  >
+                                    {ocupado === formato.id ? (
+                                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                                    )}
+                                    Confirmar emisión
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 flex gap-2">
+                                <Input
+                                  placeholder="https://… link de la publicación"
+                                  value={nuevoLink[formato.id] ?? ""}
+                                  onChange={(e) =>
+                                    setNuevoLink((v) => ({
+                                      ...v,
+                                      [formato.id]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 shrink-0"
+                                  disabled={
+                                    ocupado === formato.id ||
+                                    !(nuevoLink[formato.id] ?? "").trim()
+                                  }
+                                  onClick={() =>
+                                    conError(formato.id, async () => {
+                                      await registrarEntrega(campaignId, {
+                                        campaignServiceId: formato.id,
+                                        url: nuevoLink[formato.id],
+                                      });
+                                      setNuevoLink((v) => ({ ...v, [formato.id]: "" }));
+                                    })
+                                  }
+                                >
+                                  {ocupado === formato.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Plus className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            ))}
                         </div>
                       );
                     })

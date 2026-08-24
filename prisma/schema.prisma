@@ -215,6 +215,13 @@ model ServiceType {
   platformId   String
   profileTypes ProfileType[] // [INFLUENCER], [UGC], o [INFLUENCER, UGC]
 
+  /// Contenido que no deja enlace: stories, directos, menciones en
+  /// directo. No es que el link se nos escape, es que la plataforma no
+  /// publica ninguno permanente, y sus metricas solo las ve el creador
+  /// en su panel. Para estos formatos la entrega se confirma con la
+  /// fecha de emision y quien la registro, sin URL.
+  esEfimero Boolean @default(false)
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -698,7 +705,10 @@ model CampaignEntrega {
   id String @id @default(cuid())
 
   /// El link de la publicacion.
-  url String
+  ///
+  /// Vacio en los formatos efimeros, donde no hay enlace que pegar: ahi
+  /// la entrega la sostienen `publicadoEn` y `registradoPor`.
+  url String?
   /// Cuando se registro el link. Es lo que se compara con la fecha
   /// limite, porque el plazo pactado es para ENTREGAR los links.
   entregadoEn DateTime @default(now())
@@ -721,6 +731,8 @@ model CampaignEntrega {
   metricas CampaignEntregaMetrica[]
 
   /// El mismo link no se registra dos veces para el mismo formato.
+  /// Postgres admite varios NULL en un unico, asi que un formato efimero
+  /// puede tener tantas confirmaciones como emisiones se contrataron.
   @@unique([campaignServiceId, url])
   @@index([campaignServiceId])
 }
