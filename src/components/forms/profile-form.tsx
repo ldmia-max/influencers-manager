@@ -813,6 +813,21 @@ export function ProfileForm({
 
               <div className="space-y-3">
                 <Label>Formatos y Precios</Label>
+
+                {/* Una plataforma sin formatos dejaba esta seccion vacia
+                    y sin explicacion, y era imposible distinguir "no hay
+                    ninguno configurado" de "algo falla". Los dos motivos
+                    reales se nombran aqui, con la salida para cada uno. */}
+                {availableServices.length === 0 && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    {serviceTypes.some((st) => st.platformId === account.platformId)
+                      ? `No hay formatos de ${platform?.displayName} para perfiles de tipo ${
+                          type === "INFLUENCER" ? "Influencer" : "UGC"
+                        }. Cámbialo a «Ambos» o añade el formato en Administración › Formatos.`
+                      : `${platform?.displayName} todavía no tiene formatos configurados. Créalos en Administración › Formatos.`}
+                  </p>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {availableServices.map((service) => {
                     const serviceInput = account.services.find(

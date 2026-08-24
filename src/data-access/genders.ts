@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { ValidationError } from "./errors";
 
 export async function getCachedGenders() {
@@ -32,10 +32,14 @@ export async function createGender(name: string) {
     throw new ValidationError("Este género ya existe");
   }
 
-  return prisma.gender.create({
+  const resultado = await prisma.gender.create({
     data: {
       name: normalizedName,
       displayName,
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("genders", "hours");
+  return resultado;
 }

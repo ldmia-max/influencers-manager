@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import type { ProfileType } from "@prisma/client";
 import { ValidationError } from "./errors";
 
@@ -46,7 +46,7 @@ export async function createServiceType(data: {
     );
   }
 
-  return prisma.serviceType.create({
+  const resultado = await prisma.serviceType.create({
     data: {
       name: data.name.toLowerCase(),
       displayName: data.displayName,
@@ -57,13 +57,17 @@ export async function createServiceType(data: {
       platform: true,
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("service-types", "hours");
+  return resultado;
 }
 
 export async function updateServiceType(
   id: string,
   data: { isActive?: boolean; displayName?: string; profileTypes?: ProfileType[] }
 ) {
-  return prisma.serviceType.update({
+  const resultado = await prisma.serviceType.update({
     where: { id },
     data: {
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
@@ -71,6 +75,10 @@ export async function updateServiceType(
       ...(data.profileTypes && { profileTypes: data.profileTypes }),
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("service-types", "hours");
+  return resultado;
 }
 
 export async function deleteServiceType(id: string) {
@@ -91,4 +99,7 @@ export async function deleteServiceType(id: string) {
   }
 
   await prisma.serviceType.delete({ where: { id } });
+  // Sin esto el borrado tarda hasta una hora en reflejarse en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("service-types", "hours");
 }

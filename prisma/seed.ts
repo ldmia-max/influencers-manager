@@ -980,6 +980,15 @@ async function main() {
   }
 
   console.log("\nSeeding completed!");
+
+  // El seed escribe directo en la base, saltandose las funciones que
+  // invalidan la cache de la aplicacion. Los formularios leen listas
+  // cacheadas por horas, asi que hasta que no se reinicie el servidor
+  // pueden seguir mostrando las de antes.
+  console.log("");
+  console.log("AVISO: reinicia la aplicacion para que los formularios vean");
+  console.log("lo recien sembrado. Leen listas cacheadas por horas y el");
+  console.log("seed no las invalida.");
 }
 
 main()

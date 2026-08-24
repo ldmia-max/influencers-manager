@@ -64,7 +64,8 @@ Tags in use: `profiles`, `profile-<id>`, `categories`, `platforms`, `service-typ
 Invalidation uses Next 16's two-arg form, `revalidateTag("profiles", "hours")` — the second argument must match the `cacheLife` profile of the cached function.
 
 **Gotchas that are live right now:**
-- Only `profiles`, `categories`, and `reach-ranges` are ever revalidated. The admin CRUD for **platforms, service types, locations, and genders never calls `revalidateTag`**, so those edits take up to an hour to show up in forms and filters.
+- Every mutation now revalidates its own tag **from inside `src/data-access/`**, not from the route — putting it in routes meant remembering it in each new one, and it had been forgotten in all of them. Caching is stale-while-revalidate, so the first request after a change still serves the old list and refreshes behind it; the second is fresh.
+- **`prisma/seed.ts` writes straight to the database and invalidates nothing.** After seeding, forms keep showing the previous lists until the server restarts. That is why YouTube and Kick appeared to have no formats: their `ServiceType` rows entered the seed in `85c4d2d`, later than the first production seed.
 - `src/app/api/campaigns/[id]/markup/route.ts` calls `revalidateTag("campaigns", "hours")`, but nothing tags `campaigns` — campaign reads in `src/data-access/campaigns.ts` are uncached, so that call does nothing.
 
 Because `"use cache"` functions can't read the session, anything session-dependent must be passed in as an argument (and thereby becomes part of the cache key).

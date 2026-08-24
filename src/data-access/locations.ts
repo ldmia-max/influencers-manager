@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { ValidationError } from "./errors";
 
 // === Cached functions ===
@@ -72,19 +72,23 @@ export async function createCountry(name: string, code: string) {
     throw new ValidationError("Ya existe un país con ese código");
   }
 
-  return prisma.country.create({
+  const resultado = await prisma.country.create({
     data: {
       name,
       code: code.toUpperCase(),
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("countries", "hours");
+  return resultado;
 }
 
 export async function patchCountry(
   id: string,
   data: { isActive?: boolean; name?: string; code?: string }
 ) {
-  return prisma.country.update({
+  const resultado = await prisma.country.update({
     where: { id },
     data: {
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
@@ -92,19 +96,27 @@ export async function patchCountry(
       ...(data.code && { code: data.code.toUpperCase() }),
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("countries", "hours");
+  return resultado;
 }
 
 export async function updateCountry(
   id: string,
   data: { name: string; code: string }
 ) {
-  return prisma.country.update({
+  const resultado = await prisma.country.update({
     where: { id },
     data: {
       name: data.name,
       code: data.code.toUpperCase(),
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("countries", "hours");
+  return resultado;
 }
 
 export async function deleteCountry(id: string) {
@@ -124,6 +136,9 @@ export async function deleteCountry(id: string) {
   }
 
   await prisma.country.delete({ where: { id } });
+  // Sin esto el borrado tarda hasta una hora en reflejarse en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("countries", "hours");
 }
 
 // === Departments ===
@@ -157,7 +172,7 @@ export async function createDepartment(name: string, countryId: string) {
     );
   }
 
-  return prisma.department.create({
+  const resultado = await prisma.department.create({
     data: {
       name,
       countryId,
@@ -168,13 +183,17 @@ export async function createDepartment(name: string, countryId: string) {
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("departments", "hours");
+  return resultado;
 }
 
 export async function patchDepartment(
   id: string,
   data: { isActive?: boolean; name?: string; countryId?: string }
 ) {
-  return prisma.department.update({
+  const resultado = await prisma.department.update({
     where: { id },
     data: {
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
@@ -187,13 +206,17 @@ export async function patchDepartment(
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("departments", "hours");
+  return resultado;
 }
 
 export async function updateDepartment(
   id: string,
   data: { name: string; countryId: string }
 ) {
-  return prisma.department.update({
+  const resultado = await prisma.department.update({
     where: { id },
     data: {
       name: data.name,
@@ -205,6 +228,10 @@ export async function updateDepartment(
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("departments", "hours");
+  return resultado;
 }
 
 export async function deleteDepartment(id: string) {
@@ -224,6 +251,9 @@ export async function deleteDepartment(id: string) {
   }
 
   await prisma.department.delete({ where: { id } });
+  // Sin esto el borrado tarda hasta una hora en reflejarse en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("departments", "hours");
 }
 
 // === Cities ===
@@ -268,7 +298,7 @@ export async function createCity(name: string, departmentId: string) {
     );
   }
 
-  return prisma.city.create({
+  const resultado = await prisma.city.create({
     data: {
       name,
       departmentId,
@@ -285,13 +315,17 @@ export async function createCity(name: string, departmentId: string) {
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("cities", "hours");
+  return resultado;
 }
 
 export async function patchCity(
   id: string,
   data: { isActive?: boolean; name?: string; departmentId?: string }
 ) {
-  return prisma.city.update({
+  const resultado = await prisma.city.update({
     where: { id },
     data: {
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
@@ -310,13 +344,17 @@ export async function patchCity(
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("cities", "hours");
+  return resultado;
 }
 
 export async function updateCity(
   id: string,
   data: { name: string; departmentId: string }
 ) {
-  return prisma.city.update({
+  const resultado = await prisma.city.update({
     where: { id },
     data: {
       name: data.name,
@@ -334,8 +372,15 @@ export async function updateCity(
       },
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("cities", "hours");
+  return resultado;
 }
 
 export async function deleteCity(id: string) {
   await prisma.city.delete({ where: { id } });
+  // Sin esto el borrado tarda hasta una hora en reflejarse en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("cities", "hours");
 }

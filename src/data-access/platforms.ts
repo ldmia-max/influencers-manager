@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { ValidationError } from "./errors";
 
 export async function getCachedPlatforms() {
@@ -40,25 +40,33 @@ export async function createPlatform(name: string, displayName: string) {
     throw new ValidationError("Ya existe una plataforma con ese identificador");
   }
 
-  return prisma.socialPlatform.create({
+  const resultado = await prisma.socialPlatform.create({
     data: {
       name: name.toLowerCase(),
       displayName,
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("platforms", "hours");
+  return resultado;
 }
 
 export async function updatePlatform(
   id: string,
   data: { isActive?: boolean; displayName?: string }
 ) {
-  return prisma.socialPlatform.update({
+  const resultado = await prisma.socialPlatform.update({
     where: { id },
     data: {
       ...(typeof data.isActive === "boolean" && { isActive: data.isActive }),
       ...(data.displayName && { displayName: data.displayName }),
     },
   });
+  // Sin esto el cambio tarda hasta una hora en aparecer en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("platforms", "hours");
+  return resultado;
 }
 
 export async function deletePlatform(id: string) {
@@ -78,4 +86,7 @@ export async function deletePlatform(id: string) {
   }
 
   await prisma.socialPlatform.delete({ where: { id } });
+  // Sin esto el borrado tarda hasta una hora en reflejarse en los
+  // formularios, que leen la version cacheada de esta tabla.
+  revalidateTag("platforms", "hours");
 }
