@@ -16,6 +16,7 @@ import {
 import { CampaignWizardProvider } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
 import { useProfileFilters } from "@/hooks/use-profile-filters";
+import { useProfileConfigs } from "@/hooks/use-profile-configs";
 import { CampaignStepProfiles } from "./campaign-step-profiles";
 import { formatNumber } from "@/lib/format";
 import { apiPost, apiPatch } from "@/services/api";
@@ -69,6 +70,11 @@ export function ReemplazarInfluencer({
   const [error, setError] = useState<string | null>(null);
 
   const filters = useProfileFilters(profiles);
+
+  // Sin esto se podia marcar un influencer y el panel derecho seguia
+  // vacio: quien construye su configuracion de formatos es este hook.
+  useProfileConfigs(profiles, filters);
+
   const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const reset = useCampaignWizardStore((s) => s.reset);
@@ -98,6 +104,7 @@ export function ReemplazarInfluencer({
         endDate: "",
       },
       currentStep: 2,
+      showFilters: true,
     });
   }, [abierto, campaignId, markup, presupuesto, totalActual, reset]);
 

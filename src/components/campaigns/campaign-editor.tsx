@@ -7,6 +7,7 @@ import { ChevronLeft } from "lucide-react";
 import type { CampaignStatus } from "@prisma/client";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
 import { useProfileFilters } from "@/hooks/use-profile-filters";
+import { useProfileConfigs } from "@/hooks/use-profile-configs";
 import {
   createCampaign as createCampaignApi,
   updateCampaign,
@@ -24,9 +25,7 @@ import { CampaignNavigationBar } from "./campaign-navigation-bar";
 import type {
   CampaignData,
   CampaignEditorProps,
-  PlatformConfig,
   ProfileConfig,
-  ServiceConfig,
   WizardStep,
 } from "@/models/campaign";
 
@@ -38,40 +37,6 @@ export type { ProfileWithServices } from "@/models/campaign";
 // Esto resuelve el race condition entre el cleanup de useEffect (que corre
 // después del paint) y la inicialización render-phase de la nueva instancia.
 let _activeEditorSessionId: string | null = null;
-
-/**
- * Clave sintetica del combo dentro de una plataforma.
- *
- * El combo no sale del tarifario, asi que no tiene profileServiceId. El
- * store identifica cada servicio por `profileServiceId ?? serviceTypeId`,
- * y este valor ocupa ese segundo hueco.
- */
-const COMBO_ID = "__combo__";
-
-/**
- * Fila de combo que se anade a cada plataforma.
- *
- * Se inyecta en la interfaz en vez de guardarse en el tarifario del
- * influencer: un combo es un acuerdo puntual de UNA campana, y crear
- * una tarifa "Combo $0" en cada creador seria informacion falsa.
- */
-function construirCombo(
-  existingPlatform: PlatformConfig | undefined
-): ServiceConfig[] {
-  const previo = existingPlatform?.services.find((s) => s.esCombo);
-  return [
-    {
-      profileServiceId: null,
-      serviceTypeId: COMBO_ID,
-      serviceName: "Combo",
-      // Nace apagado; solo viene activo si la campana ya tenia combo.
-      quantity: previo && previo.basePrice > 0 ? 1 : 0,
-      basePrice: previo?.basePrice ?? 0,
-      esCombo: true,
-      comboDescripcion: previo?.comboDescripcion ?? "",
-    },
-  ];
-}
 
 export function CampaignEditor({
   campaignId: initialCampaignId,
@@ -106,7 +71,6 @@ export function CampaignEditor({
   const setSuccess = useCampaignWizardStore((s) => s.setSuccess);
   const setCurrentStep = useCampaignWizardStore((s) => s.setCurrentStep);
   const setSelectedProfileIds = useCampaignWizardStore((s) => s.setSelectedProfileIds);
-  const setProfileConfigs = useCampaignWizardStore((s) => s.setProfileConfigs);
   const reset = useCampaignWizardStore((s) => s.reset);
 
   // Session-storage key: only defined for existing campaigns (edit mode).
@@ -228,89 +192,10 @@ export function CampaignEditor({
   // -------------------------------------------------------------------------
   const filters = useProfileFilters(profiles);
 
-  // -------------------------------------------------------------------------
-  // Helper: build a profile config from scratch or with existing data
-  // -------------------------------------------------------------------------
-  const createProfileConfig = useCallback(
-    (profileId: string, existingConf?: ProfileConfig): ProfileConfig => {
-      const profile = profiles.find((p) => p.id === profileId);
-      const activePlatformFilters = filters.selectedPlatforms;
-      const activeServiceFilters = filters.selectedServices;
-
-      return {
-        profileId,
-        profileName: profile?.name || "",
-        platforms:
-          profile?.socialAccounts.map((sa) => {
-            const existingPlatform = existingConf?.platforms.find(
-              (p) => p.socialAccountId === sa.id
-            );
-
-            const hasMatchingServices =
-              activeServiceFilters.length > 0 &&
-              sa.services.some((s) => activeServiceFilters.includes(s.serviceType.id));
-
-            const shouldSelectPlatform =
-              (activePlatformFilters.length > 0 && activePlatformFilters.includes(sa.platform.id)) ||
-              hasMatchingServices;
-
-            return {
-              socialAccountId: sa.id,
-              platformId: sa.platform.id,
-              platformName: sa.platform.displayName,
-              username: sa.username,
-              selected: existingPlatform?.selected ?? shouldSelectPlatform,
-              services: sa.services.map((s): ServiceConfig => {
-                const existingService = existingPlatform?.services.find(
-                  (es) => es.profileServiceId === s.id
-                );
-                const shouldSelectService =
-                  shouldSelectPlatform && activeServiceFilters.length > 0
-                    ? activeServiceFilters.includes(s.serviceType.id)
-                    : false;
-                return {
-                  profileServiceId: s.id,
-                  serviceTypeId: s.serviceType.id,
-                  serviceName: s.serviceType.displayName,
-                  quantity: existingService?.quantity ?? (shouldSelectService ? 1 : 0),
-                  basePrice: Number(s.price),
-                };
-              }).concat(construirCombo(existingPlatform)),
-            };
-          }) || [],
-      };
-    },
-    [profiles, filters.selectedPlatforms, filters.selectedServices]
-  );
-
-  // -------------------------------------------------------------------------
-  // Sync profile configs when selectedProfileIds changes
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    setProfileConfigs((prevConfigs: ProfileConfig[]) => {
-      const currentIds = new Set(prevConfigs.map((c) => c.profileId));
-      const newIds = new Set(selectedProfileIds);
-
-      const hasNewProfiles = selectedProfileIds.some((id) => !currentIds.has(id));
-      const hasRemovedProfiles = prevConfigs.some((c) => !newIds.has(c.profileId));
-      const hasIncompleteConfigs = prevConfigs.some(
-        (c) => c.platforms.length > 0 && !c.platforms[0]?.platformName
-      );
-
-      if (!hasNewProfiles && !hasRemovedProfiles && !hasIncompleteConfigs) {
-        return prevConfigs;
-      }
-
-      return selectedProfileIds.map((profileId) => {
-        const existingConf = prevConfigs.find((c) => c.profileId === profileId);
-        if (existingConf && existingConf.platforms.length > 0 && existingConf.platforms[0].platformName) {
-          return existingConf;
-        }
-        return createProfileConfig(profileId, existingConf);
-      });
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedProfileIds is primitive array; setProfileConfigs is stable
-  }, [selectedProfileIds, createProfileConfig]);
+  // La configuracion de formatos la construye useProfileConfigs, que
+  // vive fuera para que el modal de sustitucion pueda montar el mismo
+  // paso de perfiles sin arrastrar el editor entero.
+  useProfileConfigs(profiles, filters);
 
   // -------------------------------------------------------------------------
   // Step validation
