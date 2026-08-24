@@ -61,9 +61,35 @@ export default async function EditCampaignPage({ params }: PageProps) {
       : "",
   };
 
+  // Influencers que el cliente rechazo o que ya se retiraron de esta
+  // campana. Quedan fuera del editor por completo: ni preseleccionados
+  // ni entre los que se pueden anadir. Volver a proponer a quien el
+  // cliente ya rechazo es la forma mas rapida de que pierda la confianza
+  // en la propuesta.
+  //
+  // Sus filas siguen en la base de datos: son el historial de lo que se
+  // propuso y por que se cayo.
+  const descartados = campaign.profiles.filter(
+    (cp) => cp.status === "REJECTED" || cp.participacion === "RETIRADO"
+  );
+  const idsDescartados = new Set(descartados.map((cp) => cp.profile.id));
+
+  const perfilesRechazados = descartados.map((cp) => ({
+    id: cp.profile.id,
+    nombre: cp.profile.name,
+    motivo: cp.rejectionReason ?? cp.motivoRetiro,
+  }));
+
+  // El catalogo de seleccionables tampoco los ofrece.
+  const perfilesDisponibles = profiles.filter((p) => !idsDescartados.has(p.id));
+
+  const enJuego = campaign.profiles.filter(
+    (cp) => !idsDescartados.has(cp.profile.id)
+  );
+
   // Extraer IDs de perfiles seleccionados y su configuración
-  const existingProfileIds = campaign.profiles.map((cp) => cp.profile.id);
-  const existingConfig = campaign.profiles.map((cp) => ({
+  const existingProfileIds = enJuego.map((cp) => cp.profile.id);
+  const existingConfig = enJuego.map((cp) => ({
     profileId: cp.profile.id,
     profileName: cp.profile.name,
     platforms: cp.platforms.map((cpp) => ({
@@ -95,9 +121,10 @@ export default async function EditCampaignPage({ params }: PageProps) {
         campaignId={id}
         initialData={campaignData}
         clients={clients}
-        profiles={profiles}
+        profiles={perfilesDisponibles}
         existingProfileIds={existingProfileIds}
         existingConfig={existingConfig}
+        perfilesRechazados={perfilesRechazados}
         currentStatus={campaign.status}
         markup={campaign.markupPercentage}
       />

@@ -276,6 +276,13 @@ export interface CampaignEditorProps {
   profiles: ProfileWithServices[];
   existingProfileIds?: string[];
   existingConfig?: ProfileConfig[];
+  /**
+   * Influencers que el cliente rechazo en ESTA campana. No aparecen
+   * entre los seleccionables: volver a proponer a quien ya se dijo que
+   * no es la forma mas rapida de que el cliente pierda la confianza en
+   * la propuesta. Se listan aparte para que se vea por que faltan.
+   */
+  perfilesRechazados?: { id: string; nombre: string; motivo: string | null }[];
   currentStatus?: CampaignStatus;
   /**
    * Margen congelado de la campana que se edita. Se omite al crear una

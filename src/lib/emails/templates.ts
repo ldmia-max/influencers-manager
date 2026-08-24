@@ -2,7 +2,14 @@
  * Email templates for campaign notifications
  */
 
-const BRAND_GRADIENT = "linear-gradient(180deg, #FF0000 0%, #FFA500 100%)";
+/**
+ * Color del logo de Los de Marketing, tomado del propio archivo
+ * (public/img/logo.png). Es plano y no un degradado: muchos clientes de
+ * correo —Outlook de escritorio entre ellos— ignoran background-image,
+ * y con un degradado la cabecera se quedaba en blanco con el texto
+ * blanco encima, es decir, ilegible. Con background-color eso no pasa.
+ */
+const BRAND_COLOR = "#DE3163";
 const BRAND_NAME = "Influencer Manager";
 
 function baseLayout(content: string): string {
@@ -19,7 +26,7 @@ function baseLayout(content: string): string {
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="background-image:${BRAND_GRADIENT};padding:24px 32px;">
+            <td style="background-color:${BRAND_COLOR};padding:24px 32px;">
               <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">${BRAND_NAME}</h1>
             </td>
           </tr>
@@ -48,7 +55,7 @@ function baseLayout(content: string): string {
 function ctaButton(text: string, url: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;">
   <tr>
-    <td style="background-image:${BRAND_GRADIENT};border-radius:8px;padding:12px 28px;">
+    <td style="background-color:${BRAND_COLOR};border-radius:8px;padding:12px 28px;">
       <a href="${url}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">${text}</a>
     </td>
   </tr>

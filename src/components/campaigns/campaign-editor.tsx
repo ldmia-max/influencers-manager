@@ -80,6 +80,7 @@ export function CampaignEditor({
   profiles,
   existingProfileIds = [],
   existingConfig = [],
+  perfilesRechazados = [],
   currentStatus: currentStatusProp,
   markup,
   onSaveSuccess,
@@ -543,7 +544,35 @@ export function CampaignEditor({
 
         <div className="min-h-[400px]">
           {currentStep === 1 && <CampaignStepDetails />}
-          {currentStep === 2 && <CampaignStepProfiles />}
+          {currentStep === 2 && (
+            <>
+              {/* Sin este aviso, quien edita la campana no entiende por
+                  que un influencer que estaba ya no aparece en la lista
+                  y lo busca una y otra vez. */}
+              {perfilesRechazados.length > 0 && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-medium text-amber-900">
+                    {perfilesRechazados.length === 1
+                      ? "Un influencer quedó fuera de esta campaña"
+                      : `${perfilesRechazados.length} influencers quedaron fuera de esta campaña`}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    No se pueden volver a añadir aquí. Siguen en el historial de
+                    la campaña.
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900">
+                    {perfilesRechazados.map((p) => (
+                      <li key={p.id}>
+                        <span className="font-medium">{p.nombre}</span>
+                        {p.motivo ? ` — ${p.motivo}` : " — sin motivo indicado"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <CampaignStepProfiles />
+            </>
+          )}
           {currentStep === 3 && <CampaignStepSummary />}
         </div>
 

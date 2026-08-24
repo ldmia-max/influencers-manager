@@ -13,13 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { MoreVertical, Pencil, Eye, Megaphone } from "lucide-react";
+import { Eye, Megaphone } from "lucide-react";
 import { formatNumber, formatCompactNumber, calculateReach } from "@/lib/format";
 import {
   CAMPAIGN_STATUS_LABELS,
@@ -269,39 +263,21 @@ export default async function CampaignsPage({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                aria-label="Acciones"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  href={`/campaigns/${campaign.id}`}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  Ver Detalle
-                                </Link>
-                              </DropdownMenuItem>
-                              {campaign.status === "DRAFT" && (
-                                <DropdownMenuItem asChild>
-                                  <Link
-                                    href={`/campaigns/${campaign.id}/edit`}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                    Editar
-                                  </Link>
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {/* Un solo clic al detalle. Antes habia un menu
+                              de tres puntos cuya unica opcion habitual
+                              era esta, asi que costaba dos clics llegar
+                              a lo que se busca siempre. Editar sigue
+                              disponible desde la propia ficha. */}
+                          <Link href={`/campaigns/${campaign.id}`}>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Ver detalle de ${campaign.name}`}
+                              title="Ver detalle"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
                         </TableCell>
                       </TableRow>
                     );

@@ -280,14 +280,63 @@ export default function ApprovePage() {
   }, [data, approvalState]);
 
   // Handlers
+  /**
+   * Aprobar o rechazar un influencer.
+   *
+   * Al rechazar se abre el dialogo para que el cliente diga por que. El
+   * motivo es opcional —obligarlo llevaria a escribir "no" con tal de
+   * cerrar la ventana—, pero preguntarlo en el momento del rechazo es
+   * cuando el cliente tiene la razon en la cabeza. Sin esto el equipo
+   * recibia rechazos sin ninguna explicacion y tenia que llamar para
+   * averiguar que habia pasado.
+   */
   const handleProfileToggle = (profileId: string, isApproved: boolean) => {
+    if (!isApproved) {
+      const perfil = data?.campaign.profiles.find((p) => p.id === profileId);
+      setRejectionDialog({
+        open: true,
+        itemType: "profile",
+        itemId: profileId,
+        itemName: perfil?.profile.name,
+      });
+      return;
+    }
+
+    // Al volver a aprobarlo se borra el motivo: dejarlo guardado enviaria
+    // al equipo un rechazo que ya no existe.
     setApprovalState((prev) => ({
       ...prev,
       profiles: {
         ...prev.profiles,
-        [profileId]: { ...prev.profiles[profileId], isApproved },
+        [profileId]: { isApproved: true, rejectionReason: undefined },
       },
     }));
+  };
+
+  /** Confirma el rechazo de UN influencer con su motivo. */
+  const handleRejectProfileConfirm = (profileId: string, reason: string) => {
+    setApprovalState((prev) => ({
+      ...prev,
+      profiles: {
+        ...prev.profiles,
+        [profileId]: {
+          isApproved: false,
+          rejectionReason: reason.trim() || undefined,
+        },
+      },
+    }));
+  };
+
+  /**
+   * El dialogo sirve para dos casos: rechazar toda la campana o rechazar
+   * a un influencer concreto. Se reparte aqui segun que lo abrio.
+   */
+  const handleRejectionConfirm = (reason: string) => {
+    if (rejectionDialog.itemType === "profile" && rejectionDialog.itemId) {
+      handleRejectProfileConfirm(rejectionDialog.itemId, reason);
+      return;
+    }
+    handleRejectAllConfirm(reason);
   };
 
   const handlePlatformToggle = (platformId: string, isApproved: boolean) => {
@@ -507,36 +556,6 @@ export default function ApprovePage() {
     );
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-6 w-6" />
-              <CardTitle>Error</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{error.message}</p>
-            {error.code === "EXPIRED_TOKEN" && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Por favor, contacta al gestor de la campaña para solicitar un
-                nuevo enlace.
-              </p>
-            )}
-            {error.code === "USED_TOKEN" && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Ya has enviado tu aprobación para esta campaña.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   // Success state
   if (submitMutation.isSuccess) {
     const counts = getCounts();
@@ -548,12 +567,14 @@ export default function ApprovePage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle2 className="h-6 w-6" />
-              <CardTitle>Aprobación Enviada</CardTitle>
+              <CardTitle>¡Revisión enviada!</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              Tu aprobación ha sido enviada correctamente.
+              Hemos recibido tu revisión de la campaña
+              {data?.campaign.name ? ` «${data.campaign.name}»` : ""}. Esto es
+              lo que nos has confirmado:
             </p>
             <div className="bg-muted rounded-lg p-4 space-y-2 text-sm">
               <div className="flex justify-between">
@@ -577,9 +598,45 @@ export default function ApprovePage() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              El equipo revisará tus comentarios y se pondrá en contacto contigo
-              pronto.
+              El equipo revisará tus comentarios y se pondrá en contacto
+              contigo. Ya puedes cerrar esta ventana: el enlace era de un solo
+              uso y no hace falta volver a entrar.
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  //
+  // Va DESPUES de la pantalla de exito a proposito: si alguna vez se
+  // vuelve a leer el enlace tras enviarlo, respondera USED_TOKEN y el
+  // error taparia el acuse de recibo, dejando al cliente creyendo que
+  // su revision no se guardo.
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-6 w-6" />
+              <CardTitle>Error</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">{error.message}</p>
+            {error.code === "EXPIRED_TOKEN" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Por favor, contacta al gestor de la campaña para solicitar un
+                nuevo enlace.
+              </p>
+            )}
+            {error.code === "USED_TOKEN" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Ya has enviado tu aprobación para esta campaña.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -789,7 +846,7 @@ export default function ApprovePage() {
         }
         itemType={rejectionDialog.itemType}
         itemName={rejectionDialog.itemName}
-        onConfirm={handleRejectAllConfirm}
+        onConfirm={handleRejectionConfirm}
       />
 
       <Dialog

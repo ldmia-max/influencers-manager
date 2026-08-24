@@ -100,16 +100,40 @@ export async function setCampaignProfiles(
   return prisma.$transaction(async (tx) => {
     const currentCampaignProfiles = await tx.campaignProfile.findMany({
       where: { campaignId },
-      select: { profileId: true },
+      select: { profileId: true, status: true, rejectionReason: true },
     });
 
-    const currentProfileIds = currentCampaignProfiles.map((cp) => cp.profileId);
     const newProfileIds = profiles.map((p) => p.profileId);
 
-    // Delete profiles no longer in the list
-    const profileIdsToDelete = currentProfileIds.filter(
-      (id) => !newProfileIds.includes(id)
+    const fuera = currentCampaignProfiles.filter(
+      (cp) => !newProfileIds.includes(cp.profileId)
     );
+
+    // A quien el cliente rechazo NO se le borra: se le retira.
+    //
+    // Su fila es el historial del rechazo —quien fue y por que— y hay
+    // que conservarla, pero tampoco puede seguir sumando en el total de
+    // la campana. Retirarlo resuelve las dos cosas a la vez, que es
+    // justo para lo que existe `participacion`. Borrarlo, en cambio,
+    // dejaba a la agencia sin saber a quien se habia propuesto.
+    const rechazados = fuera.filter((cp) => cp.status === "REJECTED");
+    for (const cp of rechazados) {
+      await tx.campaignProfile.updateMany({
+        where: { campaignId, profileId: cp.profileId },
+        data: {
+          participacion: "RETIRADO",
+          origenRetiro: "CLIENTE",
+          motivoRetiro: cp.rejectionReason,
+          retiradoEn: new Date(),
+        },
+      });
+    }
+
+    // Al resto, que solo se quito al editar, si se le borra: no hay nada
+    // que recordar de un perfil que nunca llego a proponerse.
+    const profileIdsToDelete = fuera
+      .filter((cp) => cp.status !== "REJECTED")
+      .map((cp) => cp.profileId);
 
     if (profileIdsToDelete.length > 0) {
       await tx.campaignProfile.deleteMany({
