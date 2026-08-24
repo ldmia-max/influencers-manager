@@ -115,6 +115,8 @@ Three things hang off an active campaign, added together because they share the 
 
 `transitionCampaignStatus` refuses `ACTIVE → COMPLETED` while any link is missing, naming who owes what.
 
+**The campaign editor loads every profile still in the campaign, rejected ones included.** Only `RETIRADO` profiles are held back — they already left, and re-proposing someone the client dropped is how you lose their trust in the proposal. Hiding merely-rejected ones instead opened the campaign as if they had never been there, budget at zero, forcing the whole selection to be rebuilt. `getAllProfilesForEditor()`'s list doubles as the catalogue *and* as the lookup that resolves each selected profile's platforms and prices, so anything still selected must stay in it.
+
 **Withdrawal.** `CampaignProfile.participacion` is `ACTIVO | RETIRADO`, **separate from `status`** — that one means "did the client approve them", this one "are they still contracted", and they are independent axes. A retired profile stops counting toward the total, freeing budget; the row is kept because it is commercial history and their past deliveries still feed their reliability. Withdrawal is audited (`ACCIONES.influencerRetirado`).
 
 **Every persisted campaign total must go through `calcularTotalCampana()`** (`src/lib/campaign-utils.ts`) — the campaigns list page, the API list, and the detail page all call it. It is the only place that knows retired profiles do not count, and it also returns `liberado`, the freed budget. The cart and wizard stores keep `calculateSelectionTotal` instead: those are selections that do not exist in the database yet and have no `participacion`.

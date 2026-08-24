@@ -553,12 +553,12 @@ export function CampaignEditor({
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
                   <p className="text-sm font-medium text-amber-900">
                     {perfilesRechazados.length === 1
-                      ? "Un influencer quedó fuera de esta campaña"
-                      : `${perfilesRechazados.length} influencers quedaron fuera de esta campaña`}
+                      ? "Un influencer salió de esta campaña"
+                      : `${perfilesRechazados.length} influencers salieron de esta campaña`}
                   </p>
                   <p className="mt-1 text-xs text-amber-800">
                     No se pueden volver a añadir aquí. Siguen en el historial de
-                    la campaña.
+                    la campaña y no cuentan en el presupuesto.
                   </p>
                   <ul className="mt-2 space-y-1 text-xs text-amber-900">
                     {perfilesRechazados.map((p) => (

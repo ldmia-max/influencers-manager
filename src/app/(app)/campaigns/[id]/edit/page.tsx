@@ -61,30 +61,33 @@ export default async function EditCampaignPage({ params }: PageProps) {
       : "",
   };
 
-  // Influencers que el cliente rechazo o que ya se retiraron de esta
-  // campana. Quedan fuera del editor por completo: ni preseleccionados
-  // ni entre los que se pueden anadir. Volver a proponer a quien el
-  // cliente ya rechazo es la forma mas rapida de que pierda la confianza
-  // en la propuesta.
+  // Solo quedan fuera del editor los RETIRADOS: esos ya salieron de la
+  // campana y no deben poder volver a proponerse.
   //
-  // Sus filas siguen en la base de datos: son el historial de lo que se
-  // propuso y por que se cayo.
-  const descartados = campaign.profiles.filter(
-    (cp) => cp.status === "REJECTED" || cp.participacion === "RETIRADO"
+  // Los que el cliente rechazo pero siguen dentro SI se cargan, con sus
+  // formatos y sus precios. Sacarlos abria la campana como si nunca
+  // hubieran estado —presupuesto en cero incluido— y obligaba a rehacer
+  // la seleccion entera. Se ven, se sabe que fueron rechazados, y quien
+  // edita decide si los quita; al quitarlos pasan a RETIRADO y entonces
+  // si dejan de ofrecerse.
+  const retirados = campaign.profiles.filter(
+    (cp) => cp.participacion === "RETIRADO"
   );
-  const idsDescartados = new Set(descartados.map((cp) => cp.profile.id));
+  const idsRetirados = new Set(retirados.map((cp) => cp.profile.id));
 
-  const perfilesRechazados = descartados.map((cp) => ({
+  const perfilesRechazados = retirados.map((cp) => ({
     id: cp.profile.id,
     nombre: cp.profile.name,
-    motivo: cp.rejectionReason ?? cp.motivoRetiro,
+    motivo: cp.motivoRetiro ?? cp.rejectionReason,
   }));
 
-  // El catalogo de seleccionables tampoco los ofrece.
-  const perfilesDisponibles = profiles.filter((p) => !idsDescartados.has(p.id));
+  // El catalogo de seleccionables no los ofrece. El resto sigue entero,
+  // porque el editor lo usa tambien para resolver los datos de cada
+  // perfil ya seleccionado.
+  const perfilesDisponibles = profiles.filter((p) => !idsRetirados.has(p.id));
 
   const enJuego = campaign.profiles.filter(
-    (cp) => !idsDescartados.has(cp.profile.id)
+    (cp) => !idsRetirados.has(cp.profile.id)
   );
 
   // Extraer IDs de perfiles seleccionados y su configuración
