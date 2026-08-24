@@ -1,44 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Search, UserPlus, Wallet } from "lucide-react";
+import { CheckCircle2, Loader2, UserPlus, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CampaignWizardProvider } from "@/contexts/campaign-wizard-context";
+import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
+import { useProfileFilters } from "@/hooks/use-profile-filters";
+import { CampaignStepProfiles } from "./campaign-step-profiles";
 import { formatNumber } from "@/lib/format";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
-import { apiGet, apiPost, apiPatch } from "@/services/api";
-
-interface ServicioCatalogo {
-  id: string;
-  price: string | number;
-  serviceType: { id: string; displayName: string };
-}
-
-interface CuentaCatalogo {
-  id: string;
-  username: string;
-  platform: { id: string; displayName: string };
-  services: ServicioCatalogo[];
-}
-
-interface PerfilCatalogo {
-  id: string;
-  name: string;
-  socialAccounts: CuentaCatalogo[];
-}
+import { apiPost, apiPatch } from "@/services/api";
+import type { ProfileWithServices } from "@/models/campaign";
 
 export interface PendienteVista {
   campaignProfileId: string;
@@ -47,12 +28,14 @@ export interface PendienteVista {
 
 interface Props {
   campaignId: string;
-  /** Lo que liberaron los retirados: el dinero disponible para reemplazar. */
+  /** Catálogo de influencers, ya sin los que están en la campaña. */
+  profiles: ProfileWithServices[];
+  /** Lo que liberaron los retiros: el dinero disponible para reemplazar. */
   presupuestoLiberado: number;
-  /** Influencers añadidos que esperan el visto bueno del cliente. */
+  /** Lo que ya cuesta la campaña, para no pasarse del presupuesto. */
+  totalActual: number;
+  presupuesto: number;
   pendientes: PendienteVista[];
-  /** Ids ya en la campaña, para no ofrecerlos. */
-  yaEnCampana: string[];
   markup: number;
 }
 
@@ -62,85 +45,109 @@ interface Props {
  * Solo anade. La edicion completa sigue cerrada en campanas activas a
  * proposito: ahi se podrian cambiar precios que el cliente aprobo o
  * borrar a alguien que ya entrego contenido.
+ *
+ * Por dentro reutiliza el paso de perfiles del editor —el mismo buscador,
+ * la misma configuracion de formatos y la misma barra de presupuesto— en
+ * lugar de una pantalla propia. Dos formas distintas de elegir
+ * influencers en la misma aplicacion se acaban comportando distinto, y
+ * ademas aquella no mostraba ni los combos ni el alcance.
  */
 export function ReemplazarInfluencer({
   campaignId,
+  profiles,
   presupuestoLiberado,
+  totalActual,
+  presupuesto,
   pendientes,
-  yaEnCampana,
   markup,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [abierto, setAbierto] = useState(false);
-  const [busqueda, setBusqueda] = useState("");
-  const [buscando, setBuscando] = useState(false);
-  const [resultados, setResultados] = useState<PerfilCatalogo[]>([]);
-  const [elegido, setElegido] = useState<PerfilCatalogo | null>(null);
-  const [seleccion, setSeleccion] = useState<Record<string, boolean>>({});
   const [guardando, setGuardando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const filters = useProfileFilters(profiles);
+  const profileConfigs = useCampaignWizardStore((s) => s.profileConfigs);
+  const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
+  const reset = useCampaignWizardStore((s) => s.reset);
+
   const refrescar = () => startTransition(() => router.refresh());
 
-  const buscar = async () => {
-    setBuscando(true);
-    setError(null);
-    try {
-      const datos = await apiGet<{ profiles?: PerfilCatalogo[] } | PerfilCatalogo[]>(
-        `/api/profiles?search=${encodeURIComponent(busqueda)}&limit=20`
-      );
-      const lista = Array.isArray(datos) ? datos : datos.profiles ?? [];
-      // Quien ya está en la campaña no se ofrece: añadirlo dos veces no
-      // tiene sentido y el servidor lo rechazaría igualmente.
-      setResultados(lista.filter((p) => !yaEnCampana.includes(p.id)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo buscar");
-    } finally {
-      setBuscando(false);
-    }
-  };
+  /**
+   * El asistente arranca vacio y con el presupuesto que QUEDA, no con el
+   * total de la campana: aqui solo se esta anadiendo, y la barra tiene
+   * que medir contra lo que de verdad hay libre.
+   */
+  useEffect(() => {
+    if (!abierto) return;
+    reset();
+    useCampaignWizardStore.setState({
+      campaignId,
+      markup,
+      selectedProfileIds: [],
+      profileConfigs: [],
+      formData: {
+        name: "",
+        description: "",
+        clientId: "",
+        clientContactId: "",
+        budget: String(Math.max(0, Math.round(presupuesto - totalActual))),
+        startDate: "",
+        endDate: "",
+      },
+      currentStep: 2,
+    });
+  }, [abierto, campaignId, markup, presupuesto, totalActual, reset]);
 
-  /** Formatos marcados, agrupados por cuenta, como los espera el API. */
-  const construirPlataformas = () => {
-    if (!elegido) return [];
-    return elegido.socialAccounts
-      .map((cuenta) => ({
-        socialAccountId: cuenta.id,
-        services: cuenta.services
-          .filter((s) => seleccion[s.id])
-          .map((s) => ({ profileServiceId: s.id, quantity: 1 })),
+  /** Lo elegido, en la forma que espera el API. */
+  const aEnviar = useMemo(() => {
+    return profileConfigs
+      .filter((c) => selectedProfileIds.includes(c.profileId))
+      .map((c) => ({
+        profileId: c.profileId,
+        platforms: c.platforms
+          .filter((p) => p.selected)
+          .map((p) => ({
+            socialAccountId: p.socialAccountId,
+            services: p.services
+              .filter((s) => (s.esCombo ? s.basePrice > 0 : s.quantity > 0))
+              .map((s) =>
+                s.esCombo
+                  ? {
+                      quantity: 1,
+                      esCombo: true,
+                      comboPrecio: s.basePrice,
+                      comboDescripcion: s.comboDescripcion,
+                    }
+                  : {
+                      profileServiceId: s.profileServiceId,
+                      quantity: s.quantity,
+                    }
+              ),
+          }))
+          .filter((p) => p.services.length > 0),
       }))
-      .filter((p) => p.services.length > 0);
-  };
-
-  const totalElegido = elegido
-    ? elegido.socialAccounts
-        .flatMap((c) => c.services)
-        .filter((s) => seleccion[s.id])
-        .reduce((suma, s) => suma + calculateMarkupPrice(Number(s.price), markup), 0)
-    : 0;
+      .filter((c) => c.platforms.length > 0);
+  }, [profileConfigs, selectedProfileIds]);
 
   const anadir = async () => {
-    if (!elegido) return;
-    const platforms = construirPlataformas();
-    if (platforms.length === 0) {
-      setError("Selecciona al menos un formato");
+    if (aEnviar.length === 0) {
+      setError("Selecciona al menos un influencer con sus formatos");
       return;
     }
     setGuardando(true);
     setError(null);
     try {
-      await apiPost(`/api/campaigns/${campaignId}/influencers`, {
-        profileId: elegido.id,
-        platforms,
-      });
+      // Uno por uno: si el segundo falla, el primero ya quedo guardado y
+      // el mensaje dice cual fue. Un lote que se deshace entero obligaria
+      // a rehacer la seleccion desde cero.
+      for (const perfil of aEnviar) {
+        await apiPost(`/api/campaigns/${campaignId}/influencers`, perfil);
+      }
       setAbierto(false);
-      setElegido(null);
-      setSeleccion({});
-      setResultados([]);
-      setBusqueda("");
+      reset();
       refrescar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo añadir");
@@ -184,7 +191,14 @@ export function ReemplazarInfluencer({
             </p>
           )}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAbierto(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setError(null);
+            setAbierto(true);
+          }}
+        >
           <UserPlus className="mr-2 h-3.5 w-3.5" />
           Añadir influencer
         </Button>
@@ -239,161 +253,133 @@ export function ReemplazarInfluencer({
       </CardContent>
 
       <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex h-[92vh] max-w-[95vw] flex-col gap-0 p-0 xl:max-w-[1400px]">
+          <DialogHeader className="border-b px-6 py-4">
             <DialogTitle>Añadir influencer a la campaña</DialogTitle>
             <DialogDescription>
-              Entrará pendiente de aprobación. Los precios se toman del tarifario
-              del influencer.
+              Entrará pendiente de aprobación. El presupuesto que ves es el que
+              queda libre en esta campaña.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
+          {error && (
+            <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                buscar();
+          {/* El mismo paso del editor: buscador, configuración de formatos
+              y barra de presupuesto. */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <CampaignWizardProvider
+              value={{
+                profiles,
+                filters,
+                // El resto del contexto no aplica: aqui no hay pasos que
+                // navegar ni un guardado de asistente. Los botones del
+                // modal hacen su propio trabajo.
+                clients: [],
+                currentStatus: "ACTIVE",
+                onSave: () => {},
+                onActivateDirectly: () => {},
+                onPrevious: () => {},
+                onNext: () => {},
+                onCancel: () => setAbierto(false),
               }}
-              className="flex gap-2"
             >
-              <Input
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar influencer por nombre…"
-                autoFocus
-              />
-              <Button type="submit" variant="outline" disabled={buscando}>
-                {buscando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
-            </form>
-
-            {!elegido && resultados.length > 0 && (
-              <ul className="max-h-56 space-y-1 overflow-y-auto">
-                {resultados.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setElegido(p);
-                        setSeleccion({});
-                      }}
-                      className="w-full rounded-lg border border-gray-200 p-3 text-left text-sm hover:border-violet-300"
-                    >
-                      <span className="font-medium text-gray-900">{p.name}</span>
-                      <span className="ml-2 text-xs text-gray-500">
-                        {p.socialAccounts.map((c) => c.platform.displayName).join(", ")}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {!elegido && !buscando && resultados.length === 0 && busqueda && (
-              <p className="text-sm text-gray-500">
-                Sin resultados. Prueba con otro nombre.
-              </p>
-            )}
-
-            {elegido && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-gray-900">{elegido.name}</p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setElegido(null);
-                      setSeleccion({});
-                    }}
-                  >
-                    Cambiar
-                  </Button>
-                </div>
-
-                {elegido.socialAccounts.map((cuenta) => (
-                  <div key={cuenta.id} className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">
-                      @{cuenta.username} · {cuenta.platform.displayName}
-                    </p>
-                    {cuenta.services.length === 0 ? (
-                      <p className="mt-1 text-xs text-gray-400">
-                        Sin formatos con precio en esta cuenta
-                      </p>
-                    ) : (
-                      <div className="mt-2 space-y-1">
-                        {cuenta.services.map((s) => (
-                          <div key={s.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`svc-${s.id}`}
-                              checked={!!seleccion[s.id]}
-                              onCheckedChange={(v) =>
-                                setSeleccion((prev) => ({ ...prev, [s.id]: v === true }))
-                              }
-                            />
-                            <Label
-                              htmlFor={`svc-${s.id}`}
-                              className="flex flex-1 cursor-pointer justify-between text-sm"
-                            >
-                              <span>{s.serviceType.displayName}</span>
-                              <span className="text-gray-600">
-                                $
-                                {formatNumber(
-                                  Math.round(
-                                    calculateMarkupPrice(Number(s.price), markup)
-                                  )
-                                )}
-                              </span>
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {totalElegido > 0 && (
-                  <div className="flex justify-between rounded-lg bg-violet-50 p-3 text-sm">
-                    <span className="text-violet-900">Coste para el cliente</span>
-                    <span className="font-semibold text-violet-900">
-                      ${formatNumber(Math.round(totalElegido))}
-                    </span>
-                  </div>
-                )}
-
-                {presupuestoLiberado > 0 && totalElegido > presupuestoLiberado && (
-                  <p className="text-xs text-amber-700">
-                    Supera en $
-                    {formatNumber(Math.round(totalElegido - presupuestoLiberado))} lo
-                    que liberaron los retiros. Se puede añadir igual, pero subirá el
-                    total de la campaña.
-                  </p>
-                )}
-              </div>
-            )}
+              <CampaignStepProfiles />
+            </CampaignWizardProvider>
           </div>
 
-          <DialogFooter>
+          <BarraPresupuesto />
+
+          <div className="flex justify-end gap-2 border-t px-6 py-4">
             <Button variant="outline" onClick={() => setAbierto(false)}>
               Cancelar
             </Button>
-            <Button onClick={anadir} disabled={!elegido || guardando}>
+            <Button onClick={anadir} disabled={guardando || aEnviar.length === 0}>
               {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Añadir a la campaña
+              {aEnviar.length > 1
+                ? `Añadir ${aEnviar.length} influencers`
+                : "Añadir a la campaña"}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+/**
+ * Barra de presupuesto del modal.
+ *
+ * No se reutiliza CampaignNavigationBar porque esa lleva ademas los
+ * botones de navegacion entre pasos del asistente, y aqui no hay pasos.
+ */
+function BarraPresupuesto() {
+  const disponible = useCampaignWizardStore((s) => s.getBudget());
+  const total = useCampaignWizardStore((s) => s.getTotalServicesPrice());
+  const perfiles = useCampaignWizardStore((s) => s.selectedProfileIds.length);
+
+  const restante = disponible - total;
+  const porcentaje = disponible > 0 ? Math.min((total / disponible) * 100, 100) : 0;
+  const excede = restante < 0;
+
+  return (
+    <div className="border-t bg-white px-6 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-4">
+          <span>
+            <span className="text-xs text-gray-500">Libre en la campaña</span>
+            <span className="ml-2 font-semibold">
+              ${formatNumber(Math.round(disponible))}
+            </span>
+          </span>
+          <span>
+            <span className="text-xs text-gray-500">Seleccionado</span>
+            <span
+              className={`ml-2 font-semibold ${excede ? "text-red-600" : "text-green-600"}`}
+            >
+              ${formatNumber(Math.round(total))}
+            </span>
+          </span>
+          <span>
+            <span className="text-xs text-gray-500">
+              {excede ? "Se pasa por" : "Quedaría"}
+            </span>
+            <span
+              className={`ml-2 font-semibold ${excede ? "text-red-600" : "text-gray-700"}`}
+            >
+              ${formatNumber(Math.round(Math.abs(restante)))}
+            </span>
+          </span>
+          <span>
+            <span className="text-xs text-gray-500">Influencers</span>
+            <span className="ml-2 font-semibold">{perfiles}</span>
+          </span>
+        </div>
+        <span
+          className={`text-xs font-medium ${excede ? "text-red-600" : "text-gray-500"}`}
+        >
+          {Math.round(porcentaje)}% de lo libre
+        </span>
+      </div>
+
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+        <div
+          className={`h-full rounded-full transition-all ${
+            excede ? "bg-red-500" : porcentaje > 80 ? "bg-amber-500" : "bg-green-500"
+          }`}
+          style={{ width: `${porcentaje}%` }}
+        />
+      </div>
+
+      {excede && (
+        <p className="mt-2 text-xs text-amber-700">
+          Supera el presupuesto de la campaña. Se puede añadir igual, pero el
+          total acordado con el cliente subirá.
+        </p>
+      )}
+    </div>
   );
 }

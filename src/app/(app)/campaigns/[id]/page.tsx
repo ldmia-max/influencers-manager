@@ -41,6 +41,7 @@ import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
 import { MetricasCampana } from "@/components/campaigns/metricas-campana";
 import { historicoDeCampana } from "@/data-access/metricas";
+import { getAllProfilesForEditor } from "@/data-access/profiles";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -190,7 +191,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     .filter((cp) => cp.participacion === "ACTIVO" && cp.status === "PENDING")
     .map((cp) => ({ campaignProfileId: cp.id, nombre: cp.profile.name }));
 
-  const idsEnCampana = campaign.profiles.map((cp) => cp.profile.id);
+  const idsEnCampana = new Set(campaign.profiles.map((cp) => cp.profile.id));
+
+  // El catalogo para sustituir. Solo se carga con la campana en marcha:
+  // en el resto de estados el bloque no se pinta y seria traer para nada
+  // todos los perfiles con sus cuentas y tarifas.
+  const catalogoParaSustituir =
+    campaign.status === "ACTIVE"
+      ? (await getAllProfilesForEditor()).filter((p) => !idsEnCampana.has(p.id))
+      : [];
 
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
@@ -279,9 +288,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       {campaign.status === "ACTIVE" && (
         <ReemplazarInfluencer
           campaignId={id}
+          profiles={catalogoParaSustituir}
           presupuestoLiberado={totales.liberado}
+          totalActual={totalCampaign}
+          presupuesto={budget}
           pendientes={pendientesDeAprobacion}
-          yaEnCampana={idsEnCampana}
           markup={campaign.markupPercentage}
         />
       )}
