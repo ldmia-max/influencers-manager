@@ -21,8 +21,8 @@ const VALID_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
 function getStatusMessage(status: CampaignStatus): string {
   const messages: Record<CampaignStatus, string> = {
     DRAFT: "Campaña movida a borrador",
-    REVIEW: "Campaña enviada a revisión del cliente",
-    PENDING: "Campaña pendiente de ajustes",
+    REVIEW: "Campaña enviada al cliente. Queda pendiente de su aprobación",
+    PENDING: "El cliente rechazó parte de la propuesta: requiere ajustes",
     ACTIVE: "Campaña activada exitosamente",
     COMPLETED: "Campaña marcada como completada",
     CANCELLED: "Campaña cancelada",

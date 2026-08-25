@@ -101,6 +101,8 @@ The client approves at every level: `CampaignProfile.status` and `CampaignProfil
 
 Status flow is `DRAFT → REVIEW → PENDING/ACTIVE → COMPLETED/CANCELLED`; the allowed transitions are declared in `USER_VALID_TRANSITIONS` in `src/lib/campaign-utils.ts` and enforced by `transitionCampaignStatus` in `src/data-access/campaigns.ts`.
 
+**The enum names and the on-screen labels deliberately disagree.** `REVIEW` reads **"Pendiente"** — from outside, the campaign is simply waiting on the client and nobody at the agency has anything to do. `PENDING` reads **"Requiere ajustes"**, because it is the opposite situation in terms of who must move: the client already answered rejecting someone and the ball is back with the agency. Labelling both "Pendiente" would make the campaigns list say nothing. Only `CAMPAIGN_STATUS_LABELS` changed; the enum, the transitions and the stored values are untouched.
+
 **Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
 
 ### Content delivery, withdrawal and impact

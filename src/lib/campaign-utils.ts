@@ -10,10 +10,23 @@ import { Decimal } from "@prisma/client/runtime/library";
  */
 export const MARKUP_PERCENTAGE = 0.4; // 40%
 
+/**
+ * Como se llama cada estado en pantalla.
+ *
+ * REVIEW es "Pendiente" porque desde fuera eso es lo que pasa: la
+ * campana esta esperando a que el cliente decida, y nadie de la agencia
+ * tiene nada que hacer mientras tanto.
+ *
+ * PENDING no puede llamarse igual, aunque en la base se llame asi: es el
+ * estado opuesto en cuanto a quien debe moverse. Ahi el cliente YA
+ * respondio rechazando a alguien y la pelota esta en la agencia. Dos
+ * situaciones contrarias con la misma palabra dejarian el listado de
+ * campanas sin decir nada.
+ */
 export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador",
-  REVIEW: "En Revisión",
-  PENDING: "Pendiente",
+  REVIEW: "Pendiente",
+  PENDING: "Requiere ajustes",
   ACTIVE: "Activa",
   COMPLETED: "Completada",
   CANCELLED: "Cancelada",
@@ -33,8 +46,8 @@ export const CAMPAIGN_STATUS_VARIANTS: Record<
 
 export const CAMPAIGN_STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
-  REVIEW: "bg-blue-100 text-blue-800",
-  PENDING: "bg-yellow-100 text-yellow-800",
+  REVIEW: "bg-yellow-100 text-yellow-800",
+  PENDING: "bg-orange-100 text-orange-800",
   ACTIVE: "bg-green-100 text-green-800",
   COMPLETED: "bg-purple-100 text-purple-800",
   CANCELLED: "bg-red-100 text-red-800",
