@@ -268,125 +268,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           de la campana, en una fila. Antes vivian en una columna
           lateral, donde habia que bajar hasta el final para saber de
           que cliente era la campana. */}
+      {/* Cliente, contacto, fechas y el resumen economico, en una fila.
+          Resumen va el ultimo porque es el que se consulta con mas
+          detenimiento: los otros tres se leen de un golpe. */}
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {/* Resumen */}
-        <Card className={isOverBudget ? "border-red-300" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Resumen
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Presupuesto:</span>
-              <span className="font-bold">
-                ${formatNumber(budget.toString())}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1 text-gray-500">
-                Margen:
-                {esAdmin && (
-                  <EditarMargen
-                    campaignId={campaign.id}
-                    markupActual={campaign.markupPercentage}
-                    yaEnviadaAlCliente={campaign.status !== "DRAFT"}
-                  />
-                )}
-              </span>
-              <span className="font-medium">
-                {Math.round(campaign.markupPercentage * 1000) / 10}%
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Total:</span>
-              <span
-                className={`font-bold ${
-                  isOverBudget ? "text-red-600" : "text-green-600"
-                }`}
-              >
-                ${formatNumber(totalCampaign.toFixed(0))}
-              </span>
-            </div>
-            <Separator />
-            <div className="flex justify-between">
-              <span className="text-gray-500">
-                {isOverBudget ? "Excedente:" : "Disponible:"}
-              </span>
-              <span
-                className={`font-bold ${
-                  isOverBudget ? "text-red-600" : "text-blue-600"
-                }`}
-              >
-                ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
-              </span>
-            </div>
-            {totalReach > 0 && (
-              <>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500 flex items-center gap-1.5">
-                    <Eye className="h-4 w-4 text-green-600" />
-                    Alcance Estimado:
-                  </span>
-                  <span className="font-bold text-green-600">
-                    {formatCompactNumber(totalReach)}{" "}
-                    <span className="text-sm font-normal text-gray-500">({totalReach.toLocaleString()})</span>
-                  </span>
-                </div>
-              </>
-            )}
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Perfiles:</span>
-              <span className="font-medium">{campaign.profiles.length}</span>
-            </div>
-
-            {/* Formatos */}
-            {formatCounts.size > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm text-gray-500">Formatos:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...formatCounts.entries()].map(([name, count]) => (
-                    <Badge key={name} variant="secondary" className="text-xs">
-                      {name} ({count})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Géneros */}
-            {genderCounts.size > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm text-gray-500">Géneros:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...genderCounts.entries()].map(([name, count]) => (
-                    <Badge key={name} variant="outline" className="text-xs">
-                      {name} ({count})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Departamentos */}
-            {departmentCounts.size > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm text-gray-500">Departamentos:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...departmentCounts.entries()].map(([name, count]) => (
-                    <Badge key={name} variant="outline" className="text-xs">
-                      {name} ({count})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Cliente */}
         <Card>
           <CardHeader>
@@ -468,7 +353,124 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             </div>
           </CardContent>
         </Card>
+        {/* Resumen */}
+        <Card className={isOverBudget ? "border-red-300" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Resumen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Presupuesto:</span>
+              <span className="font-bold">
+                ${formatNumber(budget.toString())}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-gray-500">
+                Margen:
+                {esAdmin && (
+                  <EditarMargen
+                    campaignId={campaign.id}
+                    markupActual={campaign.markupPercentage}
+                    yaEnviadaAlCliente={campaign.status !== "DRAFT"}
+                  />
+                )}
+              </span>
+              <span className="font-medium">
+                {Math.round(campaign.markupPercentage * 1000) / 10}%
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Total:</span>
+              <span
+                className={`font-bold ${
+                  isOverBudget ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                ${formatNumber(totalCampaign.toFixed(0))}
+              </span>
+            </div>
+            <Separator />
+            <div className="flex justify-between">
+              <span className="text-gray-500">
+                {isOverBudget ? "Excedente:" : "Disponible:"}
+              </span>
+              <span
+                className={`font-bold ${
+                  isOverBudget ? "text-red-600" : "text-blue-600"
+                }`}
+              >
+                ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Composicion de la campana, a lo ancho.
+          Estos desgloses vivian dentro de Resumen, en una columna
+          estrecha donde cada formato y cada departamento caia en su
+          propia linea y la tarjeta crecia sin fin. En una franja
+          horizontal se leen de un vistazo y Resumen se queda con lo que
+          de verdad es: las cifras de dinero. */}
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-3 py-4">
+          {totalReach > 0 && (
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-gray-500">Alcance Estimado:</span>
+              <span className="font-bold text-green-600">
+                {formatCompactNumber(totalReach)}{" "}
+                <span className="text-sm font-normal text-gray-500">
+                  ({totalReach.toLocaleString()})
+                </span>
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Perfiles:</span>
+            <span className="font-medium">{profileCounts.total}</span>
+          </div>
+
+          {formatCounts.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">Formatos:</span>
+              {[...formatCounts.entries()].map(([name, count]) => (
+                <Badge key={name} variant="secondary" className="text-xs">
+                  {name} ({count})
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {genderCounts.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">Géneros:</span>
+              {[...genderCounts.entries()].map(([name, count]) => (
+                <Badge key={name} variant="outline" className="text-xs">
+                  {name} ({count})
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {departmentCounts.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">Departamentos:</span>
+              {[...departmentCounts.entries()].map(([name, count]) => (
+                <Badge key={name} variant="outline" className="text-xs">
+                  {name} ({count})
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
 
       {/* Descripción */}
       {campaign.description && (
