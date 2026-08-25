@@ -277,19 +277,42 @@ export async function submitApproval(
       data: { usedAt: now },
     });
 
-    const hasRejections =
-      finalDecisions.profiles.some((p) => p.status === "REJECTED") ||
-      finalDecisions.platforms.some((p) => p.status === "REJECTED") ||
-      finalDecisions.services.some((s) => !s.isApproved);
+    // Rechazar a alguien no frena la campana: el resto del trabajo esta
+    // aprobado y puede empezar hoy. Antes cualquier rechazo la dejaba
+    // esperando un reenvio completo, y el equipo perdia dias por un
+    // influencer que ya no iba a participar.
+    //
+    // A los rechazados se les retira en el acto. Sin esto seguirian
+    // contando en el total de la campana —el cliente no los aprobo, pero
+    // su `participacion` seguia siendo ACTIVO— y, peor, bloquearian el
+    // cierre para siempre: la comprobacion de entregas pendientes los
+    // incluiria y nadie va a publicar su contenido.
+    const rechazados = finalDecisions.profiles
+      .filter((p) => p.status === "REJECTED")
+      .map((p) => p.id);
 
-    // Una campana que ya estaba en marcha no retrocede porque el cliente
-    // rechace a un reemplazo: el resto del trabajo sigue su curso y hay
-    // contenido publicado que no se puede poner en pausa. Solo queda ese
-    // influencer marcado como rechazado, para buscar otro.
+    if (rechazados.length > 0) {
+      const motivos = new Map(
+        finalDecisions.profiles.map((p) => [p.id, p.rejectionReason || null])
+      );
+      for (const id of rechazados) {
+        await tx.campaignProfile.update({
+          where: { id },
+          data: {
+            participacion: "RETIRADO",
+            origenRetiro: "CLIENTE",
+            motivoRetiro: motivos.get(id) ?? null,
+            retiradoEn: now,
+          },
+        });
+      }
+    }
+
+    // Una campana ya en marcha no cambia de estado: sigue como estaba.
     if (approvalToken!.campaign.status !== "ACTIVE") {
       await tx.campaign.update({
         where: { id: approvalToken!.campaignId },
-        data: { status: hasRejections ? "PENDING" : "ACTIVE" },
+        data: { status: "ACTIVE" },
       });
     }
   });

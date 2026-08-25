@@ -201,6 +201,16 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       ? (await getAllProfilesForEditor()).filter((p) => !idsEnCampana.has(p.id))
       : [];
 
+  // Entregas e impacto solo tienen sentido una vez la campana arranco.
+  // Mientras espera al cliente no hay nada publicado que registrar ni
+  // que medir, y pedir links de un trabajo que aun no se ha encargado
+  // solo confunde a quien mira la ficha.
+  const enMarcha = campaign.status === "ACTIVE";
+  const yaArranco =
+    enMarcha ||
+    campaign.status === "COMPLETED" ||
+    campaign.status === "CANCELLED";
+
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
     total: activos.length,
@@ -649,16 +659,16 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
       {/* Entregas: solo tiene sentido cuando la campana ya esta en marcha.
           En borrador o revision los formatos aun pueden cambiar. */}
-      {campaign.status !== "DRAFT" && campaign.status !== "REVIEW" && (
+      {yaArranco && (
         <EntregasCampana
           campaignId={id}
           perfiles={perfilesEntregas}
-          puedeEditar={campaign.status === "ACTIVE" || campaign.status === "PENDING"}
+          puedeEditar={enMarcha}
         />
       )}
 
       {/* Impacto: solo cuando ya hay contenido publicado que medir. */}
-      {campaign.status !== "DRAFT" && campaign.status !== "REVIEW" && (
+      {yaArranco && (
         <MetricasCampana
           campaignId={id}
           capturas={capturas}

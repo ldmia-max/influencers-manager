@@ -101,6 +101,10 @@ The client approves at every level: `CampaignProfile.status` and `CampaignProfil
 
 Status flow is `DRAFT → REVIEW → PENDING/ACTIVE → COMPLETED/CANCELLED`; the allowed transitions are declared in `USER_VALID_TRANSITIONS` in `src/lib/campaign-utils.ts` and enforced by `transitionCampaignStatus` in `src/data-access/campaigns.ts`.
 
+**The client's review always activates the campaign.** `submitApproval` sets `ACTIVE` whether or not anything was rejected: the approved work is approved and can start today, and holding the whole campaign hostage to one creator cost the team days. Rejected profiles are **retired on the spot** (`origenRetiro: CLIENTE`, `motivoRetiro` = the rejection reason). Without that they would keep counting toward the total — the client never approved them but their `participacion` was still `ACTIVO` — and, worse, they would block `ACTIVE → COMPLETED` forever, because `entregasPendientesDeCampana` counts every active profile's formats and nobody is going to publish theirs. `PENDING` therefore no longer happens through the approval flow; it survives only for campaigns already stored in it.
+
+**Deliveries and impact only render once the campaign has started** (`ACTIVE`, `COMPLETED` or `CANCELLED`). While it waits on the client there is nothing published to record or to measure.
+
 **The enum names and the on-screen labels deliberately disagree.** `REVIEW` reads **"Pendiente"** — from outside, the campaign is simply waiting on the client and nobody at the agency has anything to do. `PENDING` reads **"Requiere ajustes"**, because it is the opposite situation in terms of who must move: the client already answered rejecting someone and the ball is back with the agency. Labelling both "Pendiente" would make the campaigns list say nothing. Only `CAMPAIGN_STATUS_LABELS` changed; the enum, the transitions and the stored values are untouched.
 
 **Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
