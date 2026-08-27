@@ -11,24 +11,22 @@ import { Decimal } from "@prisma/client/runtime/library";
 export const MARKUP_PERCENTAGE = 0.4; // 40%
 
 /**
- * Como se llama cada estado en pantalla.
+ * Las cinco etapas de una campana, como se llaman en pantalla.
  *
- * REVIEW es "Pendiente" porque desde fuera eso es lo que pasa: la
- * campana esta esperando a que el cliente decida, y nadie de la agencia
- * tiene nada que hacer mientras tanto.
+ * Los nombres del enum vienen de antes y no se tocan: renombrarlos
+ * obligaria a reescribir cada fila y cada consulta a cambio de nada,
+ * porque el nombre interno no lo ve ningun usuario.
  *
- * PENDING no puede llamarse igual, aunque en la base se llame asi: es el
- * estado opuesto en cuanto a quien debe moverse. Ahi el cliente YA
- * respondio rechazando a alguien y la pelota esta en la agencia. Dos
- * situaciones contrarias con la misma palabra dejarian el listado de
- * campanas sin decir nada.
+ * PENDING ya no se alcanza. Significaba "el cliente rechazo a alguien y
+ * la agencia debe ajustar", que hoy es exactamente Abierta. Conserva
+ * etiqueta por si queda alguna campana guardada asi.
  */
 export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Borrador",
-  REVIEW: "Pendiente",
-  PENDING: "Requiere ajustes",
-  ACTIVE: "Activa",
-  COMPLETED: "Completada",
+  DRAFT: "Abierta",
+  REVIEW: "Revisión",
+  PENDING: "Abierta",
+  ACTIVE: "En proceso",
+  COMPLETED: "Cerrada",
   CANCELLED: "Cancelada",
 };
 
@@ -37,8 +35,8 @@ export const CAMPAIGN_STATUS_VARIANTS: Record<
   "default" | "secondary" | "outline" | "destructive"
 > = {
   DRAFT: "secondary",
-  REVIEW: "default",
-  PENDING: "outline",
+  REVIEW: "outline",
+  PENDING: "secondary",
   ACTIVE: "default",
   COMPLETED: "secondary",
   CANCELLED: "destructive",
@@ -47,7 +45,7 @@ export const CAMPAIGN_STATUS_VARIANTS: Record<
 export const CAMPAIGN_STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
   REVIEW: "bg-yellow-100 text-yellow-800",
-  PENDING: "bg-orange-100 text-orange-800",
+  PENDING: "bg-gray-100 text-gray-800",
   ACTIVE: "bg-green-100 text-green-800",
   COMPLETED: "bg-purple-100 text-purple-800",
   CANCELLED: "bg-red-100 text-red-800",
@@ -66,10 +64,26 @@ export const PROFILE_STATUS_COLORS: Record<string, string> = {
 };
 
 // Transiciones válidas para el usuario
+/**
+ * Que puede hacer el usuario desde cada etapa.
+ *
+ * Abierta (DRAFT) solo sale enviando al cliente. Ya no se puede activar
+ * a mano: quien decide que la campana arranca es el cliente al aprobar,
+ * y saltarselo dejaba campanas en marcha que el nunca vio.
+ *
+ * Revision no tiene salidas propias: la resuelve el cliente al responder
+ * —a Abierta si no aprobo a nadie, a En proceso si aprobo a alguien—.
+ * Solo queda cancelar, para cuando se cae el trato mientras se espera.
+ *
+ * Cerrada y Cancelada son terminales: una campana no se reabre.
+ */
 export const USER_VALID_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ["REVIEW", "ACTIVE"], // ACTIVE directo para campañas ya negociadas
-  REVIEW: ["DRAFT", "ACTIVE"], // Volver a borrador o activar si todos aprobados
-  PENDING: ["REVIEW", "CANCELLED"], // Reenviar a revisión o cancelar
+  // ACTIVE sigue disponible por "Activar Directamente", para campanas
+  // ya cerradas fuera de la aplicacion. Es la unica via a En proceso
+  // que no pasa por el cliente.
+  DRAFT: ["REVIEW", "ACTIVE", "CANCELLED"],
+  REVIEW: ["DRAFT", "CANCELLED"],
+  PENDING: ["REVIEW", "CANCELLED"],
   ACTIVE: ["COMPLETED", "CANCELLED"],
   COMPLETED: [],
   CANCELLED: [],

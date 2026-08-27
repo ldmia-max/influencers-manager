@@ -246,6 +246,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           <Badge className={CAMPAIGN_STATUS_COLORS[campaign.status]}>
             {CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}
           </Badge>
+          {/* Editar solo con la campana Abierta. PENDING es la misma
+              etapa para campanas guardadas antes del cambio. */}
           {(campaign.status === "DRAFT" || campaign.status === "PENDING") && (
             <Link href={`/campaigns/${id}/edit`}>
               <Button variant="outline">
@@ -419,6 +421,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {campaign.status === "CANCELLED" && campaign.motivoCancelacion && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-4">
+            <p className="text-sm font-medium text-red-900">
+              Campaña cancelada
+              {campaign.canceladaEn &&
+                ` el ${new Date(campaign.canceladaEn).toLocaleDateString("es-CO")}`}
+            </p>
+            <p className="mt-1 text-sm text-red-800">
+              {campaign.motivoCancelacion}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Composicion de la campana, a lo ancho.
           Estos desgloses vivian dentro de Resumen, en una columna

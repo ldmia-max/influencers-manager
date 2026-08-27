@@ -332,13 +332,16 @@ model ClientUser {
 
 // ============ CAMPAÑAS ============
 
+/// Etapas de una campana. Los nombres internos se conservan porque
+/// cambiarlos obligaria a una migracion de datos sin ganar nada: lo que
+/// se lee en pantalla lo decide CAMPAIGN_STATUS_LABELS.
 enum CampaignStatus {
-  DRAFT      // Borrador - en creación/edición
-  REVIEW     // Enviada al cliente para revisión
-  PENDING    // Cliente rechazó algunos perfiles, esperando ajustes del usuario
-  ACTIVE     // Todos los perfiles aprobados, campaña en ejecución
-  COMPLETED  // Campaña finalizada
-  CANCELLED  // Campaña cancelada
+  DRAFT      // "Abierta": se arma la campana. Unico estado editable.
+  REVIEW     // "Revisión": enviada al cliente, esperando su respuesta.
+  PENDING    // Sin uso. Quedan campanas guardadas asi de antes del cambio de etapas.
+  ACTIVE     // "En proceso": el cliente aprobo al menos uno; se registran entregas.
+  COMPLETED  // "Cerrada": entregado todo. Terminal.
+  CANCELLED  // "Cancelada". Terminal.
 }
 
 /// Si un influencer sigue contratado en la campana.
@@ -391,6 +394,12 @@ model Campaign {
   endDate          DateTime?
   activationReason String?        // Motivo opcional al activar la campaña
   activatedAt      DateTime?      // Fecha de activación
+
+  /// Por que se cancelo. Se exige al cancelar: es terminal y sin vuelta
+  /// atras, y meses despues nadie recuerda si fue el cliente, el
+  /// presupuesto o un cambio de plan.
+  motivoCancelacion String?
+  canceladaEn       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 

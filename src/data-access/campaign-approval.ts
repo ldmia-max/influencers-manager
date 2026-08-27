@@ -277,42 +277,53 @@ export async function submitApproval(
       data: { usedAt: now },
     });
 
-    // Rechazar a alguien no frena la campana: el resto del trabajo esta
-    // aprobado y puede empezar hoy. Antes cualquier rechazo la dejaba
-    // esperando un reenvio completo, y el equipo perdia dias por un
-    // influencer que ya no iba a participar.
+    // La respuesta del cliente decide la etapa.
     //
-    // A los rechazados se les retira en el acto. Sin esto seguirian
-    // contando en el total de la campana —el cliente no los aprobo, pero
-    // su `participacion` seguia siendo ACTIVO— y, peor, bloquearian el
-    // cierre para siempre: la comprobacion de entregas pendientes los
-    // incluiria y nadie va a publicar su contenido.
-    const rechazados = finalDecisions.profiles
-      .filter((p) => p.status === "REJECTED")
-      .map((p) => p.id);
+    // Si aprobo aunque sea a UNO, la campana pasa a En proceso: ese
+    // trabajo esta contratado y puede empezar hoy. Frenarlo todo por los
+    // que no aprobo costaba dias de nada.
+    //
+    // Si no aprobo a nadie, vuelve a Abierta. Dejarla en marcha sin un
+    // solo influencer contratado no describe nada real, y ademas Abierta
+    // es el unico estado editable: es justo donde el equipo tiene que
+    // estar para rehacer la propuesta.
+    const aprobados = finalDecisions.profiles.filter(
+      (p) => p.status === "APPROVED"
+    ).length;
+    const arranca = aprobados > 0;
 
-    if (rechazados.length > 0) {
+    if (arranca) {
+      // A los rechazados se les retira en el acto. Sin esto seguirian
+      // contando en el total —el cliente no los aprobo, pero su
+      // participacion seguia siendo ACTIVO— y bloquearian el cierre para
+      // siempre: la comprobacion de entregas cuenta los formatos de todo
+      // perfil activo, y nadie va a publicar los suyos.
       const motivos = new Map(
         finalDecisions.profiles.map((p) => [p.id, p.rejectionReason || null])
       );
-      for (const id of rechazados) {
+      for (const perfil of finalDecisions.profiles) {
+        if (perfil.status !== "REJECTED") continue;
         await tx.campaignProfile.update({
-          where: { id },
+          where: { id: perfil.id },
           data: {
             participacion: "RETIRADO",
             origenRetiro: "CLIENTE",
-            motivoRetiro: motivos.get(id) ?? null,
+            motivoRetiro: motivos.get(perfil.id) ?? null,
             retiradoEn: now,
           },
         });
       }
     }
+    // Si vuelve a Abierta NO se retira a nadie: alli la campana se
+    // reedita, y el equipo necesita ver a los rechazados con sus precios
+    // para decidir a quien cambia. Retirarlos abriria el editor vacio.
 
-    // Una campana ya en marcha no cambia de estado: sigue como estaba.
+    // Una campana ya en marcha no cambia de etapa: el cliente puede estar
+    // respondiendo por un reemplazo mientras el resto sigue publicando.
     if (approvalToken!.campaign.status !== "ACTIVE") {
       await tx.campaign.update({
         where: { id: approvalToken!.campaignId },
-        data: { status: "ACTIVE" },
+        data: { status: arranca ? "ACTIVE" : "DRAFT" },
       });
     }
   });

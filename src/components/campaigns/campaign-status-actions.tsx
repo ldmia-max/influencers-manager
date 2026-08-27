@@ -65,6 +65,8 @@ export function CampaignStatusActions({
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [activationReason, setActivationReason] = useState("");
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showApprovalUrlDialog, setShowApprovalUrlDialog] = useState(false);
@@ -381,11 +383,20 @@ export function CampaignStatusActions({
           </AlertDialog>
         )}
 
-        {/* Cancelar (desde DRAFT, PENDING o ACTIVE) */}
+        {/* Cancelar. Pide el motivo porque es terminal: la campana no
+            se reabre, y esa linea es todo lo que queda de por que se
+            cayo. */}
         {(currentStatus === "DRAFT" ||
+          currentStatus === "REVIEW" ||
           currentStatus === "PENDING" ||
           currentStatus === "ACTIVE") && (
-          <AlertDialog>
+          <AlertDialog
+            open={showCancelDialog}
+            onOpenChange={(abierto) => {
+              setShowCancelDialog(abierto);
+              if (!abierto) setCancelReason("");
+            }}
+          >
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={loading !== null}>
                 <XCircle className="h-4 w-4 mr-2" />
@@ -396,18 +407,32 @@ export function CampaignStatusActions({
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancelar Campaña</AlertDialogTitle>
                 <AlertDialogDescription>
-                  ¿Estás seguro de que deseas cancelar esta campaña?
-                  <br /><br />
-                  <strong className="text-red-600">
-                    Esta acción no se puede deshacer.
-                  </strong>
+                  La campaña quedará cancelada y no se podrá reabrir.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="py-2">
+                <Label htmlFor="cancel-reason" className="text-sm font-medium">
+                  ¿Por qué se cancela?
+                </Label>
+                <Textarea
+                  id="cancel-reason"
+                  placeholder="Ej: el cliente aplazó el lanzamiento, no se llegó a acuerdo de presupuesto..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="mt-2"
+                  rows={3}
+                  maxLength={500}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Queda guardado en la campaña. Dentro de unos meses será lo
+                  único que explique qué pasó.
+                </p>
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel>No, volver</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => handleStatusChange("CANCELLED")}
-                  disabled={loading !== null}
+                  onClick={() => handleStatusChange("CANCELLED", cancelReason.trim())}
+                  disabled={loading !== null || cancelReason.trim().length === 0}
                   className="bg-red-600 hover:bg-red-700"
                 >
                   {loading === "CANCELLED" ? "Cancelando..." : "Sí, cancelar"}

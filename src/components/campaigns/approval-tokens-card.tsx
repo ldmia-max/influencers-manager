@@ -140,7 +140,9 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         {!activeToken && admiteEnlace && (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
             <p className="text-sm text-yellow-800">
-              No hay un enlace de aprobación activo. El enlace anterior ha expirado o ya fue utilizado.
+              {campaignStatus === "ACTIVE"
+                ? "Genera un enlace para que el cliente apruebe los influencers que añadiste. La campaña sigue en proceso mientras tanto."
+                : "No hay un enlace de aprobación activo. El anterior expiró o ya fue utilizado."}
             </p>
             <Button
               onClick={handleRegenerateToken}
@@ -150,12 +152,14 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
               {isRegenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Regenerando...
+                  Generando...
                 </>
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Regenerar enlace de aprobación
+                  {campaignStatus === "ACTIVE"
+                    ? "Reenviar para revisión"
+                    : "Regenerar enlace de aprobación"}
                 </>
               )}
             </Button>

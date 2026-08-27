@@ -9,10 +9,18 @@ function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+/**
+ * Transiciones que acepta el servidor.
+ *
+ * REVIEW conserva las salidas a DRAFT y ACTIVE porque son las que aplica
+ * la propia respuesta del cliente: a Abierta si no aprobo a nadie, a En
+ * proceso si aprobo a alguno. Lo que el usuario puede pulsar es un
+ * subconjunto mas estrecho, declarado en USER_VALID_TRANSITIONS.
+ */
 const VALID_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   DRAFT: ["REVIEW", "ACTIVE", "CANCELLED"],
-  REVIEW: ["PENDING", "ACTIVE", "DRAFT"],
-  PENDING: ["REVIEW", "CANCELLED"],
+  REVIEW: ["DRAFT", "ACTIVE", "CANCELLED"],
+  PENDING: ["REVIEW", "DRAFT", "CANCELLED"],
   ACTIVE: ["COMPLETED", "CANCELLED"],
   COMPLETED: [],
   CANCELLED: [],
@@ -20,11 +28,11 @@ const VALID_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
 
 function getStatusMessage(status: CampaignStatus): string {
   const messages: Record<CampaignStatus, string> = {
-    DRAFT: "Campaña movida a borrador",
-    REVIEW: "Campaña enviada al cliente. Queda pendiente de su aprobación",
-    PENDING: "El cliente rechazó parte de la propuesta: requiere ajustes",
-    ACTIVE: "Campaña activada exitosamente",
-    COMPLETED: "Campaña marcada como completada",
+    DRAFT: "Campaña abierta. Ya se puede editar y ajustar los influencers",
+    REVIEW: "Campaña enviada al cliente. En revisión",
+    PENDING: "Campaña abierta",
+    ACTIVE: "Campaña en proceso. Ya se pueden registrar las entregas",
+    COMPLETED: "Campaña cerrada",
     CANCELLED: "Campaña cancelada",
   };
   return messages[status];
@@ -561,6 +569,13 @@ export async function transitionCampaignStatus(
     }
   }
 
+  // Cancelar es terminal y sin vuelta atras, asi que se exige el motivo.
+  // Meses despues nadie recuerda si fue el cliente, el presupuesto o un
+  // cambio de plan, y esa fila es todo lo que queda de la campana.
+  if (newStatus === "CANCELLED" && !reason?.trim()) {
+    throw new ValidationError("Indica por qué se cancela la campaña");
+  }
+
   // Una campana no se cierra mientras falten links por registrar. Los
   // retirados no cuentan: ya no deben nada.
   if (newStatus === "COMPLETED") {
@@ -580,11 +595,18 @@ export async function transitionCampaignStatus(
     status: CampaignStatus;
     activationReason?: string | null;
     activatedAt?: Date | null;
+    motivoCancelacion?: string | null;
+    canceladaEn?: Date | null;
   } = { status: newStatus };
 
   if (newStatus === "ACTIVE") {
     updateData.activationReason = reason || null;
     updateData.activatedAt = new Date();
+  }
+
+  if (newStatus === "CANCELLED") {
+    updateData.motivoCancelacion = reason!.trim();
+    updateData.canceladaEn = new Date();
   }
 
   const updatedCampaign = await prisma.campaign.update({

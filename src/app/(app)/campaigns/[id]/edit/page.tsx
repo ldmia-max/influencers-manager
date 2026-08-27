@@ -35,7 +35,11 @@ export default async function EditCampaignPage({ params }: PageProps) {
     redirect("/campaigns");
   }
 
-  // Solo editar si está en DRAFT o PENDING
+  // Solo se edita una campana Abierta. En Revision la esta mirando el
+  // cliente y cambiarla por debajo le mostraria una propuesta distinta a
+  // la que aprueba; en En proceso hay precios ya aprobados y contenido ya
+  // publicado. Alli los influencers se anaden o retiran desde la ficha,
+  // que es una operacion acotada y no una reedicion.
   if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
     redirect(`/campaigns/${id}`);
   }

@@ -99,13 +99,24 @@ Cascade deletes: `Profile` → `SocialAccount` → `ProfileService`; `Client` �
 
 The client approves at every level: `CampaignProfile.status` and `CampaignProfilePlatform.status` are `CampaignProfileStatus` (PENDING/APPROVED/REJECTED), while `CampaignService` uses a boolean `isApproved` plus `clientNotes`/`rejectionReason`. When touching approval logic, remember all three exist and can disagree.
 
-Status flow is `DRAFT → REVIEW → PENDING/ACTIVE → COMPLETED/CANCELLED`; the allowed transitions are declared in `USER_VALID_TRANSITIONS` in `src/lib/campaign-utils.ts` and enforced by `transitionCampaignStatus` in `src/data-access/campaigns.ts`.
+The five stages, and the fact that **the enum names and the on-screen labels deliberately disagree** — renaming the enum would rewrite every row and every query to change a word no user ever sees:
 
-**The client's review always activates the campaign.** `submitApproval` sets `ACTIVE` whether or not anything was rejected: the approved work is approved and can start today, and holding the whole campaign hostage to one creator cost the team days. Rejected profiles are **retired on the spot** (`origenRetiro: CLIENTE`, `motivoRetiro` = the rejection reason). Without that they would keep counting toward the total — the client never approved them but their `participacion` was still `ACTIVO` — and, worse, they would block `ACTIVE → COMPLETED` forever, because `entregasPendientesDeCampana` counts every active profile's formats and nobody is going to publish theirs. `PENDING` therefore no longer happens through the approval flow; it survives only for campaigns already stored in it.
+| Enum | Label | What it means |
+|---|---|---|
+| `DRAFT` | **Abierta** | Being assembled — from a brief or by hand. **The only editable stage.** |
+| `REVIEW` | **Revisión** | Sent to the client, waiting on their answer. |
+| `ACTIVE` | **En proceso** | The client approved at least one creator; deliveries are registered here. |
+| `COMPLETED` | **Cerrada** | Everything delivered. Terminal. |
+| `CANCELLED` | **Cancelada** | Terminal, and `motivoCancelacion` is **required** to get here. |
+| `PENDING` | *(unused)* | Meant "client rejected, agency must adjust" — that is Abierta now. Migration `20260823000000_etapas_de_campana` moved existing rows to `DRAFT`; the value stays in the enum because dropping it means recreating the type in Postgres. |
+
+**The client's answer decides the next stage, not the agency.** `submitApproval` counts approvals: **one or more → `ACTIVE`**, that work is contracted and can start today; **zero → back to `DRAFT`**, because a campaign in flight with nobody contracted describes nothing real, and `DRAFT` is the only stage where the team can rebuild the proposal.
+
+**Rejected profiles are retired only on the way to `ACTIVE`** (`origenRetiro: CLIENTE`, `motivoRetiro` = the rejection reason). Without it they would keep counting toward the total — `participacion` was still `ACTIVO` — and would block `ACTIVE → COMPLETED` forever, since `entregasPendientesDeCampana` counts every active profile's formats and nobody publishes theirs. On the way back to `DRAFT` nobody is retired: the campaign is about to be re-edited and the team needs to see the rejected ones with their prices to decide who to swap.
+
+`USER_VALID_TRANSITIONS` (what a button may trigger) is narrower than `VALID_TRANSITIONS` (what the server accepts): `REVIEW → DRAFT|ACTIVE` exists only so the client's own answer can apply it. `DRAFT → ACTIVE` survives for the "Activar Directamente" button, the one path to *En proceso* that skips the client, kept for campaigns closed outside the app.
 
 **Deliveries and impact only render once the campaign has started** (`ACTIVE`, `COMPLETED` or `CANCELLED`). While it waits on the client there is nothing published to record or to measure.
-
-**The enum names and the on-screen labels deliberately disagree.** `REVIEW` reads **"Pendiente"** — from outside, the campaign is simply waiting on the client and nobody at the agency has anything to do. `PENDING` reads **"Requiere ajustes"**, because it is the opposite situation in terms of who must move: the client already answered rejecting someone and the ball is back with the agency. Labelling both "Pendiente" would make the campaigns list say nothing. Only `CAMPAIGN_STATUS_LABELS` changed; the enum, the transitions and the stored values are untouched.
 
 **Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
 
