@@ -21,8 +21,10 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     const result = await regenerateApprovalToken(campaignId);
 
-    // Send email notification
-    notifyTokenRegenerated({
+    // Con await, y devolviendo si salio o no. Sin esperarlo, la promesa
+    // podia quedarse a medias al devolver la respuesta y el cliente no
+    // recibia nada mientras el boton decia que si.
+    const envio = await notifyTokenRegenerated({
       contactEmail: result.contactEmail,
       contactName: result.contactName,
       campaignName: result.campaignName,
@@ -33,7 +35,13 @@ export async function POST(req: Request, { params }: RouteParams) {
     return NextResponse.json({
       token: result.token,
       approvalUrl: result.approvalUrl,
-      message: "Token regenerado exitosamente",
+      message: envio.success
+        ? `Enlace enviado a ${result.contactEmail}`
+        : "Enlace generado, pero el correo no se pudo enviar",
+      email: envio.success
+        ? { sent: true }
+        : { sent: false, reason: envio.reason, error: envio.error },
+      emailRecipient: result.contactEmail,
     });
   } catch (error) {
     if (error instanceof ValidationError) {

@@ -43,15 +43,22 @@ export async function notifyCampaignSentToReview(params: {
 }
 
 /**
- * Envía email al cliente cuando se regenera el token de aprobación
+ * Envia al cliente el enlace de aprobacion regenerado.
+ *
+ * Devuelve el resultado, igual que notifyCampaignSentToReview y por el
+ * mismo motivo: antes se llamaba sin await y con un .catch() que solo
+ * escribia en consola. El boton decia "enlace generado", el correo no
+ * salia, y nadie se enteraba hasta que el cliente avisaba de que no
+ * habia recibido nada. Ademas, una promesa sin await puede quedarse a
+ * medias cuando la respuesta ya se devolvio.
  */
-export function notifyTokenRegenerated(params: {
+export async function notifyTokenRegenerated(params: {
   contactEmail: string;
   contactName: string;
   campaignName: string;
   approvalToken: string;
   expiresAt: Date;
-}) {
+}): Promise<ResultadoEmail> {
   const template = tokenRegeneratedTemplate({
     contactName: params.contactName,
     campaignName: params.campaignName,
@@ -59,12 +66,15 @@ export function notifyTokenRegenerated(params: {
     expiresAt: params.expiresAt,
   });
 
-  sendEmail({ to: params.contactEmail, ...template })
-    .catch((err) => console.error("Failed to send regenerated token email:", err));
+  return sendEmail({ to: params.contactEmail, ...template });
 }
 
 /**
- * Notifica al creador de la campaña sobre el resultado de la aprobación del cliente
+ * Avisa a quien creo la campana de lo que decidio el cliente.
+ *
+ * Espera al envio, como el resto. Un sendEmail sin await puede quedarse
+ * a medias cuando la peticion ya devolvio, y el .catch() que habia solo
+ * escribia en consola: el fallo no llegaba a ninguna parte.
  */
 export async function notifyApprovalResult(params: {
   campaignId: string;
@@ -105,8 +115,10 @@ export async function notifyApprovalResult(params: {
       campaignUrl,
     });
 
-    sendEmail({ to: creatorEmail, ...template })
-      .catch((err) => console.error("Failed to send rejection email:", err));
+    const envio = await sendEmail({ to: creatorEmail, ...template });
+    if (!envio.success) {
+      console.error("[email] Aviso de rechazo no enviado:", envio.reason, envio.error);
+    }
   } else {
     const template = campaignApprovedTemplate({
       campaignName: params.campaignName,
@@ -117,8 +129,10 @@ export async function notifyApprovalResult(params: {
       campaignUrl,
     });
 
-    sendEmail({ to: creatorEmail, ...template })
-      .catch((err) => console.error("Failed to send approval email:", err));
+    const envio = await sendEmail({ to: creatorEmail, ...template });
+    if (!envio.success) {
+      console.error("[email] Aviso de aprobación no enviado:", envio.reason, envio.error);
+    }
   }
 }
 

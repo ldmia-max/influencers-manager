@@ -190,6 +190,13 @@ export interface RegenerateTokenResponse {
     expiresAt: string;
   };
   approvalUrl: string;
+  /**
+   * Si el correo salio de verdad. El enlace se genera igual aunque el
+   * envio falle —el equipo puede copiarlo y mandarlo a mano—, asi que
+   * hay que decir cual de las dos cosas paso.
+   */
+  email?: { sent: boolean; reason?: string; error?: string };
+  emailRecipient?: string;
 }
 
 export interface ApprovalToken {

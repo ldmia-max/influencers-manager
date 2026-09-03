@@ -28,6 +28,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
   const router = useRouter();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [avisoEnvio, setAvisoEnvio] = useState<{ ok: boolean; texto: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Memoizar tokens ordenados por fecha de creación (más reciente primero)
@@ -69,6 +70,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
   const handleRegenerateToken = async () => {
     setIsRegenerating(true);
     setError(null);
+    setAvisoEnvio(null);
 
     try {
       const data = await regenerateApprovalToken(campaignId);
@@ -77,6 +79,23 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
       await navigator.clipboard.writeText(data.approvalUrl);
       setCopiedToken(data.token.token);
       setTimeout(() => setCopiedToken(null), 2000);
+
+      // El enlace se genera aunque el correo falle, asi que hay que decir
+      // cual de las dos cosas pasó. Antes siempre ponia "regenerado" y el
+      // equipo daba por enviado un correo que nunca salió.
+      setAvisoEnvio(
+        data.email?.sent === false
+          ? {
+              ok: false,
+              texto: `El enlace está listo y copiado, pero el correo a ${
+                data.emailRecipient ?? "el cliente"
+              } no salió (${data.email.error ?? data.email.reason}). Pégaselo tú.`,
+            }
+          : {
+              ok: true,
+              texto: `Enlace enviado a ${data.emailRecipient ?? "el cliente"} y copiado al portapapeles.`,
+            }
+      );
 
       // Refrescar la página para mostrar el nuevo token
       router.refresh();
@@ -133,6 +152,18 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {avisoEnvio && (
+          <div
+            className={`rounded-lg border p-3 text-sm ${
+              avisoEnvio.ok
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            {avisoEnvio.texto}
           </div>
         )}
 

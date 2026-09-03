@@ -224,6 +224,8 @@ Each search costs Apify credit (up to 3 queries × 10 results) plus two Haiku ca
 
 `src/lib/emails/resend.ts` — `sendEmail()` is a **no-op unless `ENABLE_EMAILS === "true"`**, and warns-and-returns when `RESEND_API_KEY` is missing. Templates are plain HTML string builders in `templates.ts`, wrapped by `campaign-notifications.ts` / `brief-notifications.ts`.
 
+**Every notification must `await sendEmail` and hand the `ResultadoEmail` back to its caller.** A fire-and-forget `sendEmail(...).catch(console.error)` fails twice over: the promise can be cut off once the response returns, and the failure reaches nobody — the button still says "sent" while nothing left. That bug shipped three times in `campaign-notifications.ts` and the last one, `notifyTokenRegenerated`, meant "Reenviar para revisión" never emailed the client. Routes surface the outcome as `email: { sent, reason, error }` so the UI can say the link is ready but the mail did not go out.
+
 ## Key patterns
 
 ### Forms are mixed — match the neighbours, don't unify
