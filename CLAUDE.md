@@ -122,7 +122,7 @@ The five stages, and the fact that **the enum names and the on-screen labels del
 
 `USER_VALID_TRANSITIONS` (what a button may trigger) is narrower than `VALID_TRANSITIONS` (what the server accepts): `REVIEW → DRAFT|ACTIVE` exists only so the client's own answer can apply it. `DRAFT → ACTIVE` survives for the "Activar Directamente" button, the one path to *En proceso* that skips the client, kept for campaigns closed outside the app.
 
-**Deliveries and impact only render once the campaign has started** (`ACTIVE`, `COMPLETED` or `CANCELLED`). While it waits on the client there is nothing published to record or to measure.
+**Deliveries and impact only render once the campaign has started** (`ACTIVE`, `COMPLETED` or `CANCELLED`). While it waits on the client there is nothing published to record or to measure. Within a started campaign, **a `PENDING` profile stays out of Deliveries entirely** — it is a proposal the client has not seen, so there is no commissioned work to hand in. It lives in Sustituciones, where it gets resolved. Three places enforce that together, and they have to move as one: the detail page filters it out of the deliveries block, `registrarEntrega` refuses it so the rule survives an API call, and `entregasPendientesDeCampana` excludes it from the close gate — without that last one an unanswered proposal would claim formats nobody is allowed to deliver, and the campaign could never reach `COMPLETED`.
 
 **Prices shown to clients carry a 20% markup.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything.
 

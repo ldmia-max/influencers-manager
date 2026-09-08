@@ -166,7 +166,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // Datos del bloque de entregas. Se aplana aqui, en el servidor, para
   // que el componente cliente reciba justo lo que pinta y las fechas
   // viajen ya como texto.
-  const perfilesEntregas = campaign.profiles.map((cp) => ({
+  const perfilesEntregas = campaign.profiles
+    // Quien espera aprobación todavía no tiene trabajo que entregar: se
+    // añadió como propuesta y el cliente no la ha visto. Aparece en
+    // Sustituciones, que es donde se resuelve, no aquí pidiendo enlaces
+    // de un contenido que nadie ha encargado aún.
+    .filter((cp) => cp.status !== "PENDING")
+    .map((cp) => ({
     id: cp.id,
     nombre: cp.profile.name,
     participacion: cp.participacion,

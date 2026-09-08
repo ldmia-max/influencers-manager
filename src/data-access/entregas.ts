@@ -254,6 +254,7 @@ export async function registrarEntrega(datos: {
           campaignProfile: {
             select: {
               participacion: true,
+              status: true,
               campaign: { select: { id: true, status: true } },
             },
           },
@@ -302,6 +303,15 @@ export async function registrarEntrega(datos: {
   if (perfil.participacion !== "ACTIVO") {
     throw new ValidationError(
       "Este influencer está retirado de la campaña. Reactívalo antes de registrar entregas."
+    );
+  }
+
+  // Tampoco entrega quien todavia espera el visto bueno: seria contenido
+  // de un trabajo que aun no se ha encargado. La ficha ya no lo muestra
+  // en Entregas, pero la regla vive aqui para que valga tambien por API.
+  if (perfil.status === "PENDING") {
+    throw new ValidationError(
+      "Este influencer todavía espera aprobación: apruébalo antes de registrar entregas."
     );
   }
 
@@ -602,7 +612,11 @@ export async function entregasPendientesDeCampana(campaignId: string): Promise<
   { influencer: string; entregados: number; esperados: number }[]
 > {
   const perfiles = await prisma.campaignProfile.findMany({
-    where: { campaignId, participacion: "ACTIVO" },
+    // Aprobados y activos. Un PENDING reclamaria formatos que nadie
+    // puede entregar —no se le pueden registrar entregas hasta que el
+    // cliente lo apruebe—, y la campana no podria cerrarse jamas por
+    // culpa de una propuesta que quedo sin contestar.
+    where: { campaignId, participacion: "ACTIVO", status: { not: "PENDING" } },
     select: {
       profile: { select: { name: true } },
       platforms: {
