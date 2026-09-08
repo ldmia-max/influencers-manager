@@ -209,9 +209,13 @@ async function main() {
   }
 
   // ============ CREAR GENEROS ============
+  // Los tres unicos. "Otro" recoge todo lo demas sin abrir una lista que
+  // nadie mantiene: este campo describe al creador para filtrar y para
+  // la demografia de la campana, no para clasificarlo con precision.
   const genders = [
     { name: "femenino", displayName: "Femenino" },
     { name: "masculino", displayName: "Masculino" },
+    { name: "otro", displayName: "Otro" },
   ];
 
   for (const gender of genders) {
