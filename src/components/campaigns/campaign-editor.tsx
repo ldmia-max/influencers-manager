@@ -210,24 +210,21 @@ export function CampaignEditor({
     );
   }, [formData.name, formData.clientId, formData.clientContactId, formData.budget]);
 
-  const canProceedToStep3 = useMemo(() => {
-    return selectedProfileIds.length > 0;
-  }, [selectedProfileIds.length]);
-
+  // Al paso 3 se llega sin haber elegido a nadie: una campana puede
+  // guardarse vacia y llenarse dias despues, que es como se trabaja
+  // cuando se cierra el presupuesto antes que el reparto. Quien no puede
+  // seguir vacia es la campana que se manda al cliente o se activa, y eso
+  // lo frenan los botones del resumen y el servidor, no la navegacion.
   const goToStep = useCallback(
     (step: WizardStep) => {
       if (step === 2 && !canProceedToStep2) {
         setError("Completa todos los campos requeridos antes de continuar");
         return;
       }
-      if (step === 3 && !canProceedToStep3) {
-        setError("Selecciona al menos un perfil antes de continuar");
-        return;
-      }
       setError("");
       setCurrentStep(step);
     },
-    [canProceedToStep2, canProceedToStep3, setError, setCurrentStep]
+    [canProceedToStep2, setError, setCurrentStep]
   );
 
   // -------------------------------------------------------------------------

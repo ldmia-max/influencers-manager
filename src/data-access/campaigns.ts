@@ -498,15 +498,29 @@ export async function transitionCampaignStatus(
     );
   }
 
+  // Ni al cliente ni a produccion se va con la campana vacia.
+  //
+  // Una campana SI se crea sin nadie —el presupuesto suele cerrarse antes
+  // que el reparto— y se queda Abierta hasta que se llena. Pero una
+  // "En proceso" sin nadie contratado no describe ningun trabajo, y
+  // ademas se daria por entregada al instante: entregasPendientes no
+  // encuentra formatos que reclamar, asi que podria cerrarse sin que
+  // nadie hubiera publicado nada.
+  if (
+    (newStatus === "REVIEW" || newStatus === "ACTIVE") &&
+    campaign.profiles.length === 0
+  ) {
+    throw new ValidationError(
+      newStatus === "REVIEW"
+        ? "La campaña debe tener al menos un perfil para enviar a revisión"
+        : "La campaña debe tener al menos un perfil para ponerla en proceso"
+    );
+  }
+
   let approvalToken: string | null = null;
 
   // REVIEW transition: reset statuses + generate token
   if (newStatus === "REVIEW") {
-    if (campaign.profiles.length === 0) {
-      throw new ValidationError(
-        "La campaña debe tener al menos un perfil para enviar a revisión"
-      );
-    }
 
     await prisma.campaignProfile.updateMany({
       where: { campaignId },

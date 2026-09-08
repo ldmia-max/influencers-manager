@@ -101,6 +101,15 @@ export function CampaignStepSummary() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
+            {configuredProfiles.length === 0 && (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Todavía no hay influencers en esta campaña.
+                <br />
+                Puedes guardarla así y añadirlos más tarde: quedará
+                <span className="font-medium"> Abierta</span>. Para enviarla al
+                cliente hará falta al menos uno.
+              </div>
+            )}
             <div className="space-y-4">
               {configuredProfiles.map((config) => {
                 const profile = profiles.find((p) => p.id === config.profileId);
@@ -258,7 +267,7 @@ export function CampaignStepSummary() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Enviar a Revision</AlertDialogTitle>
                     <AlertDialogDescription>
-                      La campana sera enviada al cliente para su aprobacion.
+                      La campaña será enviada al cliente para su aprobacion.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
