@@ -13,7 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
-import { Eye, Megaphone } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Eye, Megaphone, MoreVertical, Pencil } from "lucide-react";
 import { formatNumber, formatCompactNumber, calculateReach } from "@/lib/format";
 import {
   CAMPAIGN_STATUS_LABELS,
@@ -263,21 +269,53 @@ export default async function CampaignsPage({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {/* Un solo clic al detalle. Antes habia un menu
-                              de tres puntos cuya unica opcion habitual
-                              era esta, asi que costaba dos clics llegar
-                              a lo que se busca siempre. Editar sigue
-                              disponible desde la propia ficha. */}
-                          <Link href={`/campaigns/${campaign.id}`}>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              aria-label={`Ver detalle de ${campaign.name}`}
-                              title="Ver detalle"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          {/* El detalle se abre desde este menu y no desde
+                              un enlace suelto en la fila.
+
+                              Con el enlace a la vista, el router lo
+                              precarga solo —al entrar en pantalla o al
+                              pasar el raton— y esa precarga dejaba la
+                              navegacion muerta: el clic no llevaba a
+                              ninguna parte y en la red solo se veia un
+                              200 que no pintaba nada. Dentro del menu el
+                              enlace no existe hasta que se abre, asi que
+                              no hay precarga que pueda envenenarse y el
+                              clic navega en frio. */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                aria-label={`Acciones de ${campaign.name}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/campaigns/${campaign.id}`}
+                                  prefetch={false}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  Ver Detalle
+                                </Link>
+                              </DropdownMenuItem>
+                              {campaign.status === "DRAFT" && (
+                                <DropdownMenuItem asChild>
+                                  <Link
+                                    href={`/campaigns/${campaign.id}/edit`}
+                                    prefetch={false}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Editar
+                                  </Link>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
