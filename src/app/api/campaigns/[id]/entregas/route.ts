@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       publicadoEn: body.publicadoEn ?? null,
       notas: body.notas ?? null,
       vistasReportadas: body.vistasReportadas ?? null,
+      serviceTypeId: body.serviceTypeId ?? null,
       usuarioId: sesion.userId,
     });
 

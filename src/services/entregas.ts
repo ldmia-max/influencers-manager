@@ -8,6 +8,8 @@ export interface RegistrarEntregaPayload {
   notas?: string | null;
   /** Solo en formatos efímeros. */
   vistasReportadas?: number | null;
+  /** Qué formato es la pieza. La interfaz lo envía siempre. */
+  serviceTypeId?: string | null;
 }
 
 export interface EntregaCreada {

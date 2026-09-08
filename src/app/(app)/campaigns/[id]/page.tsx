@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { formatNumber, formatCompactNumber, calculateReach, getReachPercentage } from "@/lib/format";
 import { getCachedReachRanges } from "@/lib/cache";
+import { getCachedServiceTypes } from "@/data-access/service-types";
 import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_COLORS,
@@ -144,6 +145,24 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     };
   });
 
+  // Formatos que se pueden señalar al registrar una entrega, agrupados
+  // por plataforma. Salen del catálogo, no del tarifario del influencer:
+  // un combo se negocia fuera de él y puede incluir algo que ese creador
+  // no vende suelto. Al venir de aquí, un formato nuevo creado en
+  // Administración › Formatos aparece sin tocar código.
+  const formatosPorPlataforma: Record<
+    string,
+    { id: string; displayName: string; esEfimero: boolean }[]
+  > = {};
+  for (const tipo of await getCachedServiceTypes()) {
+    if (!tipo.isActive) continue;
+    (formatosPorPlataforma[tipo.platformId] ??= []).push({
+      id: tipo.id,
+      displayName: tipo.displayName,
+      esEfimero: tipo.esEfimero,
+    });
+  }
+
   // Datos del bloque de entregas. Se aplana aqui, en el servidor, para
   // que el componente cliente reciba justo lo que pinta y las fechas
   // viajen ya como texto.
@@ -158,6 +177,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       id: cpp.id,
       plataforma: cpp.socialAccount.platform.displayName,
       username: cpp.socialAccount.username,
+      formatosDisponibles:
+        formatosPorPlataforma[cpp.socialAccount.platform.id] ?? [],
       formatos: cpp.services.map((cs) => ({
         id: cs.id,
         quantity: cs.quantity,
@@ -171,9 +192,19 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         nombre: cs.esCombo
           ? "Combo"
           : cs.profileService?.serviceType.displayName ?? "Formato",
+        // Con qué formato viene preseleccionado el selector. Un combo no
+        // tiene ninguno: hay que señalarlo pieza a pieza.
+        formatoContratadoId: cs.esCombo
+          ? null
+          : cs.profileService?.serviceType.id ?? null,
         entregas: cs.entregas.map((e) => ({
           id: e.id,
           url: e.url,
+          // Lo que se publicó de verdad. En un combo es lo único que lo
+          // dice; en un formato simple confirma lo contratado.
+          formato: e.serviceType
+            ? { nombre: e.serviceType.displayName, esEfimero: e.serviceType.esEfimero }
+            : null,
           entregadoEn: e.entregadoEn.toISOString(),
           publicadoEn: e.publicadoEn?.toISOString() ?? null,
           notas: e.notas,

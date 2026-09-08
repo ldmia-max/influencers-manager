@@ -263,6 +263,11 @@ export async function getCampaignDetail(id: string) {
                   entregas: {
                     orderBy: { entregadoEn: "asc" },
                     include: {
+                      // Que formato es la pieza. En un combo es lo unico
+                      // que lo dice: el contratado agrupa varios.
+                      serviceType: {
+                        select: { id: true, displayName: true, esEfimero: true },
+                      },
                       registradoPor: { select: { id: true, name: true } },
                       metricas: {
                         orderBy: { capturadoEn: "desc" },
@@ -842,6 +847,7 @@ export async function getCampaignResultsForClient(
                       url: true,
                       publicadoEn: true,
                       entregadoEn: true,
+                      serviceType: { select: { displayName: true } },
                       metricas: {
                         orderBy: { capturadoEn: "asc" },
                         select: {

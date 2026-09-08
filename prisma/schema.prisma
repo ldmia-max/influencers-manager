@@ -69,11 +69,11 @@ model Gender {
 // ============ UBICACION GEOGRAFICA ============
 
 model Country {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  code        String   @unique // Código ISO 3166-1 alpha-2 (ej: "CO", "MX", "AR")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique // Código ISO 3166-1 alpha-2 (ej: "CO", "MX", "AR")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   // Relaciones
   departments Department[]
@@ -83,12 +83,12 @@ model Country {
 model Department {
   id        String   @id @default(cuid())
   name      String
-  code      String?  // Código del departamento/estado (opcional)
+  code      String? // Código del departamento/estado (opcional)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   // Relaciones
-  country   Country @relation(fields: [countryId], references: [id])
+  country   Country   @relation(fields: [countryId], references: [id])
   countryId String
   cities    City[]
   profiles  Profile[]
@@ -115,10 +115,10 @@ model City {
 model ReachRange {
   id              String   @id @default(cuid())
   name            String   @unique // "nano", "micro", "mid", "macro", "mega"
-  displayName     String   // "Nano Influencer", "Micro Influencer", etc.
-  minFollowers    Int      // Mínimo de seguidores
-  maxFollowers    Int?     // Máximo de seguidores (null para sin límite)
-  reachPercentage Float    // Porcentaje de alcance estimado (ej: 0.40 para 40%)
+  displayName     String // "Nano Influencer", "Micro Influencer", etc.
+  minFollowers    Int // Mínimo de seguidores
+  maxFollowers    Int? // Máximo de seguidores (null para sin límite)
+  reachPercentage Float // Porcentaje de alcance estimado (ej: 0.40 para 40%)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
 }
@@ -141,10 +141,10 @@ model Profile {
   updatedAt DateTime    @updatedAt
 
   // Relaciones
-  createdBy        User              @relation(fields: [createdById], references: [id])
-  createdById      String
-  gender           Gender?           @relation(fields: [genderId], references: [id])
-  genderId         String?
+  createdBy   User    @relation(fields: [createdById], references: [id])
+  createdById String
+  gender      Gender? @relation(fields: [genderId], references: [id])
+  genderId    String?
 
   // Ubicación geográfica
   country      Country?    @relation(fields: [countryId], references: [id])
@@ -165,7 +165,7 @@ model SocialPlatform {
   id          String   @id @default(cuid())
   name        String   @unique // "instagram", "tiktok", "youtube", etc.
   displayName String // "Instagram", "TikTok", "YouTube"
-  icon        String?  // Icono opcional para UI
+  icon        String? // Icono opcional para UI
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
@@ -195,9 +195,9 @@ model SocialAccount {
   lastSyncAt     DateTime?
 
   // Relaciones
-  profile           Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile           Profile                   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId         String
-  platform          SocialPlatform             @relation(fields: [platformId], references: [id])
+  platform          SocialPlatform            @relation(fields: [platformId], references: [id])
   platformId        String
   services          ProfileService[]
   campaignPlatforms CampaignProfilePlatform[]
@@ -208,7 +208,7 @@ model SocialAccount {
 // ============ TIPOS DE SERVICIO (DINAMICO) ============
 
 model ServiceType {
-  id          String        @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String // "reel", "reel_colaboracion", "story", "post", etc.
   displayName String // "Reel", "Reel - Colaboracion", "Story", etc.
   description String?
@@ -230,6 +230,9 @@ model ServiceType {
 
   // Relaciones
   profileServices ProfileService[]
+  /// Entregas registradas senalando este formato. Solo se rellena en las
+  /// entregas: el formato contratado sigue viniendo de ProfileService.
+  entregas        CampaignEntrega[]
 
   @@unique([name, platformId])
 }
@@ -253,11 +256,11 @@ model ProfileService {
 // ============ CATEGORIAS ============
 
 model Category {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  slug        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
   description String?
-  isActive    Boolean @default(true)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   // Quien la creo
@@ -280,12 +283,12 @@ model ProfileCategory {
 // ============ CLIENTES ============
 
 model Client {
-  id             String   @id @default(cuid())
-  companyName    String // Nombre de la empresa (requerido)
-  nit            String? // NIT (opcional)
-  email          String   @unique // Email de la empresa (requerido)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  companyName String // Nombre de la empresa (requerido)
+  nit         String? // NIT (opcional)
+  email       String   @unique // Email de la empresa (requerido)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Quien lo creo
   createdBy   User   @relation(fields: [createdById], references: [id])
@@ -339,12 +342,12 @@ model ClientUser {
 /// cambiarlos obligaria a una migracion de datos sin ganar nada: lo que
 /// se lee en pantalla lo decide CAMPAIGN_STATUS_LABELS.
 enum CampaignStatus {
-  DRAFT      // "Abierta": se arma la campana. Unico estado editable.
-  REVIEW     // "Revisión": enviada al cliente, esperando su respuesta.
-  PENDING    // Sin uso. Quedan campanas guardadas asi de antes del cambio de etapas.
-  ACTIVE     // "En proceso": el cliente aprobo al menos uno; se registran entregas.
-  COMPLETED  // "Cerrada": entregado todo. Terminal.
-  CANCELLED  // "Cancelada". Terminal.
+  DRAFT // "Abierta": se arma la campana. Unico estado editable.
+  REVIEW // "Revisión": enviada al cliente, esperando su respuesta.
+  PENDING // Sin uso. Quedan campanas guardadas asi de antes del cambio de etapas.
+  ACTIVE // "En proceso": el cliente aprobo al menos uno; se registran entregas.
+  COMPLETED // "Cerrada": entregado todo. Terminal.
+  CANCELLED // "Cancelada". Terminal.
 }
 
 /// Si un influencer sigue contratado en la campana.
@@ -355,30 +358,30 @@ enum CampaignStatus {
 /// meterlas en la misma columna haria indistinguible al que se cayo del
 /// que el cliente rechazo antes de contratarlo.
 enum ParticipacionCampana {
-  ACTIVO    // Contratado: sus importes cuentan en el total
-  RETIRADO  // Fuera de la campana: no suma y libera presupuesto
+  ACTIVO // Contratado: sus importes cuentan en el total
+  RETIRADO // Fuera de la campana: no suma y libera presupuesto
 }
 
 /// Quien decidio el retiro. El cliente no ve este dato.
 enum OrigenRetiro {
   INFLUENCER // Se retiro por voluntad propia
-  CLIENTE    // Lo pidio el cliente
-  AGENCIA    // Decision interna
+  CLIENTE // Lo pidio el cliente
+  AGENCIA // Decision interna
 }
 
 enum CampaignProfileStatus {
-  PENDING   // Esperando revisión del cliente
-  APPROVED  // Aprobado por el cliente
-  REJECTED  // Rechazado por el cliente
+  PENDING // Esperando revisión del cliente
+  APPROVED // Aprobado por el cliente
+  REJECTED // Rechazado por el cliente
 }
 
 model Campaign {
-  id               String         @id @default(cuid())
-  name             String
-  description      String?
-  status           CampaignStatus @default(DRAFT)
-  budget           Decimal        @db.Decimal(12, 2)
-  currency         String         @default("COP")
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  status      CampaignStatus @default(DRAFT)
+  budget      Decimal        @db.Decimal(12, 2)
+  currency    String         @default("COP")
 
   /// Margen aplicado a los precios base de ESTA campana, congelado al
   /// crearla con el valor global vigente (MARKUP_PERCENTAGE).
@@ -392,19 +395,19 @@ model Campaign {
   /// Es Float y no Decimal a proposito: es una tasa, no un importe, y
   /// el calculo ya se hacia en coma flotante, asi que no anade
   /// imprecision y evita serializar un Decimal mas hacia el cliente.
-  markupPercentage Float          @default(0.4)
+  markupPercentage Float     @default(0.4)
   startDate        DateTime?
   endDate          DateTime?
-  activationReason String?        // Motivo opcional al activar la campaña
-  activatedAt      DateTime?      // Fecha de activación
+  activationReason String? // Motivo opcional al activar la campaña
+  activatedAt      DateTime? // Fecha de activación
 
   /// Por que se cancelo. Se exige al cancelar: es terminal y sin vuelta
   /// atras, y meses despues nadie recuerda si fue el cliente, el
   /// presupuesto o un cambio de plan.
   motivoCancelacion String?
   canceladaEn       DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relaciones con Cliente
   client          Client        @relation(fields: [clientId], references: [id])
@@ -464,8 +467,8 @@ model CampaignProfile {
 
   // Estado de aprobación del cliente
   status          CampaignProfileStatus @default(PENDING)
-  rejectionReason String?               // Motivo de rechazo (opcional)
-  reviewedAt      DateTime?             // Fecha de revisión del cliente
+  rejectionReason String? // Motivo de rechazo (opcional)
+  reviewedAt      DateTime? // Fecha de revisión del cliente
 
   // Relaciones
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
@@ -669,9 +672,9 @@ model CampaignBrief {
 /// un usuario arrastrase su propio rastro, que es justo lo contrario de
 /// lo que persigue una auditoria.
 enum AuditActor {
-  USER      // personal con sesion de NextAuth
-  CLIENT    // ClientUser en el portal
-  APPROVAL  // contacto verificado por codigo en /approve
+  USER // personal con sesion de NextAuth
+  CLIENT // ClientUser en el portal
+  APPROVAL // contacto verificado por codigo en /approve
   SYSTEM
 }
 
@@ -706,7 +709,6 @@ model AuditLog {
   @@index([actorEmail, createdAt])
 }
 
-
 /// Un link publicado por el influencer para un formato de la campana.
 ///
 /// El retraso NO se guarda: se calcula comparando `entregadoEn` con la
@@ -720,10 +722,10 @@ model CampaignEntrega {
   ///
   /// Vacio en los formatos efimeros, donde no hay enlace que pegar: ahi
   /// la entrega la sostienen `publicadoEn` y `registradoPor`.
-  url String?
+  url         String?
   /// Cuando se registro el link. Es lo que se compara con la fecha
   /// limite, porque el plazo pactado es para ENTREGAR los links.
-  entregadoEn DateTime @default(now())
+  entregadoEn DateTime  @default(now())
   /// Cuando se publico el contenido, si se sabe. Marca el arranque de la
   /// ventana de un mes en la que se refrescan las metricas.
   publicadoEn DateTime?
@@ -734,6 +736,23 @@ model CampaignEntrega {
 
   campaignService   CampaignService @relation(fields: [campaignServiceId], references: [id], onDelete: Cascade)
   campaignServiceId String
+
+  /// Que formato es esta pieza.
+  ///
+  /// El formato contratado (CampaignService) no siempre basta para
+  /// saberlo: un combo agrupa varios ("Reel + 3 Stories") y no tiene
+  /// ProfileService detras, asi que sin esto no habia forma de registrar
+  /// la Story de un combo —el servidor exigia URL a todo lo que no fuera
+  /// un formato efimero del tarifario, y una Story no tiene URL—.
+  ///
+  /// Se senala en todas las entregas, tambien en las de formato simple,
+  /// para que exista una sola forma de registrar contenido. Cuando esta
+  /// puesto MANDA sobre el contratado: describe lo que se publico de
+  /// verdad, y de el salen las reglas (si lleva enlace o fecha, si
+  /// admite vistas a mano). Nulo en las entregas anteriores a este
+  /// campo, que siguen leyendose del contrato.
+  serviceType   ServiceType? @relation(fields: [serviceTypeId], references: [id])
+  serviceTypeId String?
 
   /// Quien lo registro. Los influencers no tienen cuenta: los links los
   /// pega el personal de la agencia.
@@ -747,6 +766,7 @@ model CampaignEntrega {
   /// puede tener tantas confirmaciones como emisiones se contrataron.
   @@unique([campaignServiceId, url])
   @@index([campaignServiceId])
+  @@index([serviceTypeId])
 }
 
 /// Una foto de las metricas de un link en un instante.
@@ -767,8 +787,8 @@ model CampaignEntrega {
 /// puede distinguir un dato verificado de una palabra. Van juntos en la
 /// grafica, pero etiquetados aparte.
 enum OrigenMetrica {
-  MEDIDA     // Leida de la plataforma por Apify
-  REPORTADA  // La dijo el creador y alguien de la agencia la anoto
+  MEDIDA // Leida de la plataforma por Apify
+  REPORTADA // La dijo el creador y alguien de la agencia la anoto
 }
 
 model CampaignEntregaMetrica {
@@ -777,7 +797,7 @@ model CampaignEntregaMetrica {
 
   /// MEDIDA por defecto: todo lo que ya habia en la tabla lo escribio el
   /// refresco automatico, y ese es su origen.
-  origen      OrigenMetrica @default(MEDIDA)
+  origen OrigenMetrica @default(MEDIDA)
 
   /// Quien anoto la cifra, cuando es REPORTADA. Null en las medidas: ahi
   /// no hay persona detras, solo el scraper.

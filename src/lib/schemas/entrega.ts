@@ -18,6 +18,12 @@ export const registrarEntregaSchema = z.object({
   notas: z.string().max(500, "Máximo 500 caracteres").nullish(),
   /** Solo en formatos efímeros; la capa de datos lo rechaza en el resto. */
   vistasReportadas: z.coerce.number().int().min(0).nullish(),
+  /**
+   * Qué formato es la pieza. Obligatorio en la práctica para un combo,
+   * que agrupa varios y no permite deducirlo; opcional en el resto, donde
+   * el contratado ya lo dice.
+   */
+  serviceTypeId: z.string().min(1).nullish(),
 });
 
 /** Vistas que reporta el creador de una historia o un directo. */

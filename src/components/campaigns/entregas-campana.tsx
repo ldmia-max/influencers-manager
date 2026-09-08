@@ -57,6 +57,12 @@ export interface EntregaVista {
   id: string;
   /** Vacia en los formatos efímeros: ahí la prueba es la fecha. */
   url: string | null;
+  /**
+   * Qué se publicó de verdad. En un combo es lo único que lo dice, y de
+   * ello depende si la pieza lleva enlace o vistas escritas a mano.
+   * Nulo en las entregas registradas antes de que se señalara.
+   */
+  formato: { nombre: string; esEfimero: boolean } | null;
   entregadoEn: string;
   publicadoEn: string | null;
   notas: string | null;
@@ -81,13 +87,23 @@ export interface FormatoVista {
   /** Story, directo o mención en directo: no deja enlace que pegar. */
   esEfimero: boolean;
   nombre: string;
+  /** Con qué formato abre el selector. Nulo en los combos. */
+  formatoContratadoId: string | null;
   entregas: EntregaVista[];
+}
+
+export interface FormatoDisponible {
+  id: string;
+  displayName: string;
+  esEfimero: boolean;
 }
 
 export interface PlataformaVista {
   id: string;
   plataforma: string;
   username: string;
+  /** Catálogo de la red: lo que se puede señalar al registrar una pieza. */
+  formatosDisponibles: FormatoDisponible[];
   formatos: FormatoVista[];
 }
 
@@ -134,6 +150,8 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [nuevoLink, setNuevoLink] = useState<Record<string, string>>({});
   const [fechaEmision, setFechaEmision] = useState<Record<string, string>>({});
   const [vistasNuevas, setVistasNuevas] = useState<Record<string, string>>({});
+  // Formato señalado para la próxima pieza de cada bloque.
+  const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
   const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
   const [retirando, setRetirando] = useState<PerfilVista | null>(null);
   const [origen, setOrigen] = useState<string>("");
@@ -288,6 +306,20 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                         ahora
                       );
 
+                      // Formato señalado para la próxima pieza. En un
+                      // formato simple abre con el contratado; en un combo
+                      // no hay ninguno que suponer y hay que elegirlo.
+                      const tipoId =
+                        tipoElegido[formato.id] ??
+                        formato.formatoContratadoId ??
+                        "";
+                      const tipoNuevo = plataforma.formatosDisponibles.find(
+                        (f) => f.id === tipoId
+                      );
+                      // De lo señalado depende qué se pide: un enlace, o
+                      // la fecha de emisión y las vistas.
+                      const nuevaEsEfimera = tipoNuevo?.esEfimero ?? false;
+
                       return (
                         <div
                           key={formato.id}
@@ -349,11 +381,23 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
 
                           {formato.entregas.length > 0 && (
                             <ul className="mt-2 space-y-1">
-                              {formato.entregas.map((entrega) => (
+                              {formato.entregas.map((entrega) => {
+                                // Lo efímero se decide por PIEZA, no por el
+                                // formato contratado: un combo puede llevar
+                                // un Reel con enlace y una Story sin él.
+                                const piezaEfimera =
+                                  entrega.formato?.esEfimero ?? formato.esEfimero;
+
+                                return (
                                 <li
                                   key={entrega.id}
                                   className="flex items-center gap-2 text-xs"
                                 >
+                                  {entrega.formato && (
+                                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
+                                      {entrega.formato.nombre}
+                                    </span>
+                                  )}
                                   {entrega.url ? (
                                     <a
                                       href={entrega.url}
@@ -384,7 +428,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       efímeros: en el resto las lee Apify y
                                       escribirlas a mano crearía dos verdades
                                       para el mismo contenido. */}
-                                  {formato.esEfimero && (
+                                  {piezaEfimera && (
                                     <span className="flex shrink-0 items-center gap-1">
                                       <Eye className="h-3 w-3 text-gray-400" />
                                       {entrega.metricas[0]?.vistas != null ? (
@@ -454,126 +498,169 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     </button>
                                   )}
                                 </li>
-                              ))}
+                                );
+                              })}
                             </ul>
                           )}
 
-                          {puedeEditar &&
-                            (formato.esEfimero ? (
-                              // Stories y directos no dejan enlace: la
-                              // entrega se confirma con la fecha en que se
-                              // emitió, y queda registrado quién lo dice.
-                              <div className="mt-2">
-                                <p className="mb-1 text-[11px] text-gray-500">
-                                  Este formato no deja enlace. Confirma la fecha
-                                  en que se emitió y, si el creador te las pasa,
-                                  sus vistas. Puedes anotarlas o corregirlas
-                                  después.
-                                </p>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="date"
-                                    value={fechaEmision[formato.id] ?? ""}
-                                    onChange={(e) =>
-                                      setFechaEmision((v) => ({
-                                        ...v,
-                                        [formato.id]: e.target.value,
-                                      }))
-                                    }
-                                    className="h-8 text-xs"
-                                  />
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    placeholder="Vistas (opcional)"
-                                    value={vistasNuevas[formato.id] ?? ""}
-                                    onChange={(e) =>
-                                      setVistasNuevas((v) => ({
-                                        ...v,
-                                        [formato.id]: e.target.value,
-                                      }))
-                                    }
-                                    className="h-8 w-40 text-xs"
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 shrink-0"
-                                    disabled={
-                                      ocupado === formato.id ||
-                                      !(fechaEmision[formato.id] ?? "")
-                                    }
-                                    onClick={() =>
-                                      conError(formato.id, async () => {
-                                        const vistas = (
-                                          vistasNuevas[formato.id] ?? ""
-                                        ).trim();
-                                        await registrarEntrega(campaignId, {
-                                          campaignServiceId: formato.id,
-                                          publicadoEn: new Date(
-                                            fechaEmision[formato.id]
-                                          ).toISOString(),
-                                          vistasReportadas: vistas ? Number(vistas) : null,
-                                        });
-                                        setFechaEmision((v) => ({
-                                          ...v,
-                                          [formato.id]: "",
-                                        }));
-                                        setVistasNuevas((v) => ({
-                                          ...v,
-                                          [formato.id]: "",
-                                        }));
-                                      })
-                                    }
-                                  >
-                                    {ocupado === formato.id ? (
-                                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
-                                    )}
-                                    Confirmar emisión
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mt-2 flex gap-2">
-                                <Input
-                                  placeholder="https://… link de la publicación"
-                                  value={nuevoLink[formato.id] ?? ""}
-                                  onChange={(e) =>
-                                    setNuevoLink((v) => ({
-                                      ...v,
-                                      [formato.id]: e.target.value,
-                                    }))
-                                  }
-                                  className="h-8 text-xs"
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 shrink-0"
-                                  disabled={
-                                    ocupado === formato.id ||
-                                    !(nuevoLink[formato.id] ?? "").trim()
-                                  }
-                                  onClick={() =>
-                                    conError(formato.id, async () => {
-                                      await registrarEntrega(campaignId, {
-                                        campaignServiceId: formato.id,
-                                        url: nuevoLink[formato.id],
-                                      });
-                                      setNuevoLink((v) => ({ ...v, [formato.id]: "" }));
-                                    })
+                          {puedeEditar && (
+                            // Un solo formulario para todo: se señala qué
+                            // formato es la pieza y el campo se adapta.
+                            // Antes había dos caminos y el que le tocaba a
+                            // un combo solo sabía pedir enlaces, así que su
+                            // Story no había forma de registrarla.
+                            <div className="mt-2 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Select
+                                  value={tipoId}
+                                  onValueChange={(v) =>
+                                    setTipoElegido((t) => ({ ...t, [formato.id]: v }))
                                   }
                                 >
-                                  {ocupado === formato.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Plus className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
+                                  <SelectTrigger className="h-8 w-56 text-xs">
+                                    <SelectValue placeholder="¿Qué formato es?" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {plataforma.formatosDisponibles.map((f) => (
+                                      <SelectItem key={f.id} value={f.id}>
+                                        {f.displayName}
+                                        {f.esEfimero ? " · sin enlace" : ""}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                {!tipoNuevo ? (
+                                  <span className="text-[11px] text-gray-500">
+                                    Elige el formato para registrar la entrega.
+                                  </span>
+                                ) : nuevaEsEfimera ? (
+                                  // Stories y directos no dejan enlace: la
+                                  // entrega la sostienen la fecha de emisión
+                                  // y quien la confirma. Las vistas solo las
+                                  // ve el creador, así que se escriben.
+                                  <>
+                                    <Input
+                                      type="date"
+                                      value={fechaEmision[formato.id] ?? ""}
+                                      onChange={(e) =>
+                                        setFechaEmision((v) => ({
+                                          ...v,
+                                          [formato.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="h-8 w-40 text-xs"
+                                    />
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      placeholder="Vistas (opcional)"
+                                      value={vistasNuevas[formato.id] ?? ""}
+                                      onChange={(e) =>
+                                        setVistasNuevas((v) => ({
+                                          ...v,
+                                          [formato.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="h-8 w-36 text-xs"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 shrink-0"
+                                      disabled={
+                                        ocupado === formato.id ||
+                                        !(fechaEmision[formato.id] ?? "")
+                                      }
+                                      onClick={() =>
+                                        conError(formato.id, async () => {
+                                          const vistas = (
+                                            vistasNuevas[formato.id] ?? ""
+                                          ).trim();
+                                          await registrarEntrega(campaignId, {
+                                            campaignServiceId: formato.id,
+                                            serviceTypeId: tipoId,
+                                            publicadoEn: new Date(
+                                              fechaEmision[formato.id]
+                                            ).toISOString(),
+                                            vistasReportadas: vistas
+                                              ? Number(vistas)
+                                              : null,
+                                          });
+                                          setFechaEmision((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                          setVistasNuevas((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                        })
+                                      }
+                                    >
+                                      {ocupado === formato.id ? (
+                                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                                      )}
+                                      Confirmar emisión
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Input
+                                      placeholder="https://… link de la publicación"
+                                      value={nuevoLink[formato.id] ?? ""}
+                                      onChange={(e) =>
+                                        setNuevoLink((v) => ({
+                                          ...v,
+                                          [formato.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="h-8 min-w-56 flex-1 text-xs"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 shrink-0"
+                                      disabled={
+                                        ocupado === formato.id ||
+                                        !(nuevoLink[formato.id] ?? "").trim()
+                                      }
+                                      onClick={() =>
+                                        conError(formato.id, async () => {
+                                          await registrarEntrega(campaignId, {
+                                            campaignServiceId: formato.id,
+                                            serviceTypeId: tipoId,
+                                            url: nuevoLink[formato.id],
+                                          });
+                                          setNuevoLink((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                        })
+                                      }
+                                    >
+                                      {ocupado === formato.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Plus className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                  </>
+                                )}
                               </div>
-                            ))}
+
+                              {nuevaEsEfimera && (
+                                <p className="text-[11px] text-gray-500">
+                                  «{tipoNuevo?.displayName}» no deja enlace:
+                                  confirma la fecha en que se emitió y, si el
+                                  creador te las pasa, sus vistas. Puedes
+                                  anotarlas o corregirlas después.
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })

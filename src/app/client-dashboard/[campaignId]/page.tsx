@@ -175,7 +175,15 @@ async function Contenido({ params }: PageProps) {
                         <ul className="mt-1 space-y-1">
                           {cs.entregas.map((e) =>
                             e.url ? (
-                              <li key={e.id}>
+                              <li key={e.id} className="flex items-center gap-1">
+                                {/* Que pieza es. En un combo es lo unico que
+                                    lo dice: la cabecera solo lleva el texto
+                                    del acuerdo. */}
+                                {e.serviceType && (
+                                  <span className="text-xs text-gray-500">
+                                    {e.serviceType.displayName} ·
+                                  </span>
+                                )}
                                 <a
                                   href={e.url}
                                   target="_blank"
@@ -196,6 +204,11 @@ async function Contenido({ params }: PageProps) {
                                 className="inline-flex items-center gap-1 text-xs text-gray-600"
                               >
                                 <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                {e.serviceType && (
+                                  <span className="text-gray-500">
+                                    {e.serviceType.displayName} ·
+                                  </span>
+                                )}
                                 Emitido el{" "}
                                 {formatearFecha(e.publicadoEn ?? e.entregadoEn)}
                                 <span className="text-gray-400">

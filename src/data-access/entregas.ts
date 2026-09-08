@@ -105,6 +105,9 @@ export async function getEntregasDeCampana(campaignId: string) {
                       entregadoEn: true,
                       publicadoEn: true,
                       notas: true,
+                      serviceType: {
+                        select: { id: true, displayName: true, esEfimero: true },
+                      },
                       registradoPor: { select: { id: true, name: true } },
                       metricas: {
                         orderBy: { capturadoEn: "desc" },
@@ -142,8 +145,85 @@ export async function getEntregasDeCampana(campaignId: string) {
  * ninguna URL permanente. En esos la prueba es la confirmacion de quien
  * la registra, que queda guardada en `registradoPorId`.
  */
+/** Lo minimo que hace falta saber de un formato para registrar una pieza. */
+interface FormatoResuelto {
+  id: string | null;
+  displayName: string;
+  esEfimero: boolean;
+}
+
+/**
+ * Que formato describe una entrega.
+ *
+ * El formato contratado no siempre lo dice: un combo agrupa varios
+ * ("Reel + 3 Stories") por un precio cerrado y no tiene ProfileService
+ * detras, asi que antes toda pieza de un combo se trataba como contenido
+ * con enlace y la Story no habia manera de registrarla.
+ *
+ * Cuando se senala un formato, manda: describe lo que se publico de
+ * verdad. Si no se senala se cae al contratado, que en un formato simple
+ * es exacto —asi siguen valiendo las entregas registradas antes de que
+ * existiera este campo y las que entren por API sin indicarlo—.
+ *
+ * El formato senalado tiene que ser de la misma plataforma de la cuenta:
+ * un Reel de Instagram en una entrega de TikTok no describe nada, y sus
+ * metricas se irian a leer a la red equivocada.
+ */
+async function resolverFormato(
+  serviceTypeId: string | null | undefined,
+  servicio: {
+    esCombo: boolean;
+    profileService: {
+      serviceType: { esEfimero: boolean; displayName: string };
+    } | null;
+    campaignProfilePlatform: {
+      socialAccount: {
+        platformId: string;
+        platform: { displayName: string };
+      };
+    };
+  }
+): Promise<FormatoResuelto> {
+  if (serviceTypeId) {
+    const tipo = await prisma.serviceType.findUnique({
+      where: { id: serviceTypeId },
+      select: { id: true, displayName: true, esEfimero: true, platformId: true },
+    });
+    if (!tipo) throw new NotFoundError("Formato no encontrado");
+
+    const cuenta = servicio.campaignProfilePlatform.socialAccount;
+    if (tipo.platformId !== cuenta.platformId) {
+      throw new ValidationError(
+        `«${tipo.displayName}» no es un formato de ${cuenta.platform.displayName}.`
+      );
+    }
+
+    return { id: tipo.id, displayName: tipo.displayName, esEfimero: tipo.esEfimero };
+  }
+
+  if (servicio.esCombo) {
+    throw new ValidationError(
+      "Indica qué formato es esta entrega: un combo agrupa varios y no puede deducirse."
+    );
+  }
+
+  const contratado = servicio.profileService?.serviceType;
+  return {
+    id: null,
+    displayName: contratado?.displayName ?? "Formato",
+    esEfimero: contratado?.esEfimero ?? false,
+  };
+}
+
 export async function registrarEntrega(datos: {
   campaignServiceId: string;
+  /**
+   * Que formato es esta pieza. Se pide siempre desde la interfaz, para
+   * que registrar contenido sea el mismo gesto en un formato simple y
+   * en un combo. Solo es imprescindible en el combo: ahi no hay formato
+   * contratado del que deducirlo.
+   */
+  serviceTypeId?: string | null;
   url?: string | null;
   publicadoEn?: Date | null;
   notas?: string | null;
@@ -165,6 +245,12 @@ export async function registrarEntrega(datos: {
       },
       campaignProfilePlatform: {
         select: {
+          socialAccount: {
+            select: {
+              platformId: true,
+              platform: { select: { displayName: true } },
+            },
+          },
           campaignProfile: {
             select: {
               participacion: true,
@@ -178,8 +264,12 @@ export async function registrarEntrega(datos: {
 
   if (!servicio) throw new NotFoundError("Formato no encontrado");
 
-  // Un combo nunca es efimero: agrupa formatos con enlace.
-  const esEfimero = servicio.profileService?.serviceType.esEfimero ?? false;
+  // Que formato es esta pieza. Manda el senalado sobre el contratado:
+  // describe lo que se publico de verdad, y de el salen las reglas
+  // —si lleva enlace o fecha, si admite vistas a mano—. Un combo no
+  // tiene contratado que consultar, asi que ahi es obligatorio.
+  const formato = await resolverFormato(datos.serviceTypeId, servicio);
+  const esEfimero = formato.esEfimero;
 
   let url: string | null = null;
   if (esEfimero) {
@@ -187,7 +277,7 @@ export async function registrarEntrega(datos: {
     // cliente encontraria un enlace roto donde deberia haber una prueba.
     if (datos.url?.trim()) {
       throw new ValidationError(
-        `«${servicio.profileService?.serviceType.displayName}» no deja enlace permanente: confirma la emisión con su fecha, sin link.`
+        `«${formato.displayName}» no deja enlace permanente: confirma la emisión con su fecha, sin link.`
       );
     }
     if (!datos.publicadoEn) {
@@ -241,6 +331,7 @@ export async function registrarEntrega(datos: {
       url,
       publicadoEn: datos.publicadoEn ?? null,
       notas: datos.notas?.trim() || null,
+      serviceTypeId: formato.id,
       registradoPorId: datos.usuarioId,
     },
     select: { id: true, url: true, entregadoEn: true },
@@ -280,6 +371,7 @@ export async function registrarVistasReportadas(
     select: {
       id: true,
       url: true,
+      serviceType: { select: { esEfimero: true } },
       campaignService: {
         select: {
           esCombo: true,
@@ -292,9 +384,13 @@ export async function registrarVistasReportadas(
   });
   if (!entrega) throw new NotFoundError("Entrega no encontrada");
 
-  const esEfimero =
-    !entrega.campaignService.esCombo &&
-    (entrega.campaignService.profileService?.serviceType.esEfimero ?? false);
+  // El formato senalado al registrarla manda; si no lo hay, el
+  // contratado. Un combo sin formato senalado no dice que es, asi que no
+  // admite cifras a mano.
+  const esEfimero = entrega.serviceType
+    ? entrega.serviceType.esEfimero
+    : !entrega.campaignService.esCombo &&
+      (entrega.campaignService.profileService?.serviceType.esEfimero ?? false);
 
   // En un formato con enlace las cifras las lee Apify. Dejar escribirlas
   // a mano crearia dos verdades para el mismo contenido.
