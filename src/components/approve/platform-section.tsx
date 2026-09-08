@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { urlDelPerfil } from "@/lib/social-handles";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ServiceItem } from "./service-item";
@@ -37,14 +38,6 @@ interface PlatformSectionProps {
   onServiceToggle: (serviceId: string, isApproved: boolean) => void;
   onServiceNotesChange?: (serviceId: string, notes: string) => void;
   disabled?: boolean;
-}
-
-function getProfileUrl(platformName: string, username: string): string | null {
-  const name = platformName.toLowerCase();
-  if (name === "instagram") return `https://www.instagram.com/${username}`;
-  if (name === "tiktok") return `https://www.tiktok.com/@${username}`;
-  if (name === "youtube") return `https://www.youtube.com/@${username}`;
-  return null;
 }
 
 export function PlatformSection({
@@ -101,7 +94,7 @@ export function PlatformSection({
             </span>
           </div>
           {(() => {
-            const profileUrl = getProfileUrl(platformName, username);
+            const profileUrl = urlDelPerfil(platformName, username);
             return profileUrl ? (
               <a
                 href={profileUrl}

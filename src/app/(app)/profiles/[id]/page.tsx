@@ -5,11 +5,12 @@ import { formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { urlDelPerfil } from "@/lib/social-handles";
 import { Separator } from "@/components/ui/separator";
 import { DeleteProfileDialog } from "@/components/profiles/delete-profile-dialog";
 import { getCachedProfile } from "@/lib/cache";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Mail, Phone } from "lucide-react";
+import { ExternalLink, Mail, Phone } from "lucide-react";
 
 export default async function ProfileDetailPage({
   params,
@@ -106,7 +107,27 @@ export default async function ProfileDetailPage({
                   </AvatarFallback>
                 </Avatar>
                 <Badge>{account.platform.displayName}</Badge>
-                <span className="font-normal">@{account.username}</span>
+                {(() => {
+                  const url = urlDelPerfil(
+                    account.platform.name,
+                    account.username
+                  );
+                  // Sin URL construible se queda como texto: un enlace
+                  // roto es peor que ninguno.
+                  return url ? (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-normal text-violet-700 hover:underline"
+                    >
+                      @{account.username}
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ) : (
+                    <span className="font-normal">@{account.username}</span>
+                  );
+                })()}
               </div>
               {account.followers && (
                 <span className="text-sm font-normal text-gray-500">

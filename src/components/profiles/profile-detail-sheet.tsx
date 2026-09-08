@@ -15,7 +15,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatNumber, calculateReach, getReachPercentage } from "@/lib/format";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
-import { Mail, Phone, Pencil } from "lucide-react";
+import { ExternalLink, Mail, Phone, Pencil } from "lucide-react";
+import { urlDelPerfil } from "@/lib/social-handles";
 import Link from "next/link";
 
 export function ProfileDetailSheet() {
@@ -161,9 +162,29 @@ export function ProfileDetailSheet() {
                             <Badge variant="secondary">
                               {account.platform.displayName}
                             </Badge>
-                            <span className="font-normal text-sm">
-                              @{account.username}
-                            </span>
+                            {(() => {
+                              const url = urlDelPerfil(
+                                account.platform.name,
+                                account.username
+                              );
+                              // Sin URL construible se queda como texto:
+                              // un enlace roto es peor que ninguno.
+                              return url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-sm font-normal text-violet-700 hover:underline"
+                                >
+                                  @{account.username}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="font-normal text-sm">
+                                  @{account.username}
+                                </span>
+                              );
+                            })()}
                           </div>
                           {account.fullName && (
                             <p className="text-sm font-normal text-gray-600 mt-1">
