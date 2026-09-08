@@ -125,6 +125,20 @@ model ReachRange {
 
 // ============ PERFILES DE INFLUENCERS/UGC ============
 
+/// Documentos con los que se identifica a quien cobra en Colombia.
+/// Anadir uno nuevo es una migracion de una linea; se dejo como enum y
+/// no como tabla de catalogo porque no es algo que la agencia gestione,
+/// sino una lista que fija la ley.
+enum TipoDocumento {
+  CC
+  CE
+  TI
+  NIT
+  PASAPORTE
+  PEP
+  PPT
+}
+
 enum ProfileType {
   INFLUENCER
   UGC
@@ -132,10 +146,25 @@ enum ProfileType {
 }
 
 model Profile {
-  id        String      @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
+  id    String  @id @default(cuid())
+  /// Como se le conoce: el nombre artistico o el de la marca personal.
+  name  String
+  email String?
+  phone String?
+
+  /// --- Identidad para facturar ---
+  /// Quien firma y cobra. No siempre es la persona que aparece en
+  /// camara: puede ser su representante, su manager o la sociedad que
+  /// factura por el, y por eso va aparte de `name` en vez de sustituirlo.
+  /// Es dato personal, asi que NO sale de la agencia: ninguna consulta
+  /// del portal de aprobacion ni del portal del cliente lo selecciona.
+  nombreCompleto  String?
+  tipoDocumento   TipoDocumento?
+  /// Se guarda como texto, no como numero: un NIT lleva digito de
+  /// verificacion, un pasaporte lleva letras y un documento con ceros a
+  /// la izquierda los perderia al convertirse.
+  numeroDocumento String?
+
   type      ProfileType
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt

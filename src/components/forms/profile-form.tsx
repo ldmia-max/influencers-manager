@@ -1,5 +1,11 @@
 "use client";
 
+// Radix no admite un SelectItem con value vacío, así que "sin tipo"
+// viaja con un centinela y se traduce a null al guardar.
+const SIN_DOCUMENTO = "__sin_documento__";
+
+type TipoDocumento = (typeof TIPOS_DE_DOCUMENTO)[number];
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDepartments, useCities } from "@/hooks/queries/use-locations";
@@ -43,6 +49,10 @@ import {
 } from "@/components/ui/dialog";
 import type { ProfileType } from "@prisma/client";
 import type { Platform, ServiceType, Category, Gender, Country, Department, City } from "@/models/admin";
+import {
+  TIPOS_DE_DOCUMENTO,
+  ETIQUETA_TIPO_DOCUMENTO,
+} from "@/lib/schemas/profile";
 
 interface ProfileFormProps {
   /**
@@ -61,6 +71,9 @@ interface ProfileFormProps {
     name: string;
     email?: string | null;
     phone?: string | null;
+    nombreCompleto?: string | null;
+    tipoDocumento?: string | null;
+    numeroDocumento?: string | null;
     type: ProfileType;
     countryId?: string | null;
     departmentId?: string | null;
@@ -129,6 +142,17 @@ export function ProfileForm({
   const [name, setName] = useState(initialData?.name || prefill?.nombre || "");
   const [email, setEmail] = useState(initialData?.email || "");
   const [phone, setPhone] = useState(initialData?.phone || "");
+  // Identidad de quien firma y cobra. Es dato de la agencia: no viaja a
+  // ningún portal del cliente.
+  const [nombreCompleto, setNombreCompleto] = useState(
+    initialData?.nombreCompleto || ""
+  );
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento | "">(
+    (initialData?.tipoDocumento as TipoDocumento | undefined) || ""
+  );
+  const [numeroDocumento, setNumeroDocumento] = useState(
+    initialData?.numeroDocumento || ""
+  );
   const [type, setType] = useState<ProfileType>(initialData?.type || "INFLUENCER");
   const [countryId, setCountryId] = useState<string>(initialData?.countryId || "");
   const [departmentId, setDepartmentId] = useState<string>(initialData?.departmentId || "");
@@ -340,6 +364,9 @@ export function ProfileForm({
       name,
       email: email || null,
       phone: phone || null,
+      nombreCompleto: nombreCompleto.trim() || null,
+      tipoDocumento: tipoDocumento || null,
+      numeroDocumento: numeroDocumento.trim() || null,
       type,
       countryId: countryId || null,
       departmentId: departmentId || null,
@@ -420,6 +447,55 @@ export function ProfileForm({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Ej: +57 300 123 4567"
+              />
+            </div>
+          </div>
+
+          {/* Identidad para facturar. Va aparte del nombre del perfil
+              porque no siempre coinciden: el de arriba es el artístico y
+              este es el de quien firma, que puede ser su representante o
+              la sociedad que factura. */}
+          <div className="space-y-2">
+            <Label htmlFor="nombreCompleto">Nombre completo</Label>
+            <Input
+              id="nombreCompleto"
+              value={nombreCompleto}
+              onChange={(e) => setNombreCompleto(e.target.value)}
+              placeholder="Nombre real del influencer, representante o manager"
+            />
+            <p className="text-xs text-muted-foreground">
+              Uso interno: no se muestra al cliente.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="tipoDocumento">Tipo de documento</Label>
+              <Select
+                value={tipoDocumento || SIN_DOCUMENTO}
+                onValueChange={(v) =>
+                  setTipoDocumento(v === SIN_DOCUMENTO ? "" : (v as TipoDocumento))
+                }
+              >
+                <SelectTrigger id="tipoDocumento">
+                  <SelectValue placeholder="Selecciona…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_DOCUMENTO}>Sin especificar</SelectItem>
+                  {TIPOS_DE_DOCUMENTO.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {ETIQUETA_TIPO_DOCUMENTO[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="numeroDocumento">Número de documento</Label>
+              <Input
+                id="numeroDocumento"
+                value={numeroDocumento}
+                onChange={(e) => setNumeroDocumento(e.target.value)}
+                placeholder="Ej: 1.020.304.050"
               />
             </div>
           </div>

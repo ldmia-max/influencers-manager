@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cacheLife, cacheTag } from "next/cache";
 import { revalidateTag } from "next/cache";
-import type { Prisma, Profile, ProfileType } from "@prisma/client";
+import type { Prisma, Profile, ProfileType, TipoDocumento } from "@prisma/client";
 import { ValidationError, NotFoundError } from "./errors";
 import { normalizarUsuarioSocial } from "@/lib/social-handles";
 
@@ -416,6 +416,10 @@ export async function createProfile(data: {
   name: string;
   email?: string | null;
   phone?: string | null;
+  /** Identidad de quien factura. Ver el modelo: no sale de la agencia. */
+  nombreCompleto?: string | null;
+  tipoDocumento?: TipoDocumento | null;
+  numeroDocumento?: string | null;
   type: ProfileType;
   countryId?: string | null;
   departmentId?: string | null;
@@ -440,6 +444,9 @@ export async function createProfile(data: {
       name: data.name,
       email: data.email || null,
       phone: data.phone || null,
+      nombreCompleto: data.nombreCompleto || null,
+      tipoDocumento: data.tipoDocumento || null,
+      numeroDocumento: data.numeroDocumento || null,
       type: data.type,
       countryId: data.countryId || null,
       departmentId: data.departmentId || null,
@@ -478,6 +485,9 @@ export async function updateProfile(
     name: string;
     email?: string | null;
     phone?: string | null;
+    nombreCompleto?: string | null;
+    tipoDocumento?: TipoDocumento | null;
+    numeroDocumento?: string | null;
     type: ProfileType;
     countryId?: string | null;
     departmentId?: string | null;
@@ -508,6 +518,9 @@ export async function updateProfile(
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
+        nombreCompleto: data.nombreCompleto || null,
+        tipoDocumento: data.tipoDocumento || null,
+        numeroDocumento: data.numeroDocumento || null,
         type: data.type,
         countryId: data.countryId || null,
         departmentId: data.departmentId || null,

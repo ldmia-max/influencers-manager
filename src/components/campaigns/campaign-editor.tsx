@@ -132,7 +132,6 @@ export function CampaignEditor({
 
   // After hydration: restore unsaved in-progress changes from sessionStorage.
   // Empty deps is intentional — only run once after the first client render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!storageKey) return;
     try {
