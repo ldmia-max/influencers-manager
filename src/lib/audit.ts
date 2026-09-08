@@ -96,4 +96,8 @@ export const ACCIONES = {
   influencerAnadido: "campaign.influencer_added",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
+  /// Quitar un tanteo que el cliente nunca vio. Es el unico borrado real
+  /// de un influencer en una campana, asi que se registra aqui lo que
+  /// deja de existir en la tabla.
+  influencerDescartado: "campaign.influencer_discarded",
 } as const;

@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, UserPlus, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  Copy,
+  Loader2,
+  Send,
+  Trash2,
+  UserPlus,
+  Wallet,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +27,7 @@ import { useProfileFilters } from "@/hooks/use-profile-filters";
 import { useProfileConfigs } from "@/hooks/use-profile-configs";
 import { CampaignStepProfiles } from "./campaign-step-profiles";
 import { formatNumber } from "@/lib/format";
-import { apiPost, apiPatch } from "@/services/api";
+import { apiPost, apiPatch, apiDelete } from "@/services/api";
 import type { ProfileWithServices } from "@/models/campaign";
 
 export interface PendienteVista {
@@ -68,6 +76,11 @@ export function ReemplazarInfluencer({
   const [guardando, setGuardando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // El enlace recién generado, para poder copiarlo si el correo no salió.
+  const [enlace, setEnlace] = useState<{
+    url: string;
+    correoEnviado: boolean;
+  } | null>(null);
 
   const filters = useProfileFilters(profiles);
 
@@ -163,6 +176,51 @@ export function ReemplazarInfluencer({
     }
   };
 
+  /**
+   * Pide al cliente que apruebe lo pendiente.
+   *
+   * Es el mismo enlace de aprobación que se genera al enviar una campaña
+   * a revisión, aquí al alcance de la mano: cuando se acaba de añadir a
+   * alguien, este bloque es donde se está mirando, y bajar hasta el final
+   * de la ficha a buscarlo era el paso que se olvidaba.
+   */
+  const enviarAlCliente = async () => {
+    setOcupado("enlace");
+    setError(null);
+    setEnlace(null);
+    try {
+      const r = await apiPost<{
+        approvalUrl: string;
+        email?: { sent: boolean; reason?: string };
+      }>(`/api/campaigns/${campaignId}/regenerate-token`);
+      setEnlace({
+        url: r.approvalUrl,
+        correoEnviado: Boolean(r.email?.sent),
+      });
+      refrescar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el enlace");
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  /** Quita un tanteo que el cliente todavía no ha visto. */
+  const descartar = async (campaignProfileId: string) => {
+    setOcupado(campaignProfileId);
+    setError(null);
+    try {
+      await apiDelete(
+        `/api/campaigns/${campaignId}/influencers/${campaignProfileId}`
+      );
+      refrescar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo quitar");
+    } finally {
+      setOcupado(null);
+    }
+  };
+
   const aprobar = async (campaignProfileId: string) => {
     setOcupado(campaignProfileId);
     setError(null);
@@ -225,10 +283,53 @@ export function ReemplazarInfluencer({
           </p>
         ) : (
           <div className="space-y-2">
-            <p className="text-xs text-gray-500">
-              Esperando el visto bueno. Envíaselo al cliente con el enlace de
-              aprobación, o apruébalo tú si tienes esa decisión delegada.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-gray-500">
+                Esperando el visto bueno. Mándaselo al cliente, o apruébalo tú
+                si tienes esa decisión delegada.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={ocupado === "enlace"}
+                onClick={enviarAlCliente}
+              >
+                {ocupado === "enlace" ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                )}
+                Enviar al cliente para aprobación
+              </Button>
+            </div>
+
+            {enlace && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+                <p className="font-medium">
+                  {enlace.correoEnviado
+                    ? "Correo enviado al cliente con el enlace de aprobación."
+                    : "Enlace listo, pero el correo no salió: pásaselo tú."}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1 ring-1 ring-sky-200">
+                    {enlace.url}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0"
+                    onClick={() => navigator.clipboard?.writeText(enlace.url)}
+                  >
+                    <Copy className="mr-1 h-3 w-3" />
+                    Copiar
+                  </Button>
+                </div>
+                <p className="mt-2 text-sky-800">
+                  El cliente tendrá que verificar su correo con un código antes
+                  de decidir.
+                </p>
+              </div>
+            )}
             {pendientes.map((p) => (
               <div
                 key={p.campaignProfileId}
@@ -240,19 +341,33 @@ export function ReemplazarInfluencer({
                     Pendiente de aprobación
                   </Badge>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={ocupado === p.campaignProfileId}
-                  onClick={() => aprobar(p.campaignProfileId)}
-                >
-                  {ocupado === p.campaignProfileId ? (
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
-                  )}
-                  Aprobar sin el cliente
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={ocupado === p.campaignProfileId}
+                    onClick={() => aprobar(p.campaignProfileId)}
+                  >
+                    {ocupado === p.campaignProfileId ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    Aprobar sin el cliente
+                  </Button>
+                  {/* Sin motivo ni confirmación pesada: el cliente no lo
+                      ha visto, así que no hay acuerdo que deshacer. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-gray-500 hover:text-red-600"
+                    title="Quitar de la campaña"
+                    disabled={ocupado === p.campaignProfileId}
+                    onClick={() => descartar(p.campaignProfileId)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

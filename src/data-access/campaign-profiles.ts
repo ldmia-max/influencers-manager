@@ -395,6 +395,72 @@ export async function aprobarInfluencerDeCampana(campaignProfileId: string) {
   return { id: perfil.id, campana: perfil.campaign, influencer: perfil.profile };
 }
 
+/**
+ * Quita de la campana a un influencer que aun espera aprobacion.
+ *
+ * Aqui se BORRA de verdad, mientras que retirar a un contratado solo lo
+ * marca. La diferencia es que este no llego a serlo: se anadio como
+ * tentativa, el cliente no lo ha visto y no hay nada que conservar. Un
+ * retiro deja fila, motivo y fecha porque documenta un acuerdo que
+ * existio; esto solo ensuciaria la vista con alguien que nunca entro,
+ * y por eso tampoco se pide motivo.
+ *
+ * Las tres condiciones son lo que separa "descartar un tanteo" de
+ * "borrar historia comercial":
+ *
+ *  - PENDING. Si el cliente ya dijo algo —aprobado o rechazado—, su
+ *    respuesta es un hecho y se conserva.
+ *  - Sin entregas. Si ya hay contenido registrado, alguien publico algo
+ *    en nombre de esta campana y borrarlo se llevaria por delante sus
+ *    metricas por el efecto cascada.
+ *  - ACTIVO. Un retirado ya tiene su propio camino y su motivo escrito.
+ */
+export async function descartarInfluencerPendiente(campaignProfileId: string) {
+  const perfil = await prisma.campaignProfile.findUnique({
+    where: { id: campaignProfileId },
+    select: {
+      id: true,
+      status: true,
+      participacion: true,
+      campaign: { select: { id: true, name: true } },
+      profile: { select: { id: true, name: true } },
+      _count: { select: { platforms: true } },
+      platforms: { select: { _count: { select: { services: true } } } },
+    },
+  });
+  if (!perfil) throw new NotFoundError("Influencer no encontrado en la campaña");
+
+  if (perfil.status !== "PENDING") {
+    throw new ValidationError(
+      perfil.status === "APPROVED"
+        ? "Este influencer ya está aprobado: retíralo en vez de quitarlo, para que quede constancia."
+        : "El cliente ya se pronunció sobre este influencer: su respuesta no se borra."
+    );
+  }
+
+  if (perfil.participacion !== "ACTIVO") {
+    throw new ValidationError("Este influencer ya fue retirado de la campaña.");
+  }
+
+  const entregas = await prisma.campaignEntrega.count({
+    where: {
+      campaignService: {
+        campaignProfilePlatform: { campaignProfileId },
+      },
+    },
+  });
+  if (entregas > 0) {
+    throw new ValidationError(
+      "Ya hay contenido registrado a su nombre: retíralo en vez de quitarlo, para no perder esas entregas."
+    );
+  }
+
+  // El borrado arrastra plataformas y formatos por cascada.
+  await prisma.campaignProfile.delete({ where: { id: campaignProfileId } });
+
+  return { campana: perfil.campaign, influencer: perfil.profile };
+}
+
 /** Influencers de una campana que esperan decision del cliente. */
 export async function influencersPendientesDeAprobacion(campaignId: string) {
   return prisma.campaignProfile.findMany({

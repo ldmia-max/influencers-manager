@@ -39,6 +39,16 @@ export function eliminarEntrega(campaignId: string, entregaId: string) {
   );
 }
 
+/**
+ * Quita a un influencer que espera aprobación. Sin motivo: no llegó a
+ * estar contratado.
+ */
+export function descartarInfluencer(campaignId: string, campaignProfileId: string) {
+  return apiDelete<{ influencer: { id: string; name: string } }>(
+    `/api/campaigns/${campaignId}/influencers/${campaignProfileId}`
+  );
+}
+
 /** Anota las vistas que reportó el creador de una historia o directo. */
 export function registrarVistas(
   campaignId: string,

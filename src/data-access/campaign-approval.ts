@@ -384,7 +384,12 @@ export async function estadoDelToken(token: string) {
   if (!registro) throw new NotFoundError("Token no encontrado");
   if (registro.usedAt) throw new ValidationError("USED_TOKEN");
   if (registro.expiresAt < new Date()) throw new ValidationError("EXPIRED_TOKEN");
-  if (registro.campaign.status !== "REVIEW") {
+  // La misma lista que admite la aprobacion en si. Exigir REVIEW aqui
+  // dejaba fuera el caso para el que existe el enlace en una campana en
+  // marcha: el cliente recibia el correo del reemplazo, abria el enlace
+  // y se encontraba "la campana ya no esta disponible para revision",
+  // sin poder pedir siquiera su codigo.
+  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(registro.campaign.status)) {
     throw new ValidationError("INVALID_STATUS");
   }
 
@@ -421,7 +426,12 @@ export async function prepararCodigo(token: string, correo: string) {
   if (!registro) throw new NotFoundError("Token no encontrado");
   if (registro.usedAt) throw new ValidationError("USED_TOKEN");
   if (registro.expiresAt < new Date()) throw new ValidationError("EXPIRED_TOKEN");
-  if (registro.campaign.status !== "REVIEW") {
+  // La misma lista que admite la aprobacion en si. Exigir REVIEW aqui
+  // dejaba fuera el caso para el que existe el enlace en una campana en
+  // marcha: el cliente recibia el correo del reemplazo, abria el enlace
+  // y se encontraba "la campana ya no esta disponible para revision",
+  // sin poder pedir siquiera su codigo.
+  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(registro.campaign.status)) {
     throw new ValidationError("INVALID_STATUS");
   }
 
