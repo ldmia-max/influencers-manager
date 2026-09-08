@@ -22,6 +22,8 @@ import { apiPost } from "@/services/api";
 
 export interface CapturaMetrica {
   capturadoEn: string;
+  /** MEDIDA la leyó Apify; REPORTADA la dijo el creador. */
+  origen: string;
   vistas: number | null;
   meGusta: number | null;
   comentarios: number | null;
@@ -102,24 +104,39 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
     });
 
     // Reparto por influencer, para ver quien aporta que.
-    const porInfluencer = new Map<string, { nombre: string; vistas: number; interacciones: number }>();
+    const porInfluencer = new Map<
+      string,
+      { nombre: string; vistas: number; interacciones: number; reportadas: number }
+    >();
     for (const c of actuales) {
       const fila = porInfluencer.get(c.influencer) ?? {
         nombre: c.influencer,
         vistas: 0,
         interacciones: 0,
+        reportadas: 0,
       };
       fila.vistas += c.vistas ?? 0;
       fila.interacciones +=
         (c.meGusta ?? 0) + (c.comentarios ?? 0) + (c.compartidos ?? 0);
+      // El asterisco del nombre avisa de que parte de su cifra la dijo él.
+      if (c.origen === "REPORTADA") fila.reportadas++;
       porInfluencer.set(c.influencer, fila);
     }
+
+    // Cuantas publicaciones traen cifras que dijo el creador en vez de
+    // leerse de la plataforma. Van en el mismo total —son vistas reales—
+    // pero se dice cuantas son: sin eso el cliente no puede distinguir un
+    // dato verificado de una palabra.
+    const reportadas = actuales.filter((c) => c.origen === "REPORTADA").length;
 
     return {
       totales,
       evolucion,
-      porInfluencer: [...porInfluencer.values()].sort((a, b) => b.vistas - a.vistas),
+      porInfluencer: [...porInfluencer.values()]
+        .map((f) => ({ ...f, nombre: f.reportadas > 0 ? `${f.nombre} *` : f.nombre }))
+        .sort((a, b) => b.vistas - a.vistas),
       publicaciones: actuales.length,
+      reportadas,
       capturadoEn: actuales.length
         ? actuales.reduce((m, c) => (c.capturadoEn > m ? c.capturadoEn : m), "")
         : null,
@@ -211,6 +228,20 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                 ))}
             </div>
 
+            {datos.reportadas > 0 && (
+              <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+                <strong>
+                  {datos.reportadas === 1
+                    ? "1 publicación"
+                    : `${datos.reportadas} publicaciones`}
+                </strong>{" "}
+                {datos.reportadas === 1 ? "aporta" : "aportan"} cifras reportadas
+                por el creador, no leídas de la plataforma: son historias o
+                directos, cuyas vistas solo ve su autor. Cuentan en los totales,
+                pero no están verificadas.
+              </p>
+            )}
+
             {datos.totales.some((t) => !t.disponible) && (
               <p className="text-xs text-gray-400">
                 {datos.totales
@@ -252,6 +283,11 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
               <div>
                 <p className="mb-2 text-sm font-medium text-gray-700">
                   Aporte por influencer
+                  {datos.porInfluencer.some((f) => f.reportadas > 0) && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      (* incluye cifras reportadas por el creador)
+                    </span>
+                  )}
                 </p>
                 <ResponsiveContainer width="100%" height={Math.max(160, datos.porInfluencer.length * 46)}>
                   <BarChart data={datos.porInfluencer} layout="vertical">

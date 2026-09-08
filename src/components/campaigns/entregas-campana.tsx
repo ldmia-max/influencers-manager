@@ -9,11 +9,13 @@ import {
   Link2,
   Loader2,
   Plus,
+  Eye,
   Trash2,
   UserMinus,
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatNumber } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +43,7 @@ import {
 } from "@/lib/entregas";
 import {
   registrarEntrega,
+  registrarVistas,
   eliminarEntrega,
   fijarFechaLimite,
   cambiarParticipacion,
@@ -60,6 +63,7 @@ export interface EntregaVista {
   registradoPor: { id: string; name: string } | null;
   metricas: {
     capturadoEn: string;
+    origen: string;
     vistas: number | null;
     meGusta: number | null;
     comentarios: number | null;
@@ -129,6 +133,8 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [nuevoLink, setNuevoLink] = useState<Record<string, string>>({});
   const [fechaEmision, setFechaEmision] = useState<Record<string, string>>({});
+  const [vistasNuevas, setVistasNuevas] = useState<Record<string, string>>({});
+  const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
   const [retirando, setRetirando] = useState<PerfilVista | null>(null);
   const [origen, setOrigen] = useState<string>("");
   const [motivo, setMotivo] = useState("");
@@ -374,6 +380,62 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       </span>
                                     </span>
                                   )}
+                                  {/* Vistas que reportó el creador. Solo en los
+                                      efímeros: en el resto las lee Apify y
+                                      escribirlas a mano crearía dos verdades
+                                      para el mismo contenido. */}
+                                  {formato.esEfimero && (
+                                    <span className="flex shrink-0 items-center gap-1">
+                                      <Eye className="h-3 w-3 text-gray-400" />
+                                      {entrega.metricas[0]?.vistas != null ? (
+                                        <span className="font-medium text-gray-700">
+                                          {formatNumber(entrega.metricas[0].vistas)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">sin vistas</span>
+                                      )}
+                                      {puedeEditar && (
+                                        <>
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            placeholder="actualizar"
+                                            value={vistasEntrega[entrega.id] ?? ""}
+                                            onChange={(e) =>
+                                              setVistasEntrega((v) => ({
+                                                ...v,
+                                                [entrega.id]: e.target.value,
+                                              }))
+                                            }
+                                            className="h-6 w-24 text-xs"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="text-violet-700 hover:underline disabled:opacity-40"
+                                            disabled={
+                                              ocupado === `vistas-${entrega.id}` ||
+                                              !(vistasEntrega[entrega.id] ?? "").trim()
+                                            }
+                                            onClick={() =>
+                                              conError(`vistas-${entrega.id}`, async () => {
+                                                await registrarVistas(
+                                                  campaignId,
+                                                  entrega.id,
+                                                  Number(vistasEntrega[entrega.id])
+                                                );
+                                                setVistasEntrega((v) => ({
+                                                  ...v,
+                                                  [entrega.id]: "",
+                                                }));
+                                              })
+                                            }
+                                          >
+                                            Guardar
+                                          </button>
+                                        </>
+                                      )}
+                                    </span>
+                                  )}
                                   <span className="shrink-0 text-gray-400">
                                     {fechaCorta(entrega.entregadoEn)}
                                   </span>
@@ -404,7 +466,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                               <div className="mt-2">
                                 <p className="mb-1 text-[11px] text-gray-500">
                                   Este formato no deja enlace. Confirma la fecha
-                                  en que se emitió.
+                                  en que se emitió y, si el creador te las pasa,
+                                  sus vistas. Puedes anotarlas o corregirlas
+                                  después.
                                 </p>
                                 <div className="flex gap-2">
                                   <Input
@@ -418,6 +482,19 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     }
                                     className="h-8 text-xs"
                                   />
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Vistas (opcional)"
+                                    value={vistasNuevas[formato.id] ?? ""}
+                                    onChange={(e) =>
+                                      setVistasNuevas((v) => ({
+                                        ...v,
+                                        [formato.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-8 w-40 text-xs"
+                                  />
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -428,13 +505,21 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     }
                                     onClick={() =>
                                       conError(formato.id, async () => {
+                                        const vistas = (
+                                          vistasNuevas[formato.id] ?? ""
+                                        ).trim();
                                         await registrarEntrega(campaignId, {
                                           campaignServiceId: formato.id,
                                           publicadoEn: new Date(
                                             fechaEmision[formato.id]
                                           ).toISOString(),
+                                          vistasReportadas: vistas ? Number(vistas) : null,
                                         });
                                         setFechaEmision((v) => ({
+                                          ...v,
+                                          [formato.id]: "",
+                                        }));
+                                        setVistasNuevas((v) => ({
                                           ...v,
                                           [formato.id]: "",
                                         }));

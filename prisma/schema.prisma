@@ -48,6 +48,9 @@ model User {
 
   /// Links de campana que ha registrado esta persona.
   entregasRegistradas CampaignEntrega[]
+
+  /// Cifras de historias y directos que ha anotado esta persona.
+  metricasReportadas CampaignEntregaMetrica[]
 }
 
 // ============ GENEROS ============
@@ -757,9 +760,29 @@ model CampaignEntrega {
 /// mismo: los compartidos solo existen en TikTok, y guardados tampoco
 /// los dan Instagram ni YouTube. Null significa "la plataforma no lo
 /// publica", que no es lo mismo que cero.
+/// De donde salio una cifra.
+///
+/// Importa mas de lo que parece: si un numero que dijo el influencer se
+/// suma en el mismo total que uno leido de la plataforma, el cliente no
+/// puede distinguir un dato verificado de una palabra. Van juntos en la
+/// grafica, pero etiquetados aparte.
+enum OrigenMetrica {
+  MEDIDA     // Leida de la plataforma por Apify
+  REPORTADA  // La dijo el creador y alguien de la agencia la anoto
+}
+
 model CampaignEntregaMetrica {
   id          String   @id @default(cuid())
   capturadoEn DateTime @default(now())
+
+  /// MEDIDA por defecto: todo lo que ya habia en la tabla lo escribio el
+  /// refresco automatico, y ese es su origen.
+  origen      OrigenMetrica @default(MEDIDA)
+
+  /// Quien anoto la cifra, cuando es REPORTADA. Null en las medidas: ahi
+  /// no hay persona detras, solo el scraper.
+  reportadaPor   User?   @relation(fields: [reportadaPorId], references: [id])
+  reportadaPorId String?
 
   vistas      Int?
   meGusta     Int?

@@ -846,6 +846,7 @@ export async function getCampaignResultsForClient(
                         orderBy: { capturadoEn: "asc" },
                         select: {
                           capturadoEn: true,
+                          origen: true,
                           vistas: true,
                           meGusta: true,
                           comentarios: true,

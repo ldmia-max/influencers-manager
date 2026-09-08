@@ -6,6 +6,8 @@ export interface RegistrarEntregaPayload {
   url?: string | null;
   publicadoEn?: string | null;
   notas?: string | null;
+  /** Solo en formatos efímeros. */
+  vistasReportadas?: number | null;
 }
 
 export interface EntregaCreada {
@@ -32,6 +34,18 @@ export function actualizarEntrega(
 export function eliminarEntrega(campaignId: string, entregaId: string) {
   return apiDelete<{ eliminado: string }>(
     `/api/campaigns/${campaignId}/entregas/${entregaId}`
+  );
+}
+
+/** Anota las vistas que reportó el creador de una historia o directo. */
+export function registrarVistas(
+  campaignId: string,
+  entregaId: string,
+  vistas: number
+) {
+  return apiPost<{ id: string; vistas: number | null; capturadoEn: string }>(
+    `/api/campaigns/${campaignId}/entregas/${entregaId}/vistas`,
+    { vistas }
   );
 }
 

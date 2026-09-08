@@ -72,6 +72,7 @@ async function Contenido({ params }: PageProps) {
         cs.entregas.flatMap((e) =>
           e.metricas.map((m) => ({
             capturadoEn: m.capturadoEn.toISOString(),
+            origen: m.origen,
             vistas: m.vistas,
             meGusta: m.meGusta,
             comentarios: m.comentarios,

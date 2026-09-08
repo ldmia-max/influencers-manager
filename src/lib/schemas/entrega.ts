@@ -16,6 +16,16 @@ export const registrarEntregaSchema = z.object({
   url: z.string().nullish(),
   publicadoEn: z.coerce.date().nullish(),
   notas: z.string().max(500, "Máximo 500 caracteres").nullish(),
+  /** Solo en formatos efímeros; la capa de datos lo rechaza en el resto. */
+  vistasReportadas: z.coerce.number().int().min(0).nullish(),
+});
+
+/** Vistas que reporta el creador de una historia o un directo. */
+export const vistasReportadasSchema = z.object({
+  vistas: z.coerce
+    .number({ message: "Escribe un número" })
+    .int("Sin decimales")
+    .min(0, "No puede ser negativo"),
 });
 
 export const actualizarEntregaSchema = z

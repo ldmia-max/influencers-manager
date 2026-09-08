@@ -111,6 +111,7 @@ export async function getEntregasDeCampana(campaignId: string) {
                         take: 1,
                         select: {
                           capturadoEn: true,
+                          origen: true,
                           vistas: true,
                           meGusta: true,
                           comentarios: true,
@@ -146,6 +147,12 @@ export async function registrarEntrega(datos: {
   url?: string | null;
   publicadoEn?: Date | null;
   notas?: string | null;
+  /**
+   * Vistas que reporta el creador. Solo en formatos efimeros: en los
+   * demas las lee Apify, y aceptar un numero a mano abriria la puerta a
+   * que conviviera con el medido sin que nadie sepa cual manda.
+   */
+  vistasReportadas?: number | null;
   usuarioId: string;
 }) {
   const servicio = await prisma.campaignService.findUnique({
@@ -187,6 +194,11 @@ export async function registrarEntrega(datos: {
       throw new ValidationError("Indica la fecha en que se emitió");
     }
   } else {
+    if (datos.vistasReportadas != null) {
+      throw new ValidationError(
+        "Las vistas de este formato se leen de la plataforma, no se escriben a mano."
+      );
+    }
     if (!datos.url?.trim()) {
       throw new ValidationError("Pega el link de la publicación");
     }
@@ -223,7 +235,7 @@ export async function registrarEntrega(datos: {
     }
   }
 
-  return prisma.campaignEntrega.create({
+  const entrega = await prisma.campaignEntrega.create({
     data: {
       campaignServiceId: datos.campaignServiceId,
       url,
@@ -232,6 +244,74 @@ export async function registrarEntrega(datos: {
       registradoPorId: datos.usuarioId,
     },
     select: { id: true, url: true, entregadoEn: true },
+  });
+
+  if (datos.vistasReportadas != null) {
+    await registrarVistasReportadas(
+      entrega.id,
+      datos.vistasReportadas,
+      datos.usuarioId
+    );
+  }
+
+  return entrega;
+}
+
+/**
+ * Anota las vistas que reporto el creador de un contenido efimero.
+ *
+ * Crea una captura nueva en vez de corregir la anterior, igual que hace
+ * el refresco automatico. Una historia se mira durante horas, asi que la
+ * cifra del primer dia y la del tercero son datos distintos, no una
+ * correccion; guardar las dos permite dibujar la curva y deja claro
+ * quien dijo que y cuando.
+ */
+export async function registrarVistasReportadas(
+  entregaId: string,
+  vistas: number,
+  usuarioId: string
+) {
+  if (!Number.isFinite(vistas) || vistas < 0) {
+    throw new ValidationError("Las vistas deben ser un número igual o mayor que cero");
+  }
+
+  const entrega = await prisma.campaignEntrega.findUnique({
+    where: { id: entregaId },
+    select: {
+      id: true,
+      url: true,
+      campaignService: {
+        select: {
+          esCombo: true,
+          profileService: {
+            select: { serviceType: { select: { esEfimero: true, displayName: true } } },
+          },
+        },
+      },
+    },
+  });
+  if (!entrega) throw new NotFoundError("Entrega no encontrada");
+
+  const esEfimero =
+    !entrega.campaignService.esCombo &&
+    (entrega.campaignService.profileService?.serviceType.esEfimero ?? false);
+
+  // En un formato con enlace las cifras las lee Apify. Dejar escribirlas
+  // a mano crearia dos verdades para el mismo contenido.
+  if (!esEfimero) {
+    throw new ValidationError(
+      "Este formato tiene enlace: sus métricas se leen de la plataforma."
+    );
+  }
+
+  return prisma.campaignEntregaMetrica.create({
+    data: {
+      entregaId,
+      vistas: Math.round(vistas),
+      origen: "REPORTADA",
+      reportadaPorId: usuarioId,
+    },
+    select: { id: true, vistas: true, capturadoEn: true },
   });
 }
 

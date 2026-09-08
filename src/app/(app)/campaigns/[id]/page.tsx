@@ -131,6 +131,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     const cpp = m.entrega.campaignService.campaignProfilePlatform;
     return {
       capturadoEn: m.capturadoEn.toISOString(),
+      origen: m.origen,
       vistas: m.vistas,
       meGusta: m.meGusta,
       comentarios: m.comentarios,
