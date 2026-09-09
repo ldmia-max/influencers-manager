@@ -1,5 +1,6 @@
 import { ApifyClient } from "apify-client";
 import { put } from "@vercel/blob";
+import { idDePublicacion } from "./social-handles";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { directorioUploads, RUTA_PUBLICA_UPLOADS } from "./uploads";
@@ -678,6 +679,20 @@ const num = (v: unknown): number | null =>
  * borrado, una cuenta que se hizo privada— simplemente no aparecen, en
  * vez de guardarse como ceros que falsearian el historico.
  */
+/**
+ * Guarda la medicion bajo su URL Y bajo su identificador, para que quien
+ * la busque la encuentre venga como venga escrito el enlace.
+ */
+function indexar(
+  mapa: Map<string, MetricasPublicacion>,
+  url: string,
+  metricas: MetricasPublicacion
+) {
+  mapa.set(url, metricas);
+  const id = idDePublicacion(url);
+  if (id) mapa.set(id, metricas);
+}
+
 export async function obtenerMetricasDePublicaciones(
   plataforma: string,
   urls: string[]
@@ -698,7 +713,7 @@ export async function obtenerMetricasDePublicaciones(
         const it = bruto as Record<string, unknown>;
         const url = String(it.webVideoUrl || it.url || "");
         if (!url) continue;
-        mapa.set(url, {
+        indexar(mapa, url, {
           url,
           vistas: num(it.playCount),
           meGusta: num(it.diggCount),
@@ -722,7 +737,7 @@ export async function obtenerMetricasDePublicaciones(
         const it = bruto as Record<string, unknown>;
         const url = String(it.url || it.inputUrl || "");
         if (!url) continue;
-        mapa.set(url, {
+        indexar(mapa, url, {
           url,
           vistas: num(it.videoPlayCount) ?? num(it.videoViewCount),
           meGusta: num(it.likesCount),
@@ -747,7 +762,7 @@ export async function obtenerMetricasDePublicaciones(
         const it = bruto as Record<string, unknown>;
         const url = String(it.url || "");
         if (!url) continue;
-        mapa.set(url, {
+        indexar(mapa, url, {
           url,
           vistas: num(it.viewCount),
           meGusta: num(it.likes),

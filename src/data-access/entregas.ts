@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "./errors";
 import { unidadesEsperadas } from "@/lib/entregas";
+import { limpiarUrlPublicacion } from "@/lib/social-handles";
 import type { OrigenRetiro } from "@prisma/client";
 
 /**
@@ -55,7 +56,10 @@ function validarUrl(valor: string): string {
     );
   }
 
-  return url.toString();
+  // Se guarda el enlace de la publicacion, no el rastro de quien lo
+  // copio: al pegar desde Instagram viene con ?utm_source=...&stkn=...,
+  // y ese stkn es un token de la sesion de esa persona.
+  return limpiarUrlPublicacion(url.toString());
 }
 
 /** Lo que necesita la ficha de campana para pintar el bloque de entregas. */

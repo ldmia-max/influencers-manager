@@ -123,6 +123,97 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       porInfluencer.set(c.influencer, fila);
     }
 
+    // Detalle de cada influencer, abierto por plataforma. La misma
+    // persona suele entregar en dos redes y sus numeros no son
+    // comparables entre si —un Reel y un video de TikTok no se miden
+    // igual—, asi que se suman para saber quien aporta mas, pero se
+    // muestran separados para saber de donde sale ese aporte.
+    const detalle = new Map<
+      string,
+      {
+        nombre: string;
+        vistas: number;
+        interacciones: number;
+        publicaciones: number;
+        reportadas: number;
+        plataformas: Map<
+          string,
+          {
+            plataforma: string;
+            username: string;
+            vistas: number;
+            interacciones: number;
+            publicaciones: number;
+            reportadas: number;
+          }
+        >;
+      }
+    >();
+    // Y el total de cada red, sumando a todos los influencers.
+    const plataformas = new Map<
+      string,
+      {
+        plataforma: string;
+        vistas: number;
+        interacciones: number;
+        publicaciones: number;
+        reportadas: number;
+      }
+    >();
+
+    for (const c of actuales) {
+      const interacciones =
+        (c.meGusta ?? 0) + (c.comentarios ?? 0) + (c.compartidos ?? 0);
+      const esReportada = c.origen === "REPORTADA" ? 1 : 0;
+
+      const persona =
+        detalle.get(c.influencer) ??
+        {
+          nombre: c.influencer,
+          vistas: 0,
+          interacciones: 0,
+          publicaciones: 0,
+          reportadas: 0,
+          plataformas: new Map(),
+        };
+      persona.vistas += c.vistas ?? 0;
+      persona.interacciones += interacciones;
+      persona.publicaciones += 1;
+      persona.reportadas += esReportada;
+
+      const cuenta =
+        persona.plataformas.get(c.plataforma) ??
+        {
+          plataforma: c.plataforma,
+          username: c.username,
+          vistas: 0,
+          interacciones: 0,
+          publicaciones: 0,
+          reportadas: 0,
+        };
+      cuenta.vistas += c.vistas ?? 0;
+      cuenta.interacciones += interacciones;
+      cuenta.publicaciones += 1;
+      cuenta.reportadas += esReportada;
+      persona.plataformas.set(c.plataforma, cuenta);
+      detalle.set(c.influencer, persona);
+
+      const red =
+        plataformas.get(c.plataforma) ??
+        {
+          plataforma: c.plataforma,
+          vistas: 0,
+          interacciones: 0,
+          publicaciones: 0,
+          reportadas: 0,
+        };
+      red.vistas += c.vistas ?? 0;
+      red.interacciones += interacciones;
+      red.publicaciones += 1;
+      red.reportadas += esReportada;
+      plataformas.set(c.plataforma, red);
+    }
+
     // Cuantas publicaciones traen cifras que dijo el creador en vez de
     // leerse de la plataforma. Van en el mismo total —son vistas reales—
     // pero se dice cuantas son: sin eso el cliente no puede distinguir un
@@ -135,6 +226,15 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       porInfluencer: [...porInfluencer.values()]
         .map((f) => ({ ...f, nombre: f.reportadas > 0 ? `${f.nombre} *` : f.nombre }))
         .sort((a, b) => b.vistas - a.vistas),
+      // De mayor a menor aporte: la pregunta que se hace siempre ante
+      // esta seccion es quien rindio mas.
+      detalle: [...detalle.values()]
+        .map((d) => ({
+          ...d,
+          plataformas: [...d.plataformas.values()].sort((a, b) => b.vistas - a.vistas),
+        }))
+        .sort((a, b) => b.vistas - a.vistas),
+      plataformas: [...plataformas.values()].sort((a, b) => b.vistas - a.vistas),
       publicaciones: actuales.length,
       reportadas,
       capturadoEn: actuales.length
@@ -276,6 +376,132 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                       ))}
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Totales de cada red. Van antes del reparto por persona
+                porque responden a otra pregunta: no quien rindio mas,
+                sino donde rindio la campana. */}
+            {datos.plataformas.length > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-700">
+                  Total por plataforma
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {datos.plataformas.map((r) => (
+                    <div
+                      key={r.plataforma}
+                      className="rounded-lg border border-gray-200 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-800">
+                          {r.plataforma}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {r.publicaciones}{" "}
+                          {r.publicaciones === 1 ? "publicación" : "publicaciones"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex gap-4">
+                        <span className="flex items-center gap-1 text-sm">
+                          <Eye className="h-3.5 w-3.5 text-violet-600" />
+                          <span className="font-semibold text-gray-900">
+                            {formatNumber(r.vistas)}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1 text-sm">
+                          <Heart className="h-3.5 w-3.5 text-pink-600" />
+                          <span className="font-semibold text-gray-900">
+                            {formatNumber(r.interacciones)}
+                          </span>
+                        </span>
+                      </div>
+                      {r.reportadas > 0 && (
+                        <p className="mt-1 text-[11px] text-sky-800">
+                          {r.reportadas} con cifras reportadas por el creador
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Cada influencer, y de donde sale su aporte. La suma sirve
+                para ordenarlos; el desglose, para saber que red le
+                funciono, que es lo que decide la proxima campana. */}
+            {datos.detalle.length > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-700">
+                  Resultado por influencer
+                </p>
+                <div className="space-y-2">
+                  {datos.detalle.map((persona, i) => (
+                    <div
+                      key={persona.nombre}
+                      className="rounded-lg border border-gray-200 p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600">
+                            {i + 1}
+                          </span>
+                          <span className="font-medium text-gray-900">
+                            {persona.nombre}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {persona.publicaciones}{" "}
+                            {persona.publicaciones === 1
+                              ? "publicación"
+                              : "publicaciones"}
+                          </span>
+                        </span>
+                        <span className="flex gap-4 text-sm">
+                          <span className="flex items-center gap-1">
+                            <Eye className="h-3.5 w-3.5 text-violet-600" />
+                            <span className="font-semibold text-gray-900">
+                              {formatNumber(persona.vistas)}
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Heart className="h-3.5 w-3.5 text-pink-600" />
+                            <span className="font-semibold text-gray-900">
+                              {formatNumber(persona.interacciones)}
+                            </span>
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="mt-2 space-y-1 border-t border-dashed border-gray-200 pt-2">
+                        {persona.plataformas.map((cuenta) => (
+                          <div
+                            key={cuenta.plataforma}
+                            className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                          >
+                            <span className="text-gray-600">
+                              {cuenta.plataforma}
+                              <span className="ml-1 text-gray-400">
+                                @{cuenta.username}
+                              </span>
+                              {cuenta.reportadas > 0 && (
+                                <span className="ml-1 text-sky-700">
+                                  · {cuenta.reportadas} reportada
+                                  {cuenta.reportadas === 1 ? "" : "s"}
+                                </span>
+                              )}
+                            </span>
+                            <span className="flex gap-4 text-gray-700">
+                              <span>{formatNumber(cuenta.vistas)} vistas</span>
+                              <span>
+                                {formatNumber(cuenta.interacciones)} interacciones
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

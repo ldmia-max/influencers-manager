@@ -93,3 +93,85 @@ export function urlDelPerfil(plataforma: string, usuario: string): string | null
   }
   return null;
 }
+
+/**
+ * Identificador de una publicacion a partir de su enlace.
+ *
+ * Existe porque emparejar por la URL entera no funciona. Al copiar un
+ * enlace desde Instagram se pega con la cola de la sesion de quien lo
+ * copio —?utm_source=ig_web_copy_link&stkn=...— y el actor devuelve la
+ * forma canonica, sin parametros y a veces con /p/ donde el enlace decia
+ * /reel/. Comparando cadenas no coincidian, la metrica se descartaba en
+ * silencio y esa publicacion no volvia a aparecer en las graficas: ni
+ * error, ni aviso, ni forma de notarlo salvo echar en falta a alguien.
+ *
+ * El identificador si es estable: el shortcode de Instagram, el id del
+ * video en TikTok, el del video en YouTube. Devuelve null cuando no lo
+ * reconoce, y entonces se compara por URL como antes.
+ */
+export function idDePublicacion(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const partes = u.pathname.split("/").filter(Boolean);
+
+  if (host === "instagram.com") {
+    // /p/CODE, /reel/CODE, /reels/CODE, /tv/CODE
+    const i = partes.findIndex((x) => ["p", "reel", "reels", "tv"].includes(x.toLowerCase()));
+    return i >= 0 && partes[i + 1] ? `instagram:${partes[i + 1]}` : null;
+  }
+
+  if (host === "tiktok.com" || host === "vm.tiktok.com") {
+    // /@usuario/video/ID  ·  /video/ID
+    const i = partes.findIndex((x) => x.toLowerCase() === "video");
+    if (i >= 0 && partes[i + 1]) return `tiktok:${partes[i + 1]}`;
+    // Los enlaces cortos vm.tiktok.com/XXXX no llevan el id a la vista.
+    return null;
+  }
+
+  if (host === "youtube.com") {
+    const v = u.searchParams.get("v");
+    if (v) return `youtube:${v}`;
+    const i = partes.findIndex((x) => ["shorts", "live", "embed"].includes(x.toLowerCase()));
+    return i >= 0 && partes[i + 1] ? `youtube:${partes[i + 1]}` : null;
+  }
+
+  if (host === "youtu.be") {
+    return partes[0] ? `youtube:${partes[0]}` : null;
+  }
+
+  return null;
+}
+
+/**
+ * El enlace sin la cola que anaden las apps al copiar.
+ *
+ * Se guarda asi para que lo almacenado sea la publicacion y no el rastro
+ * de quien copio el enlace: `stkn` es un token de la sesion de Instagram
+ * de esa persona y no pinta nada en la base de datos.
+ *
+ * En YouTube el parametro `v` SI identifica el video, asi que ahi se
+ * conserva y se descarta el resto.
+ */
+export function limpiarUrlPublicacion(url: string): string {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return url;
+  }
+
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const v = host === "youtube.com" ? u.searchParams.get("v") : null;
+
+  u.search = "";
+  u.hash = "";
+  if (v) u.searchParams.set("v", v);
+
+  return u.toString();
+}

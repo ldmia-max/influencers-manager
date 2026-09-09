@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import {
-  obtenerMetricasDePublicaciones,
-  plataformaDeUrl,
-} from "@/lib/apify";
+import { obtenerMetricasDePublicaciones, plataformaDeUrl } from "@/lib/apify";
+import { idDePublicacion } from "@/lib/social-handles";
 
 /**
  * Refresco de las metricas de los contenidos entregados.
@@ -97,7 +95,11 @@ export async function refrescarMetricas(
 
     const filas = lista
       .map((entrega) => {
-        const m = metricas.get(entrega.url);
+        // Primero por identificador de publicacion, que sobrevive a los
+        // parametros que anaden las apps al copiar el enlace; la URL
+        // exacta queda como respaldo.
+        const id = idDePublicacion(entrega.url);
+        const m = (id ? metricas.get(id) : undefined) ?? metricas.get(entrega.url);
         if (!m) return null;
         return {
           entregaId: entrega.id,
