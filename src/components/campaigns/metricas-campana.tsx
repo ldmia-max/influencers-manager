@@ -49,6 +49,35 @@ const SERIES = [
   { clave: "compartidos" as const, nombre: "Compartidos", color: "#22c55e", icono: Share2 },
 ];
 
+/**
+ * Una cifra agregada, o una raya cuando ninguna de las publicaciones que
+ * la componen la publica.
+ *
+ * `cuantasLaDan` es el numero de publicaciones del grupo que traen ese
+ * dato. Si es cero no se ha medido un cero: es que esa red no lo da para
+ * ese tipo de contenido —un carrusel de Instagram no tiene vistas—, y
+ * escribir 0 seria afirmar que nadie lo vio. La misma regla que ya usan
+ * las tarjetas de arriba con `disponible`.
+ */
+function Cifra({
+  valor,
+  cuantasLaDan,
+  titulo,
+}: {
+  valor: number;
+  cuantasLaDan: number;
+  titulo: string;
+}) {
+  if (cuantasLaDan === 0) {
+    return (
+      <span className="text-gray-400" title={titulo}>
+        —
+      </span>
+    );
+  }
+  return <>{formatNumber(valor)}</>;
+}
+
 function dia(iso: string): string {
   return iso.slice(0, 10);
 }
@@ -136,6 +165,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         interacciones: number;
         publicaciones: number;
         reportadas: number;
+        conVistas: number;
+        conInteracciones: number;
         plataformas: Map<
           string,
           {
@@ -145,6 +176,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
             interacciones: number;
             publicaciones: number;
             reportadas: number;
+            conVistas: number;
+            conInteracciones: number;
           }
         >;
       }
@@ -158,6 +191,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         interacciones: number;
         publicaciones: number;
         reportadas: number;
+        conVistas: number;
+        conInteracciones: number;
       }
     >();
 
@@ -165,6 +200,13 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       const interacciones =
         (c.meGusta ?? 0) + (c.comentarios ?? 0) + (c.compartidos ?? 0);
       const esReportada = c.origen === "REPORTADA" ? 1 : 0;
+      // Cuantas publicaciones aportan cada cifra. Sin esto no se puede
+      // distinguir "no tuvo vistas" de "esta red no las publica": un
+      // carrusel de Instagram no da numero de vistas, y pintar un 0 seria
+      // decir que nadie lo vio.
+      const daVistas = c.vistas !== null ? 1 : 0;
+      const daInteracciones =
+        c.meGusta !== null || c.comentarios !== null || c.compartidos !== null ? 1 : 0;
 
       const persona =
         detalle.get(c.influencer) ??
@@ -174,12 +216,16 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           interacciones: 0,
           publicaciones: 0,
           reportadas: 0,
+          conVistas: 0,
+          conInteracciones: 0,
           plataformas: new Map(),
         };
       persona.vistas += c.vistas ?? 0;
       persona.interacciones += interacciones;
       persona.publicaciones += 1;
       persona.reportadas += esReportada;
+      persona.conVistas += daVistas;
+      persona.conInteracciones += daInteracciones;
 
       const cuenta =
         persona.plataformas.get(c.plataforma) ??
@@ -190,11 +236,15 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           interacciones: 0,
           publicaciones: 0,
           reportadas: 0,
+          conVistas: 0,
+          conInteracciones: 0,
         };
       cuenta.vistas += c.vistas ?? 0;
       cuenta.interacciones += interacciones;
       cuenta.publicaciones += 1;
       cuenta.reportadas += esReportada;
+      cuenta.conVistas += daVistas;
+      cuenta.conInteracciones += daInteracciones;
       persona.plataformas.set(c.plataforma, cuenta);
       detalle.set(c.influencer, persona);
 
@@ -206,11 +256,15 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           interacciones: 0,
           publicaciones: 0,
           reportadas: 0,
+          conVistas: 0,
+          conInteracciones: 0,
         };
       red.vistas += c.vistas ?? 0;
       red.interacciones += interacciones;
       red.publicaciones += 1;
       red.reportadas += esReportada;
+      red.conVistas += daVistas;
+      red.conInteracciones += daInteracciones;
       plataformas.set(c.plataforma, red);
     }
 
@@ -406,13 +460,21 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                         <span className="flex items-center gap-1 text-sm">
                           <Eye className="h-3.5 w-3.5 text-violet-600" />
                           <span className="font-semibold text-gray-900">
-                            {formatNumber(r.vistas)}
+                            <Cifra
+                              valor={r.vistas}
+                              cuantasLaDan={r.conVistas}
+                              titulo="Esta red no publica el número de vistas para este tipo de contenido"
+                            />
                           </span>
                         </span>
                         <span className="flex items-center gap-1 text-sm">
                           <Heart className="h-3.5 w-3.5 text-pink-600" />
                           <span className="font-semibold text-gray-900">
-                            {formatNumber(r.interacciones)}
+                            <Cifra
+                              valor={r.interacciones}
+                              cuantasLaDan={r.conInteracciones}
+                              titulo="Ninguna de estas publicaciones expone interacciones"
+                            />
                           </span>
                         </span>
                       </div>
@@ -460,13 +522,21 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                           <span className="flex items-center gap-1">
                             <Eye className="h-3.5 w-3.5 text-violet-600" />
                             <span className="font-semibold text-gray-900">
-                              {formatNumber(persona.vistas)}
+                              <Cifra
+                                valor={persona.vistas}
+                                cuantasLaDan={persona.conVistas}
+                                titulo="Esta red no publica el número de vistas para este tipo de contenido"
+                              />
                             </span>
                           </span>
                           <span className="flex items-center gap-1">
                             <Heart className="h-3.5 w-3.5 text-pink-600" />
                             <span className="font-semibold text-gray-900">
-                              {formatNumber(persona.interacciones)}
+                              <Cifra
+                                valor={persona.interacciones}
+                                cuantasLaDan={persona.conInteracciones}
+                                titulo="Ninguna de estas publicaciones expone interacciones"
+                              />
                             </span>
                           </span>
                         </span>
@@ -491,9 +561,21 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                               )}
                             </span>
                             <span className="flex gap-4 text-gray-700">
-                              <span>{formatNumber(cuenta.vistas)} vistas</span>
                               <span>
-                                {formatNumber(cuenta.interacciones)} interacciones
+                                <Cifra
+                                  valor={cuenta.vistas}
+                                  cuantasLaDan={cuenta.conVistas}
+                                  titulo="Esta red no publica el número de vistas para este tipo de contenido"
+                                />{" "}
+                                vistas
+                              </span>
+                              <span>
+                                <Cifra
+                                  valor={cuenta.interacciones}
+                                  cuantasLaDan={cuenta.conInteracciones}
+                                  titulo="Ninguna de estas publicaciones expone interacciones"
+                                />{" "}
+                                interacciones
                               </span>
                             </span>
                           </div>
