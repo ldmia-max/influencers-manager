@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
@@ -144,7 +144,6 @@ function fechaCorta(iso: string): string {
 
 export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nuevoLink, setNuevoLink] = useState<Record<string, string>>({});
@@ -162,7 +161,45 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   // milisegundos de diferencia entre llamadas.
   const ahora = new Date();
 
-  const refrescar = () => startTransition(() => router.refresh());
+  /**
+   * Lo que se acaba de hacer, encima de lo que dice el servidor.
+   *
+   * La pantalla NO puede depender de router.refresh() para mostrarlo. Se
+   * comprobo en el navegador contra el build de produccion: al registrar
+   * un enlace la peticion se guarda (201), el refresco se pide, el
+   * servidor devuelve el arbol nuevo con el enlace dentro... y React no
+   * lo aplica. La lista y el contador seguian igual hasta recargar con
+   * F5. En desarrollo si se aplica, que es por lo que no se habia visto.
+   *
+   * Asi que lo registrado se pinta desde aqui, al instante y sin esperar
+   * al servidor. Es una capa que se disuelve sola: en cuanto el servidor
+   * manda la entrega en sus props, la copia local se descarta por id, asi
+   * que no puede quedar un duplicado ni una linea fantasma.
+   */
+  const [anadidas, setAnadidas] = useState<Record<string, EntregaVista[]>>({});
+  const [quitadas, setQuitadas] = useState<string[]>([]);
+  /** Vistas recien anotadas, mientras el servidor no las devuelva. */
+  const [vistasAnotadas, setVistasAnotadas] = useState<Record<string, number>>({});
+
+  /** Mete una entrega recien creada en la lista, sin esperar al servidor. */
+  const pintarYa = (formatoId: string, entrega: EntregaVista) =>
+    setAnadidas((a) => ({ ...a, [formatoId]: [...(a[formatoId] ?? []), entrega] }));
+
+  /** Las entregas de un formato: las del servidor mas lo recien hecho. */
+  const entregasDe = (formato: FormatoVista): EntregaVista[] => {
+    const idsDelServidor = new Set(formato.entregas.map((e) => e.id));
+    return [
+      ...formato.entregas,
+      ...(anadidas[formato.id] ?? []).filter((e) => !idsDelServidor.has(e.id)),
+    ].filter((e) => !quitadas.includes(e.id));
+  };
+
+  /**
+   * Se sigue pidiendo al servidor: cuando el refresco si llega, trae lo
+   * que la copia local no sabe —quien registro la entrega, las metricas
+   * medidas— y ademas es lo que deja la pagina correcta al navegar.
+   */
+  const refrescar = () => router.refresh();
 
   const conError = async (clave: string, accion: () => Promise<unknown>) => {
     setOcupado(clave);
@@ -180,7 +217,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const todosLosFormatos = perfiles
     .filter((p) => p.participacion === "ACTIVO")
     .flatMap((p) => p.plataformas.flatMap((pl) => pl.formatos))
-    .map((f) => ({ ...f, entregas: f.entregas.map((e) => ({ entregadoEn: e.entregadoEn })) }));
+    .map((f) => ({
+      ...f,
+      entregas: entregasDe(f).map((e) => ({ entregadoEn: e.entregadoEn })),
+    }));
   const resumen = resumirEntregas(todosLosFormatos, ahora);
 
   return (
@@ -299,7 +339,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                           quantity: formato.quantity,
                           esCombo: formato.esCombo,
                           fechaLimite: formato.fechaLimite,
-                          entregas: formato.entregas.map((e) => ({
+                          entregas: entregasDe(formato).map((e) => ({
                             entregadoEn: e.entregadoEn,
                           })),
                         },
@@ -379,9 +419,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                             </p>
                           )}
 
-                          {formato.entregas.length > 0 && (
+                          {entregasDe(formato).length > 0 && (
                             <ul className="mt-2 space-y-1">
-                              {formato.entregas.map((entrega) => {
+                              {entregasDe(formato).map((entrega) => {
                                 // Lo efímero se decide por PIEZA, no por el
                                 // formato contratado: un combo puede llevar
                                 // un Reel con enlace y una Story sin él.
@@ -431,9 +471,13 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   {piezaEfimera && (
                                     <span className="flex shrink-0 items-center gap-1">
                                       <Eye className="h-3 w-3 text-gray-400" />
-                                      {entrega.metricas[0]?.vistas != null ? (
+                                      {(vistasAnotadas[entrega.id] ??
+                                        entrega.metricas[0]?.vistas) != null ? (
                                         <span className="font-medium text-gray-700">
-                                          {formatNumber(entrega.metricas[0].vistas)}
+                                          {formatNumber(
+                                            vistasAnotadas[entrega.id] ??
+                                              entrega.metricas[0]!.vistas!
+                                          )}
                                         </span>
                                       ) : (
                                         <span className="text-gray-400">sin vistas</span>
@@ -462,11 +506,18 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             }
                                             onClick={() =>
                                               conError(`vistas-${entrega.id}`, async () => {
+                                                const cifra = Number(
+                                                  vistasEntrega[entrega.id]
+                                                );
                                                 await registrarVistas(
                                                   campaignId,
                                                   entrega.id,
-                                                  Number(vistasEntrega[entrega.id])
+                                                  cifra
                                                 );
+                                                setVistasAnotadas((v) => ({
+                                                  ...v,
+                                                  [entrega.id]: cifra,
+                                                }));
                                                 setVistasEntrega((v) => ({
                                                   ...v,
                                                   [entrega.id]: "",
@@ -489,9 +540,15 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       className="shrink-0 text-gray-400 hover:text-red-600"
                                       disabled={ocupado === entrega.id}
                                       onClick={() =>
-                                        conError(entrega.id, () =>
-                                          eliminarEntrega(campaignId, entrega.id)
-                                        )
+                                        conError(entrega.id, async () => {
+                                          await eliminarEntrega(
+                                            campaignId,
+                                            entrega.id
+                                          );
+                                          // Desaparece de la lista ya, sin
+                                          // esperar al servidor.
+                                          setQuitadas((q) => [...q, entrega.id]);
+                                        })
                                       }
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -577,15 +634,44 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           const vistas = (
                                             vistasNuevas[formato.id] ?? ""
                                           ).trim();
-                                          await registrarEntrega(campaignId, {
-                                            campaignServiceId: formato.id,
-                                            serviceTypeId: tipoId,
-                                            publicadoEn: new Date(
-                                              fechaEmision[formato.id]
-                                            ).toISOString(),
-                                            vistasReportadas: vistas
-                                              ? Number(vistas)
-                                              : null,
+                                          const publicadoEn = new Date(
+                                            fechaEmision[formato.id]
+                                          ).toISOString();
+                                          const creada = await registrarEntrega(
+                                            campaignId,
+                                            {
+                                              campaignServiceId: formato.id,
+                                              serviceTypeId: tipoId,
+                                              publicadoEn,
+                                              vistasReportadas: vistas
+                                                ? Number(vistas)
+                                                : null,
+                                            }
+                                          );
+                                          pintarYa(formato.id, {
+                                            id: creada.id,
+                                            url: null,
+                                            formato: {
+                                              nombre: tipoNuevo.displayName,
+                                              esEfimero: true,
+                                            },
+                                            entregadoEn: creada.entregadoEn,
+                                            publicadoEn,
+                                            notas: null,
+                                            registradoPor: null,
+                                            metricas: vistas
+                                              ? [
+                                                  {
+                                                    capturadoEn: creada.entregadoEn,
+                                                    origen: "REPORTADA",
+                                                    vistas: Number(vistas),
+                                                    meGusta: null,
+                                                    comentarios: null,
+                                                    compartidos: null,
+                                                    guardados: null,
+                                                  },
+                                                ]
+                                              : [],
                                           });
                                           setFechaEmision((v) => ({
                                             ...v,
@@ -629,10 +715,26 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       }
                                       onClick={() =>
                                         conError(formato.id, async () => {
-                                          await registrarEntrega(campaignId, {
-                                            campaignServiceId: formato.id,
-                                            serviceTypeId: tipoId,
-                                            url: nuevoLink[formato.id],
+                                          const creada = await registrarEntrega(
+                                            campaignId,
+                                            {
+                                              campaignServiceId: formato.id,
+                                              serviceTypeId: tipoId,
+                                              url: nuevoLink[formato.id],
+                                            }
+                                          );
+                                          pintarYa(formato.id, {
+                                            id: creada.id,
+                                            url: creada.url,
+                                            formato: {
+                                              nombre: tipoNuevo.displayName,
+                                              esEfimero: false,
+                                            },
+                                            entregadoEn: creada.entregadoEn,
+                                            publicadoEn: null,
+                                            notas: null,
+                                            registradoPor: null,
+                                            metricas: [],
                                           });
                                           setNuevoLink((v) => ({
                                             ...v,

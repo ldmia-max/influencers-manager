@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Copy,
@@ -70,8 +69,6 @@ export function ReemplazarInfluencer({
   pendientes,
   markup,
 }: Props) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -92,7 +89,24 @@ export function ReemplazarInfluencer({
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const reset = useCampaignWizardStore((s) => s.reset);
 
-  const refrescar = () => startTransition(() => router.refresh());
+  /**
+   * Recarga la ficha entera despues de aprobar, descartar o anadir.
+   *
+   * Es una recarga de verdad y no router.refresh(), que en el build de
+   * produccion no llega a aplicarse: se comprobo en el navegador —la
+   * peticion sale, el servidor devuelve el arbol nuevo y React no lo
+   * pinta hasta un F5—. En Entregas eso se resolvio dibujando lo hecho
+   * al instante desde el propio componente, pero aqui no vale el mismo
+   * truco: aprobar a alguien lo mueve de esta tarjeta a Entregas, cambia
+   * el total de la campana y su presupuesto libre. Media ficha tendria
+   * que adivinar el resultado, y una que se equivocara mentiria sobre
+   * dinero contratado.
+   *
+   * Son acciones contadas —se aprueba a un influencer una vez—, asi que
+   * el coste de recargar es despreciable al lado de mostrar una ficha
+   * incoherente.
+   */
+  const refrescar = () => window.location.reload();
 
   /**
    * El asistente arranca vacio y con el presupuesto que QUEDA, no con el
