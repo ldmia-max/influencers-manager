@@ -173,6 +173,10 @@ export async function historicoDeCampana(campaignId: string) {
         select: {
           id: true,
           url: true,
+          // Que pieza es, para poder nombrarla en el desglose por
+          // publicacion: "Reel", "Story"... Nulo en las entregas
+          // anteriores a ese campo.
+          serviceType: { select: { displayName: true } },
           campaignService: {
             select: {
               campaignProfilePlatform: {

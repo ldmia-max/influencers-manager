@@ -30,6 +30,10 @@ export interface CapturaMetrica {
   compartidos: number | null;
   guardados: number | null;
   entregaId: string;
+  /** Enlace de la publicación. Vacío en formatos sin enlace permanente. */
+  url?: string | null;
+  /** "Reel", "Story"… Nulo en entregas anteriores a que se señalara. */
+  formato?: string | null;
   influencer: string;
   plataforma: string;
   username: string;
@@ -167,6 +171,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         reportadas: number;
         conVistas: number;
         conInteracciones: number;
+        comentarios: number;
+        conComentarios: number;
         plataformas: Map<
           string,
           {
@@ -174,10 +180,29 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
             username: string;
             vistas: number;
             interacciones: number;
+            comentarios: number;
+            conComentarios: number;
             publicaciones: number;
             reportadas: number;
             conVistas: number;
             conInteracciones: number;
+            /**
+             * Una fila por publicacion. Es el nivel al que se pregunta
+             * "¿cuantos comentarios tuvo ESTA?", y ademas hace cuadrable
+             * el total de arriba: sumando esta lista se llega al mismo
+             * numero, porque las dos salen de la misma ultima captura de
+             * cada entrega.
+             */
+            piezas: {
+              entregaId: string;
+              url: string | null;
+              formato: string | null;
+              vistas: number | null;
+              meGusta: number | null;
+              comentarios: number | null;
+              compartidos: number | null;
+              origen: string;
+            }[];
           }
         >;
       }
@@ -189,6 +214,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         plataforma: string;
         vistas: number;
         interacciones: number;
+        comentarios: number;
+        conComentarios: number;
         publicaciones: number;
         reportadas: number;
         conVistas: number;
@@ -207,6 +234,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       const daVistas = c.vistas !== null ? 1 : 0;
       const daInteracciones =
         c.meGusta !== null || c.comentarios !== null || c.compartidos !== null ? 1 : 0;
+      const daComentarios = c.comentarios !== null ? 1 : 0;
 
       const persona =
         detalle.get(c.influencer) ??
@@ -214,6 +242,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           nombre: c.influencer,
           vistas: 0,
           interacciones: 0,
+          comentarios: 0,
+          conComentarios: 0,
           publicaciones: 0,
           reportadas: 0,
           conVistas: 0,
@@ -226,6 +256,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       persona.reportadas += esReportada;
       persona.conVistas += daVistas;
       persona.conInteracciones += daInteracciones;
+      persona.comentarios += c.comentarios ?? 0;
+      persona.conComentarios += daComentarios;
 
       const cuenta =
         persona.plataformas.get(c.plataforma) ??
@@ -234,17 +266,32 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           username: c.username,
           vistas: 0,
           interacciones: 0,
+          comentarios: 0,
+          conComentarios: 0,
           publicaciones: 0,
           reportadas: 0,
           conVistas: 0,
           conInteracciones: 0,
+          piezas: [],
         };
+      cuenta.piezas.push({
+        entregaId: c.entregaId,
+        url: c.url ?? null,
+        formato: c.formato ?? null,
+        vistas: c.vistas,
+        meGusta: c.meGusta,
+        comentarios: c.comentarios,
+        compartidos: c.compartidos,
+        origen: c.origen,
+      });
       cuenta.vistas += c.vistas ?? 0;
       cuenta.interacciones += interacciones;
       cuenta.publicaciones += 1;
       cuenta.reportadas += esReportada;
       cuenta.conVistas += daVistas;
       cuenta.conInteracciones += daInteracciones;
+      cuenta.comentarios += c.comentarios ?? 0;
+      cuenta.conComentarios += daComentarios;
       persona.plataformas.set(c.plataforma, cuenta);
       detalle.set(c.influencer, persona);
 
@@ -254,6 +301,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           plataforma: c.plataforma,
           vistas: 0,
           interacciones: 0,
+          comentarios: 0,
+          conComentarios: 0,
           publicaciones: 0,
           reportadas: 0,
           conVistas: 0,
@@ -265,6 +314,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       red.reportadas += esReportada;
       red.conVistas += daVistas;
       red.conInteracciones += daInteracciones;
+      red.comentarios += c.comentarios ?? 0;
+      red.conComentarios += daComentarios;
       plataformas.set(c.plataforma, red);
     }
 
@@ -477,6 +528,16 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                             />
                           </span>
                         </span>
+                        <span className="flex items-center gap-1 text-sm">
+                          <MessageCircle className="h-3.5 w-3.5 text-sky-600" />
+                          <span className="font-semibold text-gray-900">
+                            <Cifra
+                              valor={r.comentarios}
+                              cuantasLaDan={r.conComentarios}
+                              titulo="Esta red no publica el número de comentarios para este contenido"
+                            />
+                          </span>
+                        </span>
                       </div>
                       {r.reportadas > 0 && (
                         <p className="mt-1 text-[11px] text-sky-800">
@@ -539,6 +600,16 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                               />
                             </span>
                           </span>
+                          <span className="flex items-center gap-1">
+                            <MessageCircle className="h-3.5 w-3.5 text-sky-600" />
+                            <span className="font-semibold text-gray-900">
+                              <Cifra
+                                valor={persona.comentarios}
+                                cuantasLaDan={persona.conComentarios}
+                                titulo="Esta red no publica el número de comentarios para este contenido"
+                              />
+                            </span>
+                          </span>
                         </span>
                       </div>
 
@@ -571,6 +642,14 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                               </span>
                               <span>
                                 <Cifra
+                                  valor={cuenta.comentarios}
+                                  cuantasLaDan={cuenta.conComentarios}
+                                  titulo="Esta red no publica el número de comentarios para este contenido"
+                                />{" "}
+                                comentarios
+                              </span>
+                              <span>
+                                <Cifra
                                   valor={cuenta.interacciones}
                                   cuantasLaDan={cuenta.conInteracciones}
                                   titulo="Ninguna de estas publicaciones expone interacciones"
@@ -580,6 +659,61 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                             </span>
                           </div>
                         ))}
+
+                        {/* Publicacion a publicacion. Sumadas dan el total
+                            de arriba: las dos cifras salen de la misma
+                            ultima captura de cada entrega, asi que no
+                            pueden discrepar. */}
+                        {persona.plataformas.flatMap((c) => c.piezas).length > 0 && (
+                          <ul className="mt-2 space-y-1 border-t border-dashed border-gray-200 pt-2">
+                            {persona.plataformas.flatMap((cuenta) =>
+                              cuenta.piezas.map((pieza) => (
+                                <li
+                                  key={pieza.entregaId}
+                                  className="flex flex-wrap items-center justify-between gap-2 text-[11px]"
+                                >
+                                  <span className="flex min-w-0 items-center gap-1 text-gray-500">
+                                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+                                      {pieza.formato ?? cuenta.plataforma}
+                                    </span>
+                                    {pieza.url ? (
+                                      <a
+                                        href={pieza.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="min-w-0 truncate text-violet-700 hover:underline"
+                                      >
+                                        {pieza.url.replace(/^https?:\/\/(www\.)?/, "")}
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400">sin enlace</span>
+                                    )}
+                                  </span>
+                                  <span className="flex shrink-0 gap-3 text-gray-600">
+                                    <span title="Vistas">
+                                      {pieza.vistas !== null
+                                        ? formatNumber(pieza.vistas)
+                                        : "—"}{" "}
+                                      <Eye className="inline h-3 w-3 text-violet-500" />
+                                    </span>
+                                    <span title="Comentarios" className="font-medium text-gray-800">
+                                      {pieza.comentarios !== null
+                                        ? formatNumber(pieza.comentarios)
+                                        : "—"}{" "}
+                                      <MessageCircle className="inline h-3 w-3 text-sky-500" />
+                                    </span>
+                                    <span title="Me gusta">
+                                      {pieza.meGusta !== null
+                                        ? formatNumber(pieza.meGusta)
+                                        : "—"}{" "}
+                                      <Heart className="inline h-3 w-3 text-pink-500" />
+                                    </span>
+                                  </span>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -139,6 +139,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       compartidos: m.compartidos,
       guardados: m.guardados,
       entregaId: m.entrega.id,
+      url: m.entrega.url,
+      formato: m.entrega.serviceType?.displayName ?? null,
       influencer: cpp.campaignProfile.profile.name,
       plataforma: cpp.socialAccount.platform.displayName,
       username: cpp.socialAccount.username,

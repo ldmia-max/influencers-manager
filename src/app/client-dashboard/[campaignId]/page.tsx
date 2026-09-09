@@ -79,6 +79,8 @@ async function Contenido({ params }: PageProps) {
             compartidos: m.compartidos,
             guardados: m.guardados,
             entregaId: e.id,
+            url: e.url,
+            formato: e.serviceType?.displayName ?? null,
             influencer: cp.profile.name,
             plataforma: cpp.socialAccount.platform.displayName,
             username: cpp.socialAccount.username,
