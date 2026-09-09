@@ -99,6 +99,12 @@ export async function POST(req: Request, { params }: RouteParams) {
         EXPIRED_TOKEN: { message: "El enlace de aprobación ha expirado", status: 410 },
         USED_TOKEN: { message: "Este enlace ya fue utilizado", status: 410 },
         INVALID_STATUS: { message: "La campaña ya no está disponible para revisión", status: 400 },
+        // Todo lo de este enlace ya estaba decidido: no es un error del
+        // cliente, es que llega tarde —o volvio sobre una pestana vieja—.
+        NADA_QUE_APROBAR: {
+          message: "No queda nada pendiente de aprobar en esta campaña",
+          status: 409,
+        },
       };
       const mapped = codeMap[error.message];
       if (mapped) {

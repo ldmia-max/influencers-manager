@@ -16,6 +16,7 @@ import { calculateMarkupPrice } from "@/lib/campaign-utils";
 import { calculateReach } from "@/lib/format";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -436,15 +437,20 @@ export default function ApprovePage() {
   const handleSubmit = () => {
     if (!data) return;
 
+    // Solo viaja lo que estaba pendiente. El servidor lo comprueba otra
+    // vez por su cuenta —no se fia de esta lista—, pero mandar decisiones
+    // sobre lo ya cerrado seria pedirle que las descarte.
+    const pendientes = data.campaign.profiles.filter((p) => p.status === "PENDING");
+
     const finalDecisions = {
-      profiles: data.campaign.profiles.map((profile) => ({
+      profiles: pendientes.map((profile) => ({
         id: profile.id,
         status: approvalState.profiles[profile.id]?.isApproved
           ? "APPROVED" as const
           : "REJECTED" as const,
         rejectionReason: approvalState.profiles[profile.id]?.rejectionReason,
       })),
-      platforms: data.campaign.profiles.flatMap((profile) =>
+      platforms: pendientes.flatMap((profile) =>
         profile.platforms.map((platform) => ({
           id: platform.id,
           status: approvalState.platforms[platform.id]?.isApproved
@@ -454,7 +460,7 @@ export default function ApprovePage() {
             approvalState.platforms[platform.id]?.rejectionReason,
         })),
       ),
-      services: data.campaign.profiles.flatMap((profile) =>
+      services: pendientes.flatMap((profile) =>
         profile.platforms.flatMap((platform) =>
           platform.services.map((service) => ({
             id: service.id,
@@ -649,6 +655,20 @@ export default function ApprovePage() {
   const totals = calculateTotals();
   const counts = getCounts();
 
+  /**
+   * Que puede decidir el cliente en ESTA visita.
+   *
+   * Un enlace se reenvia cuando se anade a alguien a una campana ya en
+   * marcha, y entonces solo ese alguien esta pendiente. Volver a poner
+   * sobre la mesa a quien ya se aprobo no es ofrecerle una correccion:
+   * es pedirle que repita una decision que ya produjo efectos —hay
+   * contenido publicado— y arriesgarse a que la deshaga sin querer.
+   *
+   * Los ya decididos siguen a la vista, pero como lo que son: hechos.
+   */
+  const porDecidir = data.campaign.profiles.filter((p) => p.status === "PENDING");
+  const yaDecididos = data.campaign.profiles.filter((p) => p.status !== "PENDING");
+
   // Compute chart data
   const formatCounts = new Map<string, number>();
   const categoryCounts = new Map<string, number>();
@@ -778,9 +798,25 @@ export default function ApprovePage() {
           {/* Profiles List */}
           <div className="lg:col-span-7 space-y-4">
             <h2 className="text-lg font-semibold">
-              Perfiles ({data.campaign.profiles.length})
+              {yaDecididos.length > 0
+                ? `Nuevos por aprobar (${porDecidir.length})`
+                : `Perfiles (${porDecidir.length})`}
             </h2>
-            {data.campaign.profiles.map((profile) => {
+            {yaDecididos.length > 0 && porDecidir.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Se añadieron a una campaña que ya estaba en marcha. El resto de
+                influencers ya los revisaste y no hace falta que vuelvas sobre
+                ellos.
+              </p>
+            )}
+            {porDecidir.length === 0 && (
+              <Card>
+                <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                  No queda nada pendiente de aprobar en esta campaña.
+                </CardContent>
+              </Card>
+            )}
+            {porDecidir.map((profile) => {
               const profilePicUrl =
                 profile.platforms.find((p) => p.socialAccount.profilePicUrl)
                   ?.socialAccount.profilePicUrl ?? undefined;
@@ -809,6 +845,62 @@ export default function ApprovePage() {
                 />
               );
             })}
+
+            {/* Lo ya revisado, sin interruptores: es historia, no una
+                pregunta abierta. Se muestran tambien los rechazados
+                porque si desaparecieran pareceria que falta decidirlos. */}
+            {yaDecididos.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    Ya revisados ({yaDecididos.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {yaDecididos.map((cp) => {
+                    const aprobado = cp.status === "APPROVED";
+                    const pic = cp.platforms.find(
+                      (pl) => pl.socialAccount.profilePicUrl
+                    )?.socialAccount.profilePicUrl;
+                    return (
+                      <div
+                        key={cp.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={pic ?? ""} alt={cp.profile.name} />
+                            <AvatarFallback className="text-xs">
+                              {cp.profile.name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {cp.profile.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {cp.platforms
+                                .map((pl) => pl.socialAccount.platform.displayName)
+                                .join(" · ")}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className={
+                            aprobado
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }
+                        >
+                          {aprobado ? "Aprobado" : "Rechazado"}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar: Summary (sticky) */}

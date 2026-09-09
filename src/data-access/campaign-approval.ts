@@ -237,8 +237,57 @@ export async function submitApproval(
 
   const now = new Date();
 
+  /**
+   * Que puede decidir este enlace: SOLO lo que sigue pendiente en ESTA
+   * campana.
+   *
+   * Antes se aplicaba lo que llegara, buscando por id a secas. Eso tenia
+   * dos consecuencias. La visible: al reenviar una campana en marcha para
+   * aprobar un reemplazo, el cliente veia otra vez a los que ya habia
+   * decidido y podia cambiarlos, incluido rechazar a alguien que ya
+   * habia publicado —y a un rechazado se le retira en el acto, asi que
+   * se perdia trabajo contratado—. La invisible, peor: el id no se
+   * comprobaba contra la campana del token, de modo que un envio
+   * manipulado podia escribir en la campana de OTRO cliente.
+   *
+   * La lista se construye aqui, desde la base de datos, y no se confia
+   * en la que manda el navegador.
+   */
+  const decidibles = await prisma.campaignProfile.findMany({
+    where: {
+      campaignId: approvalToken!.campaignId,
+      status: "PENDING",
+      participacion: "ACTIVO",
+    },
+    select: {
+      id: true,
+      platforms: { select: { id: true, services: { select: { id: true } } } },
+    },
+  });
+
+  const perfilesAbiertos = new Set(decidibles.map((p) => p.id));
+  const plataformasAbiertas = new Set(
+    decidibles.flatMap((p) => p.platforms.map((pl) => pl.id))
+  );
+  const serviciosAbiertos = new Set(
+    decidibles.flatMap((p) => p.platforms.flatMap((pl) => pl.services.map((s) => s.id)))
+  );
+
+  // Lo que no estaba abierto se descarta sin ruido: no es un ataque
+  // necesariamente, tambien es lo que manda un enlace viejo abierto en
+  // otra pestana.
+  const perfiles = finalDecisions.profiles.filter((p) => perfilesAbiertos.has(p.id));
+  const plataformas = finalDecisions.platforms.filter((p) =>
+    plataformasAbiertas.has(p.id)
+  );
+  const servicios = finalDecisions.services.filter((s) => serviciosAbiertos.has(s.id));
+
+  if (perfiles.length === 0) {
+    throw new ValidationError("NADA_QUE_APROBAR");
+  }
+
   await prisma.$transaction(async (tx) => {
-    for (const profile of finalDecisions.profiles) {
+    for (const profile of perfiles) {
       await tx.campaignProfile.update({
         where: { id: profile.id },
         data: {
@@ -249,7 +298,7 @@ export async function submitApproval(
       });
     }
 
-    for (const platform of finalDecisions.platforms) {
+    for (const platform of plataformas) {
       await tx.campaignProfilePlatform.update({
         where: { id: platform.id },
         data: {
@@ -260,7 +309,7 @@ export async function submitApproval(
       });
     }
 
-    for (const service of finalDecisions.services) {
+    for (const service of servicios) {
       await tx.campaignService.update({
         where: { id: service.id },
         data: {
@@ -287,9 +336,7 @@ export async function submitApproval(
     // solo influencer contratado no describe nada real, y ademas Abierta
     // es el unico estado editable: es justo donde el equipo tiene que
     // estar para rehacer la propuesta.
-    const aprobados = finalDecisions.profiles.filter(
-      (p) => p.status === "APPROVED"
-    ).length;
+    const aprobados = perfiles.filter((p) => p.status === "APPROVED").length;
     const arranca = aprobados > 0;
 
     if (arranca) {
@@ -299,9 +346,9 @@ export async function submitApproval(
       // siempre: la comprobacion de entregas cuenta los formatos de todo
       // perfil activo, y nadie va a publicar los suyos.
       const motivos = new Map(
-        finalDecisions.profiles.map((p) => [p.id, p.rejectionReason || null])
+        perfiles.map((p) => [p.id, p.rejectionReason || null])
       );
-      for (const perfil of finalDecisions.profiles) {
+      for (const perfil of perfiles) {
         if (perfil.status !== "REJECTED") continue;
         await tx.campaignProfile.update({
           where: { id: perfil.id },
@@ -329,15 +376,15 @@ export async function submitApproval(
   });
 
   const summary = {
-    totalProfiles: finalDecisions.profiles.length,
-    approvedProfiles: finalDecisions.profiles.filter((p) => p.status === "APPROVED").length,
-    rejectedProfiles: finalDecisions.profiles.filter((p) => p.status === "REJECTED").length,
-    totalPlatforms: finalDecisions.platforms.length,
-    approvedPlatforms: finalDecisions.platforms.filter((p) => p.status === "APPROVED").length,
-    rejectedPlatforms: finalDecisions.platforms.filter((p) => p.status === "REJECTED").length,
-    totalServices: finalDecisions.services.length,
-    approvedServices: finalDecisions.services.filter((s) => s.isApproved).length,
-    rejectedServices: finalDecisions.services.filter((s) => !s.isApproved).length,
+    totalProfiles: perfiles.length,
+    approvedProfiles: perfiles.filter((p) => p.status === "APPROVED").length,
+    rejectedProfiles: perfiles.filter((p) => p.status === "REJECTED").length,
+    totalPlatforms: plataformas.length,
+    approvedPlatforms: plataformas.filter((p) => p.status === "APPROVED").length,
+    rejectedPlatforms: plataformas.filter((p) => p.status === "REJECTED").length,
+    totalServices: servicios.length,
+    approvedServices: servicios.filter((s) => s.isApproved).length,
+    rejectedServices: servicios.filter((s) => !s.isApproved).length,
   };
 
   return {
@@ -348,7 +395,9 @@ export async function submitApproval(
       clientName: approvalToken!.campaign.client.companyName,
       contactName: `${approvalToken!.campaign.clientContact.firstName} ${approvalToken!.campaign.clientContact.lastName}`,
       createdById: approvalToken!.campaign.createdById,
-      rejectedProfileIds: finalDecisions.profiles
+      // El correo al equipo habla de lo que se acaba de decidir, no de
+      // lo que ya estaba decidido de antes.
+      rejectedProfileIds: perfiles
         .filter((p) => p.status === "REJECTED")
         .map((p) => p.id),
     },
