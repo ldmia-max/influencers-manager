@@ -409,7 +409,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   htmlFor={`fecha-${formato.id}`}
                                   className="text-xs font-normal text-gray-500"
                                 >
-                                  Fecha de entrega de contenido
+                                  Fecha límite de entrega de contenido
                                 </Label>
                                 <Input
                                   id={`fecha-${formato.id}`}
