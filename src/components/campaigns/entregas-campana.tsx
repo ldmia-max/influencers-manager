@@ -393,9 +393,20 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                             </div>
 
                             {puedeEditar && (
+                              // El campo iba suelto, sin decir que fecha
+                              // era: al lado del formulario de registro se
+                              // confundia con la fecha de la entrega que se
+                              // esta anotando, cuando es el plazo pactado.
                               <div className="flex items-center gap-1">
                                 <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
+                                <Label
+                                  htmlFor={`fecha-${formato.id}`}
+                                  className="text-xs font-normal text-gray-500"
+                                >
+                                  Fecha de entrega de contenido
+                                </Label>
                                 <Input
+                                  id={`fecha-${formato.id}`}
                                   type="date"
                                   defaultValue={soloFecha(formato.fechaLimite)}
                                   className="h-7 w-36 text-xs"
