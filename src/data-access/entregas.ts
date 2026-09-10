@@ -120,6 +120,7 @@ export async function getEntregasDeCampana(campaignId: string) {
                           capturadoEn: true,
                           origen: true,
                           vistas: true,
+                          interacciones: true,
                           meGusta: true,
                           comentarios: true,
                           compartidos: true,
@@ -237,6 +238,11 @@ export async function registrarEntrega(datos: {
    * que conviviera con el medido sin que nadie sepa cual manda.
    */
   vistasReportadas?: number | null;
+  /**
+   * Interacciones en un solo numero. Igual que las vistas: solo en
+   * formatos efimeros, porque en el resto las lee Apify con su desglose.
+   */
+  interaccionesReportadas?: number | null;
   usuarioId: string;
 }) {
   const servicio = await prisma.campaignService.findUnique({
@@ -289,9 +295,9 @@ export async function registrarEntrega(datos: {
       throw new ValidationError("Indica la fecha en que se emitió");
     }
   } else {
-    if (datos.vistasReportadas != null) {
+    if (datos.vistasReportadas != null || datos.interaccionesReportadas != null) {
       throw new ValidationError(
-        "Las vistas de este formato se leen de la plataforma, no se escriben a mano."
+        "Las cifras de este formato se leen de la plataforma, no se escriben a mano."
       );
     }
     if (!datos.url?.trim()) {
@@ -351,10 +357,13 @@ export async function registrarEntrega(datos: {
     select: { id: true, url: true, entregadoEn: true },
   });
 
-  if (datos.vistasReportadas != null) {
-    await registrarVistasReportadas(
+  if (datos.vistasReportadas != null || datos.interaccionesReportadas != null) {
+    await registrarCifrasReportadas(
       entrega.id,
-      datos.vistasReportadas,
+      {
+        vistas: datos.vistasReportadas,
+        interacciones: datos.interaccionesReportadas,
+      },
       datos.usuarioId
     );
   }
@@ -371,13 +380,22 @@ export async function registrarEntrega(datos: {
  * correccion; guardar las dos permite dibujar la curva y deja claro
  * quien dijo que y cuando.
  */
-export async function registrarVistasReportadas(
+export async function registrarCifrasReportadas(
   entregaId: string,
-  vistas: number,
+  cifras: { vistas?: number | null; interacciones?: number | null },
   usuarioId: string
 ) {
-  if (!Number.isFinite(vistas) || vistas < 0) {
-    throw new ValidationError("Las vistas deben ser un número igual o mayor que cero");
+  const valida = (valor: number | null | undefined, nombre: string) => {
+    if (valor == null) return;
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new ValidationError(`${nombre} debe ser un número igual o mayor que cero`);
+    }
+  };
+  valida(cifras.vistas, "Las vistas");
+  valida(cifras.interacciones, "Las interacciones");
+
+  if (cifras.vistas == null && cifras.interacciones == null) {
+    throw new ValidationError("Indica al menos una cifra");
   }
 
   const entrega = await prisma.campaignEntrega.findUnique({
@@ -414,14 +432,31 @@ export async function registrarVistasReportadas(
     );
   }
 
+  // La cifra que NO se anota ahora se arrastra de la ultima captura.
+  //
+  // Manda la ultima captura de cada entrega, asi que crear una con las
+  // vistas vacias porque solo se estaban anotando interacciones borraria
+  // de las graficas unas vistas que si se sabian. Una captura describe el
+  // estado completo de la publicacion en ese momento, no el ultimo
+  // teclazo.
+  const ultima = await prisma.campaignEntregaMetrica.findFirst({
+    where: { entregaId },
+    orderBy: { capturadoEn: "desc" },
+    select: { vistas: true, interacciones: true },
+  });
+
   return prisma.campaignEntregaMetrica.create({
     data: {
       entregaId,
-      vistas: Math.round(vistas),
+      vistas: cifras.vistas != null ? Math.round(cifras.vistas) : ultima?.vistas ?? null,
+      interacciones:
+        cifras.interacciones != null
+          ? Math.round(cifras.interacciones)
+          : ultima?.interacciones ?? null,
       origen: "REPORTADA",
       reportadaPorId: usuarioId,
     },
-    select: { id: true, vistas: true, capturadoEn: true },
+    select: { id: true, vistas: true, interacciones: true, capturadoEn: true },
   });
 }
 

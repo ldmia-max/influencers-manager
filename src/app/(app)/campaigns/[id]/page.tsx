@@ -134,6 +134,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       capturadoEn: m.capturadoEn.toISOString(),
       origen: m.origen,
       vistas: m.vistas,
+      interacciones: m.interacciones,
       meGusta: m.meGusta,
       comentarios: m.comentarios,
       compartidos: m.compartidos,

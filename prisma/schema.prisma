@@ -839,6 +839,16 @@ model CampaignEntregaMetrica {
   compartidos Int?
   guardados   Int?
 
+  /// Interacciones en un solo numero, para las cifras REPORTADAS.
+  ///
+  /// Una story no se puede desglosar: su autor ve un total de respuestas
+  /// y reacciones en su panel, sin separar unas de otras, asi que pedir
+  /// meGusta y comentarios por separado seria pedir algo que nadie tiene
+  /// delante. En las capturas MEDIDAS este campo va nulo y las
+  /// interacciones se siguen calculando sumando el desglose, que ahi si
+  /// existe.
+  interacciones Int?
+
   entrega   CampaignEntrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
   entregaId String
 

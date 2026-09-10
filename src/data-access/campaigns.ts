@@ -868,6 +868,7 @@ export async function getCampaignResultsForClient(
                           capturadoEn: true,
                           origen: true,
                           vistas: true,
+                          interacciones: true,
                           meGusta: true,
                           comentarios: true,
                           compartidos: true,

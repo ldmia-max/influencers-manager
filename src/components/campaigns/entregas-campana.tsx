@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Eye,
+  Heart,
   Trash2,
   UserMinus,
   UserPlus,
@@ -43,7 +44,7 @@ import {
 } from "@/lib/entregas";
 import {
   registrarEntrega,
-  registrarVistas,
+  registrarCifras,
   eliminarEntrega,
   fijarFechaLimite,
   cambiarParticipacion,
@@ -71,6 +72,8 @@ export interface EntregaVista {
     capturadoEn: string;
     origen: string;
     vistas: number | null;
+    /** Respuestas y reacciones juntas, en las cifras reportadas. */
+    interacciones: number | null;
     meGusta: number | null;
     comentarios: number | null;
     compartidos: number | null;
@@ -149,9 +152,11 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [nuevoLink, setNuevoLink] = useState<Record<string, string>>({});
   const [fechaEmision, setFechaEmision] = useState<Record<string, string>>({});
   const [vistasNuevas, setVistasNuevas] = useState<Record<string, string>>({});
+  const [interNuevas, setInterNuevas] = useState<Record<string, string>>({});
   // Formato señalado para la próxima pieza de cada bloque.
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
   const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
+  const [interEntrega, setInterEntrega] = useState<Record<string, string>>({});
   const [retirando, setRetirando] = useState<PerfilVista | null>(null);
   const [origen, setOrigen] = useState<string>("");
   const [motivo, setMotivo] = useState("");
@@ -180,6 +185,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [quitadas, setQuitadas] = useState<string[]>([]);
   /** Vistas recien anotadas, mientras el servidor no las devuelva. */
   const [vistasAnotadas, setVistasAnotadas] = useState<Record<string, number>>({});
+  const [interAnotadas, setInterAnotadas] = useState<Record<string, number>>({});
 
   /** Mete una entrega recien creada en la lista, sin esperar al servidor. */
   const pintarYa = (formatoId: string, entrega: EntregaVista) =>
@@ -493,53 +499,105 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       ) : (
                                         <span className="text-gray-400">sin vistas</span>
                                       )}
-                                      {puedeEditar && (
-                                        <>
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="actualizar"
-                                            value={vistasEntrega[entrega.id] ?? ""}
-                                            onChange={(e) =>
-                                              setVistasEntrega((v) => ({
-                                                ...v,
-                                                [entrega.id]: e.target.value,
-                                              }))
-                                            }
-                                            className="h-6 w-24 text-xs"
-                                          />
-                                          <button
-                                            type="button"
-                                            className="text-violet-700 hover:underline disabled:opacity-40"
-                                            disabled={
-                                              ocupado === `vistas-${entrega.id}` ||
-                                              !(vistasEntrega[entrega.id] ?? "").trim()
-                                            }
-                                            onClick={() =>
-                                              conError(`vistas-${entrega.id}`, async () => {
-                                                const cifra = Number(
-                                                  vistasEntrega[entrega.id]
-                                                );
-                                                await registrarVistas(
-                                                  campaignId,
-                                                  entrega.id,
-                                                  cifra
-                                                );
-                                                setVistasAnotadas((v) => ({
-                                                  ...v,
-                                                  [entrega.id]: cifra,
-                                                }));
-                                                setVistasEntrega((v) => ({
-                                                  ...v,
-                                                  [entrega.id]: "",
-                                                }));
-                                              })
-                                            }
-                                          >
-                                            Guardar
-                                          </button>
-                                        </>
+                                    </span>
+                                  )}
+
+                                  {/* Interacciones: respuestas y reacciones
+                                      juntas, tal y como las ve el creador
+                                      en su panel. */}
+                                  {piezaEfimera && (
+                                    <span className="flex shrink-0 items-center gap-1">
+                                      <Heart className="h-3 w-3 text-gray-400" />
+                                      {(interAnotadas[entrega.id] ??
+                                        entrega.metricas[0]?.interacciones) != null ? (
+                                        <span className="font-medium text-gray-700">
+                                          {formatNumber(
+                                            interAnotadas[entrega.id] ??
+                                              entrega.metricas[0]!.interacciones!
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">
+                                          sin interacciones
+                                        </span>
                                       )}
+                                    </span>
+                                  )}
+
+                                  {piezaEfimera && puedeEditar && (
+                                    <span className="flex shrink-0 items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="vistas"
+                                        value={vistasEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setVistasEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        className="h-6 w-20 text-xs"
+                                      />
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="interacc."
+                                        value={interEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setInterEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        className="h-6 w-24 text-xs"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="text-violet-700 hover:underline disabled:opacity-40"
+                                        disabled={
+                                          ocupado === `cifras-${entrega.id}` ||
+                                          (!(vistasEntrega[entrega.id] ?? "").trim() &&
+                                            !(interEntrega[entrega.id] ?? "").trim())
+                                        }
+                                        onClick={() =>
+                                          conError(`cifras-${entrega.id}`, async () => {
+                                            const v = (
+                                              vistasEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            const i = (
+                                              interEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            await registrarCifras(campaignId, entrega.id, {
+                                              vistas: v ? Number(v) : null,
+                                              interacciones: i ? Number(i) : null,
+                                            });
+                                            // Solo se pinta lo que se acaba
+                                            // de anotar: lo otro conserva su
+                                            // valor, no se pone a cero.
+                                            if (v)
+                                              setVistasAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: Number(v),
+                                              }));
+                                            if (i)
+                                              setInterAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: Number(i),
+                                              }));
+                                            setVistasEntrega((x) => ({
+                                              ...x,
+                                              [entrega.id]: "",
+                                            }));
+                                            setInterEntrega((x) => ({
+                                              ...x,
+                                              [entrega.id]: "",
+                                            }));
+                                          })
+                                        }
+                                      >
+                                        Guardar
+                                      </button>
                                     </span>
                                   )}
                                   <span className="shrink-0 text-gray-400">
@@ -632,6 +690,22 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       }
                                       className="h-8 w-36 text-xs"
                                     />
+                                    {/* Un solo numero: en una story el
+                                        creador ve un total de respuestas y
+                                        reacciones, sin desglosar. */}
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      placeholder="Interacciones (opcional)"
+                                      value={interNuevas[formato.id] ?? ""}
+                                      onChange={(e) =>
+                                        setInterNuevas((v) => ({
+                                          ...v,
+                                          [formato.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="h-8 w-44 text-xs"
+                                    />
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -645,6 +719,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           const vistas = (
                                             vistasNuevas[formato.id] ?? ""
                                           ).trim();
+                                          const inter = (
+                                            interNuevas[formato.id] ?? ""
+                                          ).trim();
                                           const publicadoEn = new Date(
                                             fechaEmision[formato.id]
                                           ).toISOString();
@@ -656,6 +733,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               publicadoEn,
                                               vistasReportadas: vistas
                                                 ? Number(vistas)
+                                                : null,
+                                              interaccionesReportadas: inter
+                                                ? Number(inter)
                                                 : null,
                                             }
                                           );
@@ -670,12 +750,15 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             publicadoEn,
                                             notas: null,
                                             registradoPor: null,
-                                            metricas: vistas
+                                            metricas: vistas || inter
                                               ? [
                                                   {
                                                     capturadoEn: creada.entregadoEn,
                                                     origen: "REPORTADA",
-                                                    vistas: Number(vistas),
+                                                    vistas: vistas ? Number(vistas) : null,
+                                                    interacciones: inter
+                                                      ? Number(inter)
+                                                      : null,
                                                     meGusta: null,
                                                     comentarios: null,
                                                     compartidos: null,
@@ -689,6 +772,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             [formato.id]: "",
                                           }));
                                           setVistasNuevas((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                          setInterNuevas((v) => ({
                                             ...v,
                                             [formato.id]: "",
                                           }));

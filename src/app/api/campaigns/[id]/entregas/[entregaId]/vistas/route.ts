@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { registrarVistasReportadas } from "@/data-access/entregas";
+import { registrarCifrasReportadas } from "@/data-access/entregas";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { exigirPermiso } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
-import { vistasReportadasSchema } from "@/lib/schemas/entrega";
+import { cifrasReportadasSchema } from "@/lib/schemas/entrega";
 
 interface RouteParams {
   params: Promise<{ id: string; entregaId: string }>;
@@ -13,7 +13,8 @@ interface RouteParams {
 /**
  * POST /api/campaigns/[id]/entregas/[entregaId]/vistas
  *
- * Anota las vistas que reporto el creador de una historia o un directo.
+ * Anota las cifras que reporto el creador de una historia o un directo:
+ * sus vistas, sus interacciones, o las dos.
  *
  * Es POST y no PATCH porque no corrige nada: anade una captura mas, igual
  * que hace el refresco automatico. Una historia se mira durante horas, y
@@ -26,12 +27,12 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (sesion instanceof NextResponse) return sesion;
 
     const { entregaId } = await params;
-    const body = await parseBody(req, vistasReportadasSchema);
+    const body = await parseBody(req, cifrasReportadasSchema);
     if (body instanceof NextResponse) return body;
 
-    const metrica = await registrarVistasReportadas(
+    const metrica = await registrarCifrasReportadas(
       entregaId,
-      body.vistas,
+      { vistas: body.vistas, interacciones: body.interacciones },
       sesion.userId
     );
 
@@ -44,9 +45,9 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("Error anotando vistas:", error);
+    console.error("Error anotando cifras reportadas:", error);
     return NextResponse.json(
-      { error: "No se pudieron guardar las vistas" },
+      { error: "No se pudieron guardar las cifras" },
       { status: 500 }
     );
   }

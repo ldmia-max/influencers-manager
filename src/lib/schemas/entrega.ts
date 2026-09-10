@@ -18,6 +18,8 @@ export const registrarEntregaSchema = z.object({
   notas: z.string().max(500, "Máximo 500 caracteres").nullish(),
   /** Solo en formatos efímeros; la capa de datos lo rechaza en el resto. */
   vistasReportadas: z.coerce.number().int().min(0).nullish(),
+  /** Respuestas y reacciones juntas: una story no se puede desglosar. */
+  interaccionesReportadas: z.coerce.number().int().min(0).nullish(),
   /**
    * Qué formato es la pieza. Obligatorio en la práctica para un combo,
    * que agrupa varios y no permite deducirlo; opcional en el resto, donde
@@ -26,13 +28,26 @@ export const registrarEntregaSchema = z.object({
   serviceTypeId: z.string().min(1).nullish(),
 });
 
-/** Vistas que reporta el creador de una historia o un directo. */
-export const vistasReportadasSchema = z.object({
-  vistas: z.coerce
-    .number({ message: "Escribe un número" })
-    .int("Sin decimales")
-    .min(0, "No puede ser negativo"),
-});
+/**
+ * Cifras que reporta el creador de una historia o un directo.
+ *
+ * Las dos son opcionales por separado, pero tiene que llegar alguna: se
+ * anota lo que se sabe hoy y lo demas mas tarde, sin que apuntar una
+ * borre la otra.
+ */
+const cifra = z.coerce
+  .number({ message: "Escribe un número" })
+  .int("Sin decimales")
+  .min(0, "No puede ser negativo");
+
+export const cifrasReportadasSchema = z
+  .object({
+    vistas: cifra.nullish(),
+    interacciones: cifra.nullish(),
+  })
+  .refine((v) => v.vistas != null || v.interacciones != null, {
+    message: "Indica al menos una cifra",
+  });
 
 export const actualizarEntregaSchema = z
   .object({

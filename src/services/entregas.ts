@@ -8,6 +8,8 @@ export interface RegistrarEntregaPayload {
   notas?: string | null;
   /** Solo en formatos efímeros. */
   vistasReportadas?: number | null;
+  /** Respuestas y reacciones juntas. Solo en formatos efímeros. */
+  interaccionesReportadas?: number | null;
   /** Qué formato es la pieza. La interfaz lo envía siempre. */
   serviceTypeId?: string | null;
 }
@@ -49,16 +51,21 @@ export function descartarInfluencer(campaignId: string, campaignProfileId: strin
   );
 }
 
-/** Anota las vistas que reportó el creador de una historia o directo. */
-export function registrarVistas(
+/**
+ * Anota lo que reportó el creador de una historia o directo: vistas,
+ * interacciones, o las dos. La que no se manda conserva su último valor.
+ */
+export function registrarCifras(
   campaignId: string,
   entregaId: string,
-  vistas: number
+  cifras: { vistas?: number | null; interacciones?: number | null }
 ) {
-  return apiPost<{ id: string; vistas: number | null; capturadoEn: string }>(
-    `/api/campaigns/${campaignId}/entregas/${entregaId}/vistas`,
-    { vistas }
-  );
+  return apiPost<{
+    id: string;
+    vistas: number | null;
+    interacciones: number | null;
+    capturadoEn: string;
+  }>(`/api/campaigns/${campaignId}/entregas/${entregaId}/vistas`, cifras);
 }
 
 export function fijarFechaLimite(

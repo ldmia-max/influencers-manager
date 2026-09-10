@@ -25,6 +25,11 @@ export interface CapturaMetrica {
   /** MEDIDA la leyó Apify; REPORTADA la dijo el creador. */
   origen: string;
   vistas: number | null;
+  /**
+   * Interacciones en un solo numero, cuando la cifra la anoto una
+   * persona. Nulo en lo que mide el scraper, que si trae el desglose.
+   */
+  interacciones?: number | null;
   meGusta: number | null;
   comentarios: number | null;
   compartidos: number | null;
@@ -201,6 +206,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
               meGusta: number | null;
               comentarios: number | null;
               compartidos: number | null;
+              interacciones: number | null;
               origen: string;
             }[];
           }
@@ -224,7 +230,11 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
     >();
 
     for (const c of actuales) {
+      // Una story trae un unico numero de interacciones porque su autor
+      // no ve mas: no se puede sumar un desglose que la plataforma no da.
+      // Cuando existe manda sobre la suma, que ahi valdria cero.
       const interacciones =
+        c.interacciones ??
         (c.meGusta ?? 0) + (c.comentarios ?? 0) + (c.compartidos ?? 0);
       const esReportada = c.origen === "REPORTADA" ? 1 : 0;
       // Cuantas publicaciones aportan cada cifra. Sin esto no se puede
@@ -233,7 +243,12 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       // decir que nadie lo vio.
       const daVistas = c.vistas !== null ? 1 : 0;
       const daInteracciones =
-        c.meGusta !== null || c.comentarios !== null || c.compartidos !== null ? 1 : 0;
+        c.interacciones != null ||
+        c.meGusta !== null ||
+        c.comentarios !== null ||
+        c.compartidos !== null
+          ? 1
+          : 0;
       const daComentarios = c.comentarios !== null ? 1 : 0;
 
       const persona =
@@ -282,6 +297,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         meGusta: c.meGusta,
         comentarios: c.comentarios,
         compartidos: c.compartidos,
+        interacciones: c.interacciones ?? null,
         origen: c.origen,
       });
       cuenta.vistas += c.vistas ?? 0;
@@ -702,10 +718,18 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                                         : "—"}{" "}
                                       <MessageCircle className="inline h-3 w-3 text-sky-500" />
                                     </span>
-                                    <span title="Me gusta">
-                                      {pieza.meGusta !== null
-                                        ? formatNumber(pieza.meGusta)
-                                        : "—"}{" "}
+                                    <span
+                                      title={
+                                        pieza.interacciones != null
+                                          ? "Interacciones (respuestas y reacciones)"
+                                          : "Me gusta"
+                                      }
+                                    >
+                                      {pieza.interacciones != null
+                                        ? formatNumber(pieza.interacciones)
+                                        : pieza.meGusta !== null
+                                          ? formatNumber(pieza.meGusta)
+                                          : "—"}{" "}
                                       <Heart className="inline h-3 w-3 text-pink-500" />
                                     </span>
                                   </span>
