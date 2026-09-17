@@ -172,6 +172,18 @@ The impact section reports at four altitudes, because they answer different ques
 
 Refresh is `POST /api/cron/metricas`, authenticated with `CRON_SECRET` in the `Authorization` header because the caller is a machine; without that secret the route answers 503 rather than sitting open, since it triggers paid scraping. Schedule it daily. `POST /api/campaigns/[id]/metricas` does the same on demand.
 
+**Deadline warnings.** `src/services/avisos-entregas.ts` emails whoever created the campaign about formats that fall due in `DIAS_DE_AVISO` (2) days, ones whose deadline passed yesterday, and — on Mondays — a reminder of everything still undelivered from before. **One combined email per person per day**, never one per campaign: whoever runs three campaigns should not get three near-identical messages, and a second email arriving in the same minute steals attention from the first. Nobody with nothing to chase gets mail at all; a daily "all clear" is archived unread and drags the ones that matter with it.
+
+Three things hold it up:
+
+- **`AvisoEntrega` records what was already sent**, keyed `(campaignService, tipo, clave)`. Without it any second run of the day — a retry, a redeploy, two cron entries on the same route — repeats the warning, and a repeated warning is the fastest way to stop being read. `clave` is the occasion: the deadline date for `PROXIMO`/`VENCIDO`, so **moving a deadline legitimately warns again**; the send date for `RESUMEN`, so the weekly reminder can repeat weekly.
+- **The email is sent first and recorded after.** If Resend fails the row is not written and tomorrow retries. The other order would mark a warning as delivered because of an outage.
+- **Days are counted in the agency's timezone, not the server's** (`src/lib/fechas-agencia.ts`). The container runs UTC and the team works in Colombia (UTC−5): a deadline stored as the 10th at UTC midnight is the **9th at 19:00** in Bogotá, so comparing raw instants shifts every warning by a day exactly at the boundary. Dates are reduced to `YYYY-MM-DD` *in Bogotá* and compared as strings.
+
+Only `ACTIVE` campaigns with `APPROVED`/`ACTIVO` profiles count, and a format already delivered is never chased — claiming work that was handed in is how these emails stop being opened. The email also reports how many active formats have **no deadline at all**, because a format without `fechaLimite` can never trigger a warning: when this shipped only 1 of 6 formats in the dev database had one, so the service would have sat silent for reasons nobody would have guessed.
+
+**Schedule `POST /api/cron/diario`**, which runs the metrics refresh *and* the warnings behind the same `CRON_SECRET`; the two halves are independent, so Apify being down does not stop anyone learning that a delivery is due today. `/api/cron/metricas` and `/api/cron/entregas` still exist separately, the second so it can be fired without spending Apify credit.
+
 Clients see results at `/client-dashboard/[campaignId]` via `getCampaignResultsForClient(clientId, campaignId)` — **`clientId` in the where clause is the only thing separating one client's results from another's**, and it must come from the signed cookie. Retired profiles and `motivoRetiro` never reach that query. Note the page awaits `params` *inside* the `<Suspense>` boundary: with `cacheComponents`, route params count as uncached data just like cookies, and awaiting them in the page component fails the build.
 
 ### Public (unauthenticated) surfaces
@@ -298,7 +310,7 @@ Data-driven; no schema change needed:
 
 ## Deployment (OVH + Dokploy)
 
-Built from the repo `Dockerfile` (three stages on `node:22-alpine`, `output: "standalone"`), published at `https://influencer-manager.losdemarketing.com`. `docker-entrypoint.sh` runs `prisma migrate deploy` before starting the server (`RUN_MIGRATIONS=false` skips it). Health probe at `/api/health` — 200 with a `SELECT 1`, 503 when the DB is down.
+Built from the repo `Dockerfile` (three stages on `node:22-alpine`, `output: "standalone"`), published at `https://influencer-manager.losdemarketing.com`. `docker-entrypoint.sh` runs `prisma migrate deploy` before starting the server (`RUN_MIGRATIONS=false` skips it). Health probe at `/api/health` — 200 with a `SELECT 1`, 503 when the DB is down. One scheduled task to configure, daily: `POST /api/cron/diario` with `Authorization: Bearer $CRON_SECRET`.
 
 Four constraints that will bite anyone editing this app:
 

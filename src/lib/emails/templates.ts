@@ -280,3 +280,119 @@ export function codigoAprobacionTemplate(params: {
 
   return { subject, html };
 }
+
+// =============================================================================
+// Template 6: Vencimientos de entregas (para quien creo la campana)
+// =============================================================================
+
+interface FilaVencimiento {
+  campana: string;
+  campanaId: string;
+  influencer: string;
+  plataforma: string;
+  formato: string;
+  fechaLimite: Date;
+  entregados: number;
+  esperados: number;
+  diasDeRetraso: number;
+}
+
+function tablaVencimientos(filas: FilaVencimiento[], color: string): string {
+  const celdas = filas
+    .map(
+      (f) => `<tr>
+  <td style="padding:10px 12px;border-bottom:1px solid #f4f4f5;font-size:13px;color:#18181b;">
+    <strong>${f.influencer}</strong><br>
+    <span style="color:#71717a;font-size:12px;">${f.formato} · ${f.plataforma}</span>
+  </td>
+  <td style="padding:10px 12px;border-bottom:1px solid #f4f4f5;font-size:13px;color:#52525b;">
+    ${f.campana}
+  </td>
+  <td style="padding:10px 12px;border-bottom:1px solid #f4f4f5;font-size:13px;color:${color};white-space:nowrap;text-align:right;">
+    ${formatDateOnly(f.fechaLimite)}<br>
+    <span style="font-size:12px;color:#71717a;">${f.entregados} de ${f.esperados} entregados</span>
+  </td>
+</tr>`
+    )
+    .join("");
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;margin:8px 0 24px;">
+  ${celdas}
+</table>`;
+}
+
+function formatDateOnly(date: Date): string {
+  return new Date(date).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/**
+ * Un solo correo al dia por persona, con todo lo que tiene que reclamar.
+ *
+ * Va combinado a proposito: quien tiene una entrega que vence en dos dias
+ * y otra que vencio ayer recibiria dos correos en el mismo minuto, y el
+ * segundo le quitaria atencion al primero.
+ */
+export function vencimientosTemplate(params: {
+  nombre: string | null;
+  proximos: FilaVencimiento[];
+  vencidos: FilaVencimiento[];
+  resumen: FilaVencimiento[];
+  sinFecha: number;
+  baseUrl: string;
+  diasDeAviso: number;
+}): { subject: string; html: string } {
+  const { proximos, vencidos, resumen, sinFecha } = params;
+
+  // El asunto dice lo mas urgente primero: es lo unico que se lee en la
+  // lista del buzon.
+  const partes: string[] = [];
+  if (vencidos.length > 0) partes.push(`${vencidos.length} vencida${vencidos.length === 1 ? "" : "s"}`);
+  if (proximos.length > 0) partes.push(`${proximos.length} por vencer`);
+  if (resumen.length > 0) partes.push(`${resumen.length} sin entregar`);
+  const subject = `Entregas: ${partes.join(" · ")}`;
+
+  const saludo = params.nombre ? `Hola ${params.nombre},` : "Hola,";
+
+  let cuerpo = `<p style="margin:0 0 16px;font-size:15px;color:#3f3f46;">${saludo}</p>
+<p style="margin:0 0 24px;font-size:14px;color:#52525b;line-height:1.6;">
+  Esto es lo que hay pendiente en las campañas que creaste.
+</p>`;
+
+  if (vencidos.length > 0) {
+    cuerpo += `<h2 style="margin:0 0 4px;font-size:15px;color:#b91c1c;">Se venció ayer</h2>
+<p style="margin:0;font-size:13px;color:#71717a;">El plazo pasó y el contenido no está registrado.</p>
+${tablaVencimientos(vencidos, "#b91c1c")}`;
+  }
+
+  if (proximos.length > 0) {
+    cuerpo += `<h2 style="margin:0 0 4px;font-size:15px;color:#a16207;">Vence en ${params.diasDeAviso} días</h2>
+<p style="margin:0;font-size:13px;color:#71717a;">Todavía hay tiempo de recordárselo al creador.</p>
+${tablaVencimientos(proximos, "#a16207")}`;
+  }
+
+  if (resumen.length > 0) {
+    cuerpo += `<h2 style="margin:0 0 4px;font-size:15px;color:#b91c1c;">Sigue sin entregarse</h2>
+<p style="margin:0;font-size:13px;color:#71717a;">De semanas anteriores. Se recuerda una vez por semana.</p>
+${tablaVencimientos(resumen, "#b91c1c")}`;
+  }
+
+  if (sinFecha > 0) {
+    cuerpo += `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border-radius:8px;margin:0 0 24px;">
+  <tr>
+    <td style="padding:14px 16px;font-size:13px;color:#1e40af;line-height:1.6;">
+      Además tienes <strong>${sinFecha} formato${sinFecha === 1 ? "" : "s"} sin fecha de entrega</strong>
+      en campañas activas. Sin plazo no hay aviso posible: si se les pone fecha, entrarán en este correo.
+    </td>
+  </tr>
+</table>`;
+  }
+
+  cuerpo += ctaButton("Ver campañas", `${params.baseUrl}/campaigns`);
+
+  return { subject, html: baseLayout(cuerpo) };
+}

@@ -7,6 +7,7 @@ import {
   campaignApprovedTemplate,
   campaignRejectedTemplate,
   codigoAprobacionTemplate,
+  vencimientosTemplate,
 } from "./templates";
 import { CODIGO_MINUTOS } from "@/lib/approval-session";
 
@@ -157,4 +158,48 @@ export async function notifyCodigoAprobacion(params: {
   });
 
   return sendEmail({ to: params.destino, ...template });
+}
+
+
+/**
+ * Avisa a quien creo la campana de lo que esta por vencer o ya vencio.
+ *
+ * Un solo correo por persona y por dia, con todas sus campanas dentro:
+ * quien lleva tres no deberia recibir tres mensajes iguales con distinto
+ * encabezado. Devuelve el resultado, como el resto, para que la tarea
+ * programada pueda decir cuantos salieron y cuantos no.
+ */
+export async function notifyVencimientos(params: {
+  email: string;
+  nombre: string | null;
+  proximos: FilaDeVencimiento[];
+  vencidos: FilaDeVencimiento[];
+  resumen: FilaDeVencimiento[];
+  sinFecha: number;
+  diasDeAviso: number;
+}): Promise<ResultadoEmail> {
+  const template = vencimientosTemplate({
+    nombre: params.nombre,
+    proximos: params.proximos,
+    vencidos: params.vencidos,
+    resumen: params.resumen,
+    sinFecha: params.sinFecha,
+    baseUrl: getBaseUrl(),
+    diasDeAviso: params.diasDeAviso,
+  });
+
+  return sendEmail({ to: params.email, ...template });
+}
+
+/** Lo que la plantilla necesita saber de cada formato. */
+interface FilaDeVencimiento {
+  campana: string;
+  campanaId: string;
+  influencer: string;
+  plataforma: string;
+  formato: string;
+  fechaLimite: Date;
+  entregados: number;
+  esperados: number;
+  diasDeRetraso: number;
 }

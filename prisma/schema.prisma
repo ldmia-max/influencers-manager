@@ -584,6 +584,9 @@ model CampaignService {
   /// forma de saber cuantas piezas incluye.
   entregas CampaignEntrega[]
 
+  /// Los correos de vencimiento ya enviados por este formato.
+  avisos AvisoEntrega[]
+
   /// Postgres admite varios NULL en un unico, asi que esta restriccion
   /// sigue impidiendo repetir un formato del tarifario en la misma
   /// plataforma, pero permite mas de un combo, que es lo deseable.
@@ -818,6 +821,39 @@ model CampaignEntrega {
 enum OrigenMetrica {
   MEDIDA // Leida de la plataforma por Apify
   REPORTADA // La dijo el creador y alguien de la agencia la anoto
+}
+
+enum TipoAvisoEntrega {
+  PROXIMO /// Vence dentro de DIAS_DE_AVISO
+  VENCIDO /// Se le paso el plazo ayer
+  RESUMEN /// Sigue sin entregarse, recordatorio semanal
+}
+
+/// Que correo de vencimiento se envio ya, para no repetirlo.
+///
+/// Sin esta tabla, cualquier segunda ejecucion del dia —un reintento, un
+/// redespliegue, dos entradas de cron apuntando a la misma ruta— volveria
+/// a avisar de lo mismo, y un aviso repetido es la forma mas rapida de
+/// que dejen de leerse.
+///
+/// `clave` es la ocasion concreta del aviso, y por eso entra en el
+/// unico:
+///  - PROXIMO y VENCIDO: la fecha limite (YYYY-MM-DD). Si alguien mueve
+///    el plazo, la clave cambia y el aviso vuelve a salir, que es lo
+///    correcto: es otro vencimiento.
+///  - RESUMEN: el dia en que se envio, asi el recordatorio semanal puede
+///    repetirse cada semana sin chocar consigo mismo.
+model AvisoEntrega {
+  id        String           @id @default(cuid())
+  tipo      TipoAvisoEntrega
+  clave     String
+  enviadoEn DateTime         @default(now())
+
+  campaignService   CampaignService @relation(fields: [campaignServiceId], references: [id], onDelete: Cascade)
+  campaignServiceId String
+
+  @@unique([campaignServiceId, tipo, clave])
+  @@index([enviadoEn])
 }
 
 model CampaignEntregaMetrica {
