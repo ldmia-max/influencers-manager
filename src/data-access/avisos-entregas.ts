@@ -37,6 +37,8 @@ export interface AvisosDeUnaPersona {
   email: string;
   nombre: string | null;
   proximos: FormatoEnRiesgo[];
+  /** Vence hoy: el ultimo dia en que todavia se puede salvar. */
+  hoy: FormatoEnRiesgo[];
   vencidos: FormatoEnRiesgo[];
   /** Solo los lunes: lo que sigue incumplido de dias anteriores. */
   resumen: FormatoEnRiesgo[];
@@ -173,6 +175,7 @@ export async function avisosDelDia(ahora: Date = new Date()): Promise<AvisosDeUn
       email,
       nombre,
       proximos: [],
+      hoy: [],
       vencidos: [],
       resumen: [],
       sinFecha: sinFechaPorCreador.get(usuarioId) ?? 0,
@@ -201,6 +204,17 @@ export async function avisosDelDia(ahora: Date = new Date()): Promise<AvisosDeUn
       continue;
     }
 
+    // El dia del vencimiento, por la manana, todavia da tiempo a llamar
+    // al creador. Sin este aviso el hueco entre el de dos dias antes y el
+    // del dia siguiente puede ser de tres dias si el plazo cae en fin de
+    // semana.
+    if (dia === hoy && !yaAvisado("HOY", claveDelPlazo)) {
+      dePersona(campana.createdById, email, campana.createdBy.name).hoy.push(
+        describir(servicio, ahora)
+      );
+      continue;
+    }
+
     if (dia === diaAyer && !yaAvisado("VENCIDO", claveDelPlazo)) {
       dePersona(campana.createdById, email, campana.createdBy.name).vencidos.push(
         describir(servicio, ahora)
@@ -222,7 +236,11 @@ export async function avisosDelDia(ahora: Date = new Date()): Promise<AvisosDeUn
   // diciendo "todo en orden" se archiva sin abrir, y arrastra a los que
   // si importan.
   return [...porPersona.values()].filter(
-    (p) => p.proximos.length > 0 || p.vencidos.length > 0 || p.resumen.length > 0
+    (p) =>
+      p.proximos.length > 0 ||
+      p.hoy.length > 0 ||
+      p.vencidos.length > 0 ||
+      p.resumen.length > 0
   );
 }
 
@@ -236,6 +254,11 @@ export async function registrarAvisos(
     ...persona.proximos.map((f) => ({
       campaignServiceId: f.campaignServiceId,
       tipo: "PROXIMO" as const,
+      clave: diaEnAgencia(f.fechaLimite),
+    })),
+    ...persona.hoy.map((f) => ({
+      campaignServiceId: f.campaignServiceId,
+      tipo: "HOY" as const,
       clave: diaEnAgencia(f.fechaLimite),
     })),
     ...persona.vencidos.map((f) => ({

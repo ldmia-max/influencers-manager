@@ -340,18 +340,20 @@ function formatDateOnly(date: Date): string {
 export function vencimientosTemplate(params: {
   nombre: string | null;
   proximos: FilaVencimiento[];
+  hoy: FilaVencimiento[];
   vencidos: FilaVencimiento[];
   resumen: FilaVencimiento[];
   sinFecha: number;
   baseUrl: string;
   diasDeAviso: number;
 }): { subject: string; html: string } {
-  const { proximos, vencidos, resumen, sinFecha } = params;
+  const { proximos, hoy, vencidos, resumen, sinFecha } = params;
 
   // El asunto dice lo mas urgente primero: es lo unico que se lee en la
   // lista del buzon.
   const partes: string[] = [];
   if (vencidos.length > 0) partes.push(`${vencidos.length} vencida${vencidos.length === 1 ? "" : "s"}`);
+  if (hoy.length > 0) partes.push(`${hoy.length} vence${hoy.length === 1 ? "" : "n"} hoy`);
   if (proximos.length > 0) partes.push(`${proximos.length} por vencer`);
   if (resumen.length > 0) partes.push(`${resumen.length} sin entregar`);
   const subject = `Entregas: ${partes.join(" · ")}`;
@@ -367,6 +369,12 @@ export function vencimientosTemplate(params: {
     cuerpo += `<h2 style="margin:0 0 4px;font-size:15px;color:#b91c1c;">Se venció ayer</h2>
 <p style="margin:0;font-size:13px;color:#71717a;">El plazo pasó y el contenido no está registrado.</p>
 ${tablaVencimientos(vencidos, "#b91c1c")}`;
+  }
+
+  if (hoy.length > 0) {
+    cuerpo += `<h2 style="margin:0 0 4px;font-size:15px;color:#c2410c;">Vence hoy</h2>
+<p style="margin:0;font-size:13px;color:#71717a;">Último día. Todavía da tiempo a recordárselo al creador.</p>
+${tablaVencimientos(hoy, "#c2410c")}`;
   }
 
   if (proximos.length > 0) {

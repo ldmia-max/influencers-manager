@@ -17,6 +17,7 @@ export interface ResumenDeAvisos {
   enviados: number;
   fallidos: { email: string; motivo: string }[];
   proximos: number;
+  hoy: number;
   vencidos: number;
   recordados: number;
 }
@@ -38,6 +39,7 @@ export async function enviarAvisosDeEntregas(): Promise<ResumenDeAvisos> {
     enviados: 0,
     fallidos: [],
     proximos: 0,
+    hoy: 0,
     vencidos: 0,
     recordados: 0,
   };
@@ -47,6 +49,7 @@ export async function enviarAvisosDeEntregas(): Promise<ResumenDeAvisos> {
       email: persona.email,
       nombre: persona.nombre,
       proximos: persona.proximos,
+      hoy: persona.hoy,
       vencidos: persona.vencidos,
       resumen: persona.resumen,
       sinFecha: persona.sinFecha,
@@ -61,13 +64,15 @@ export async function enviarAvisosDeEntregas(): Promise<ResumenDeAvisos> {
     await registrarAvisos(persona, ahora);
     resumen.enviados++;
     resumen.proximos += persona.proximos.length;
+    resumen.hoy += persona.hoy.length;
     resumen.vencidos += persona.vencidos.length;
     resumen.recordados += persona.resumen.length;
   }
 
   console.log(
     `[cron/entregas] ${resumen.enviados} de ${resumen.destinatarios} correos ·` +
-      ` ${resumen.vencidos} vencidas, ${resumen.proximos} por vencer,` +
+      ` ${resumen.vencidos} vencidas, ${resumen.hoy} vencen hoy,` +
+      ` ${resumen.proximos} por vencer,` +
       ` ${resumen.recordados} recordadas`
   );
   return resumen;

@@ -173,6 +173,7 @@ export async function notifyVencimientos(params: {
   email: string;
   nombre: string | null;
   proximos: FilaDeVencimiento[];
+  hoy: FilaDeVencimiento[];
   vencidos: FilaDeVencimiento[];
   resumen: FilaDeVencimiento[];
   sinFecha: number;
@@ -181,6 +182,7 @@ export async function notifyVencimientos(params: {
   const template = vencimientosTemplate({
     nombre: params.nombre,
     proximos: params.proximos,
+    hoy: params.hoy,
     vencidos: params.vencidos,
     resumen: params.resumen,
     sinFecha: params.sinFecha,

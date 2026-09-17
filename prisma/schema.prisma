@@ -825,6 +825,7 @@ enum OrigenMetrica {
 
 enum TipoAvisoEntrega {
   PROXIMO /// Vence dentro de DIAS_DE_AVISO
+  HOY /// Vence hoy: ultimo dia para salvarlo
   VENCIDO /// Se le paso el plazo ayer
   RESUMEN /// Sigue sin entregarse, recordatorio semanal
 }
