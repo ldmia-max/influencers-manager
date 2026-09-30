@@ -876,6 +876,14 @@ model CampaignEntregaMetrica {
   compartidos Int?
   guardados   Int?
 
+  /// Veces que se reposteo, el boton "Repost" de TikTok.
+  ///
+  /// Es distinto de `compartidos`: compartir es enviarlo a alguien o
+  /// sacarlo de la app; repostear es publicarlo en el propio perfil. Solo
+  /// TikTok lo distingue, asi que en el resto va nulo, como los
+  /// compartidos y los guardados.
+  reposteos Int?
+
   /// Interacciones en un solo numero, para las cifras REPORTADAS.
   ///
   /// Una story no se puede desglosar: su autor ve un total de respuestas

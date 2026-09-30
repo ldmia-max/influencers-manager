@@ -79,6 +79,7 @@ async function Contenido({ params }: PageProps) {
             comentarios: m.comentarios,
             compartidos: m.compartidos,
             guardados: m.guardados,
+            reposteos: m.reposteos,
             entregaId: e.id,
             url: e.url,
             formato: e.serviceType?.displayName ?? null,

@@ -873,6 +873,7 @@ export async function getCampaignResultsForClient(
                           comentarios: true,
                           compartidos: true,
                           guardados: true,
+                          reposteos: true,
                         },
                       },
                     },

@@ -648,6 +648,8 @@ export interface MetricasPublicacion {
   comentarios: number | null;
   compartidos: number | null;
   guardados: number | null;
+  /** Solo TikTok: publicar el video en el perfil propio. */
+  reposteos: number | null;
 }
 
 /** De que red es un link, mirando su dominio. */
@@ -720,6 +722,7 @@ export async function obtenerMetricasDePublicaciones(
           comentarios: num(it.commentCount),
           compartidos: num(it.shareCount),
           guardados: num(it.collectCount),
+          reposteos: num(it.repostCount),
         });
       }
       return mapa;
@@ -742,9 +745,10 @@ export async function obtenerMetricasDePublicaciones(
           vistas: num(it.videoPlayCount) ?? num(it.videoViewCount),
           meGusta: num(it.likesCount),
           comentarios: num(it.commentsCount),
-          // Instagram no publica compartidos ni guardados.
+          // Instagram no publica compartidos, guardados ni reposteos.
           compartidos: null,
           guardados: null,
+          reposteos: null,
         });
       }
       return mapa;
@@ -769,6 +773,7 @@ export async function obtenerMetricasDePublicaciones(
           comentarios: num(it.commentsCount),
           compartidos: null,
           guardados: null,
+          reposteos: null,
         });
       }
       return mapa;

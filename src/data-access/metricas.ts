@@ -108,6 +108,7 @@ export async function refrescarMetricas(
           comentarios: m.comentarios,
           compartidos: m.compartidos,
           guardados: m.guardados,
+          reposteos: m.reposteos,
         };
       })
       .filter((f): f is NonNullable<typeof f> => f !== null);
@@ -170,6 +171,7 @@ export async function historicoDeCampana(campaignId: string) {
       comentarios: true,
       compartidos: true,
       guardados: true,
+      reposteos: true,
       entrega: {
         select: {
           id: true,

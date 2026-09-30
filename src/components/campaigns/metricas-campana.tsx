@@ -14,7 +14,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Eye, Heart, Loader2, MessageCircle, RefreshCw, Share2, TrendingUp } from "lucide-react";
+import {
+  Eye,
+  Heart,
+  Loader2,
+  MessageCircle,
+  RefreshCw,
+  Repeat2,
+  Share2,
+  TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
@@ -34,6 +43,8 @@ export interface CapturaMetrica {
   comentarios: number | null;
   compartidos: number | null;
   guardados: number | null;
+  /** Solo TikTok: publicar el contenido en el perfil propio. */
+  reposteos?: number | null;
   entregaId: string;
   /** Enlace de la publicación. Vacío en formatos sin enlace permanente. */
   url?: string | null;
@@ -56,6 +67,7 @@ const SERIES = [
   { clave: "meGusta" as const, nombre: "Me gusta", color: "#ec4899", icono: Heart },
   { clave: "comentarios" as const, nombre: "Comentarios", color: "#0ea5e9", icono: MessageCircle },
   { clave: "compartidos" as const, nombre: "Compartidos", color: "#22c55e", icono: Share2 },
+  { clave: "reposteos" as const, nombre: "Reposteos", color: "#f97316", icono: Repeat2 },
 ];
 
 /**
@@ -206,6 +218,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
               meGusta: number | null;
               comentarios: number | null;
               compartidos: number | null;
+              reposteos: number | null;
               interacciones: number | null;
               origen: string;
             }[];
@@ -235,7 +248,10 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       // Cuando existe manda sobre la suma, que ahi valdria cero.
       const interacciones =
         c.interacciones ??
-        (c.meGusta ?? 0) + (c.comentarios ?? 0) + (c.compartidos ?? 0);
+        (c.meGusta ?? 0) +
+          (c.comentarios ?? 0) +
+          (c.compartidos ?? 0) +
+          (c.reposteos ?? 0);
       const esReportada = c.origen === "REPORTADA" ? 1 : 0;
       // Cuantas publicaciones aportan cada cifra. Sin esto no se puede
       // distinguir "no tuvo vistas" de "esta red no las publica": un
@@ -246,7 +262,8 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         c.interacciones != null ||
         c.meGusta !== null ||
         c.comentarios !== null ||
-        c.compartidos !== null
+        c.compartidos !== null ||
+        c.reposteos != null
           ? 1
           : 0;
       const daComentarios = c.comentarios !== null ? 1 : 0;
@@ -297,6 +314,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         meGusta: c.meGusta,
         comentarios: c.comentarios,
         compartidos: c.compartidos,
+        reposteos: c.reposteos ?? null,
         interacciones: c.interacciones ?? null,
         origen: c.origen,
       });
@@ -743,6 +761,12 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                                         ? formatNumber(pieza.compartidos)
                                         : "—"}{" "}
                                       <Share2 className="inline h-3 w-3 text-green-600" />
+                                    </span>
+                                    <span title="Reposteos">
+                                      {pieza.reposteos !== null
+                                        ? formatNumber(pieza.reposteos)
+                                        : "—"}{" "}
+                                      <Repeat2 className="inline h-3 w-3 text-orange-500" />
                                     </span>
                                   </span>
                                 </li>

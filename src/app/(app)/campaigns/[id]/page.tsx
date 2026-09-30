@@ -139,6 +139,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       comentarios: m.comentarios,
       compartidos: m.compartidos,
       guardados: m.guardados,
+      reposteos: m.reposteos,
       entregaId: m.entrega.id,
       url: m.entrega.url,
       formato: m.entrega.serviceType?.displayName ?? null,

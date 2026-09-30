@@ -1,0 +1,11 @@
+-- Veces que se reposteo una publicacion: el boton "Repost" de TikTok.
+--
+-- Es distinto de compartir: compartir es enviarlo a alguien o sacarlo de
+-- la app; repostear es publicarlo en el perfil propio. TikTok los cuenta
+-- por separado y ya venia en la misma respuesta del actor que ya se
+-- consulta, asi que no hay ninguna llamada nueva: solo se estaba
+-- descartando.
+--
+-- Nulo en lo ya guardado y en el resto de redes, que no publican la
+-- cifra, igual que los compartidos y los guardados.
+ALTER TABLE "CampaignEntregaMetrica" ADD COLUMN "reposteos" INTEGER;
