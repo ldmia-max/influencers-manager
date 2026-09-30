@@ -732,6 +732,18 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                                           : "—"}{" "}
                                       <Heart className="inline h-3 w-3 text-pink-500" />
                                     </span>
+                                    {/* Compartidos solo los publica TikTok.
+                                        Se pinta siempre, con raya donde la
+                                        red no lo da: quitar la columna en
+                                        unas filas y no en otras desalinea
+                                        la lista y esconde que el dato
+                                        existe. */}
+                                    <span title="Compartidos">
+                                      {pieza.compartidos !== null
+                                        ? formatNumber(pieza.compartidos)
+                                        : "—"}{" "}
+                                      <Share2 className="inline h-3 w-3 text-green-600" />
+                                    </span>
                                   </span>
                                 </li>
                               ))
