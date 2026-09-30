@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Eye,
+  FileText,
   Heart,
   Trash2,
   UserMinus,
@@ -45,6 +46,7 @@ import {
 import {
   registrarEntrega,
   registrarCifras,
+  actualizarEntrega,
   eliminarEntrega,
   fijarFechaLimite,
   cambiarParticipacion,
@@ -153,6 +155,12 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [fechaEmision, setFechaEmision] = useState<Record<string, string>>({});
   const [vistasNuevas, setVistasNuevas] = useState<Record<string, string>>({});
   const [interNuevas, setInterNuevas] = useState<Record<string, string>>({});
+  // Observaciones sobre el contenido: por formato mientras se registra,
+  // por entrega cuando ya existe.
+  const [notaNueva, setNotaNueva] = useState<Record<string, string>>({});
+  const [notaEntrega, setNotaEntrega] = useState<Record<string, string>>({});
+  const [editandoNota, setEditandoNota] = useState<string | null>(null);
+  const [notasGuardadas, setNotasGuardadas] = useState<Record<string, string>>({});
   // Formato señalado para la próxima pieza de cada bloque.
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
   const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
@@ -448,8 +456,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                 return (
                                 <li
                                   key={entrega.id}
-                                  className="flex items-center gap-2 text-xs"
+                                  className="space-y-1 text-xs"
                                 >
+                                  <div className="flex items-center gap-2">
                                   {entrega.formato && (
                                     <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
                                       {entrega.formato.nombre}
@@ -623,6 +632,94 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   )}
+                                  </div>
+
+                                  {/* La descripcion, bajo su entrega. Suele
+                                      llegar despues del enlace —al revisar
+                                      el contenido— asi que se puede escribir
+                                      o corregir en cualquier momento. */}
+                                  {editandoNota === entrega.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        autoFocus
+                                        placeholder="Descripción u observaciones"
+                                        value={notaEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setNotaEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        maxLength={500}
+                                        className="h-6 flex-1 text-xs"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="shrink-0 text-violet-700 hover:underline disabled:opacity-40"
+                                        disabled={ocupado === `nota-${entrega.id}`}
+                                        onClick={() =>
+                                          conError(`nota-${entrega.id}`, async () => {
+                                            const texto = (
+                                              notaEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            await actualizarEntrega(
+                                              campaignId,
+                                              entrega.id,
+                                              { notas: texto || null }
+                                            );
+                                            setNotasGuardadas((n) => ({
+                                              ...n,
+                                              [entrega.id]: texto,
+                                            }));
+                                            setEditandoNota(null);
+                                          })
+                                        }
+                                      >
+                                        Guardar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="shrink-0 text-gray-400 hover:underline"
+                                        onClick={() => setEditandoNota(null)}
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    (() => {
+                                      const nota =
+                                        notasGuardadas[entrega.id] ?? entrega.notas ?? "";
+                                      return (
+                                        <div className="flex items-start gap-1 text-[11px]">
+                                          <FileText className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" />
+                                          {nota ? (
+                                            <span className="min-w-0 flex-1 text-gray-600">
+                                              {nota}
+                                            </span>
+                                          ) : (
+                                            <span className="min-w-0 flex-1 text-gray-400">
+                                              Sin descripción
+                                            </span>
+                                          )}
+                                          {puedeEditar && (
+                                            <button
+                                              type="button"
+                                              className="shrink-0 text-violet-700 hover:underline"
+                                              onClick={() => {
+                                                setNotaEntrega((v) => ({
+                                                  ...v,
+                                                  [entrega.id]: nota,
+                                                }));
+                                                setEditandoNota(entrega.id);
+                                              }}
+                                            >
+                                              {nota ? "Editar" : "Añadir"}
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })()
+                                  )}
                                 </li>
                                 );
                               })}
@@ -737,6 +834,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               interaccionesReportadas: inter
                                                 ? Number(inter)
                                                 : null,
+                                              notas: (notaNueva[formato.id] ?? "").trim() || null,
                                             }
                                           );
                                           pintarYa(formato.id, {
@@ -748,7 +846,8 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             },
                                             entregadoEn: creada.entregadoEn,
                                             publicadoEn,
-                                            notas: null,
+                                            notas:
+                                              (notaNueva[formato.id] ?? "").trim() || null,
                                             registradoPor: null,
                                             metricas: vistas || inter
                                               ? [
@@ -776,6 +875,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             [formato.id]: "",
                                           }));
                                           setInterNuevas((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                          setNotaNueva((v) => ({
                                             ...v,
                                             [formato.id]: "",
                                           }));
@@ -819,6 +922,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               campaignServiceId: formato.id,
                                               serviceTypeId: tipoId,
                                               url: nuevoLink[formato.id],
+                                              notas: (notaNueva[formato.id] ?? "").trim() || null,
                                             }
                                           );
                                           pintarYa(formato.id, {
@@ -830,11 +934,16 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             },
                                             entregadoEn: creada.entregadoEn,
                                             publicadoEn: null,
-                                            notas: null,
+                                            notas:
+                                              (notaNueva[formato.id] ?? "").trim() || null,
                                             registradoPor: null,
                                             metricas: [],
                                           });
                                           setNuevoLink((v) => ({
+                                            ...v,
+                                            [formato.id]: "",
+                                          }));
+                                          setNotaNueva((v) => ({
                                             ...v,
                                             [formato.id]: "",
                                           }));
@@ -850,6 +959,25 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   </>
                                 )}
                               </div>
+
+                              {/* Una entrega es un enlace o una fecha, y eso
+                                  no dice si el contenido se salio del
+                                  guion, si hubo que reeditarlo o por que
+                                  se publico tarde. Eso se escribe aqui. */}
+                              {tipoNuevo && (
+                                <Input
+                                  placeholder="Descripción u observaciones (opcional)"
+                                  value={notaNueva[formato.id] ?? ""}
+                                  onChange={(e) =>
+                                    setNotaNueva((v) => ({
+                                      ...v,
+                                      [formato.id]: e.target.value,
+                                    }))
+                                  }
+                                  maxLength={500}
+                                  className="h-8 text-xs"
+                                />
+                              )}
 
                               {nuevaEsEfimera && (
                                 <p className="text-[11px] text-gray-500">
