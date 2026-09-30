@@ -101,7 +101,9 @@ export const briefSchema = z
     // ---------- 06 Creadores de contenido ----------
     creadoresSugeridos: z.array(creadorSugeridoSchema).default([]),
     nichos: z.array(z.string()).min(1, "Selecciona al menos un nicho o categoria"),
-    plataformas: z.array(z.string()).default([]),
+    plataformas: z
+      .array(z.string())
+      .min(1, "Selecciona al menos una plataforma"),
     tamanoAudiencia: opcional,
     cantidadCreadores: opcional,
     ciudadPaisCreador: opcional,

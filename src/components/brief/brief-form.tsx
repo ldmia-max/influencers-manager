@@ -87,7 +87,7 @@ const PASOS: PasoBrief[] = [
   { numero: "05", titulo: "Enlaces y menciones", corto: "Enlaces",
     campos: ["usuariosEtiquetar"] },
   { numero: "06", titulo: "Creadores de contenido", corto: "Creadores",
-    campos: ["nichos"] },
+    campos: ["nichos", "plataformas"] },
   { numero: "07", titulo: "Condiciones legales y de uso", corto: "Legal",
     campos: ["colaboracionConMarca"] },
   { numero: "08", titulo: "Documentos adjuntos", corto: "Adjuntos", campos: [] },
@@ -545,9 +545,11 @@ export function BriefForm({
                 onChange={(v) => set("nichos", v)}
                 placeholder="Selecciona los nichos" />
             </Campo>
-            <GrupoCheck label="Plataformas prioritarias" seleccion={d.plataformas}
+            <GrupoCheck label="Plataformas prioritarias" required
+              hint="Puedes elegir varias" error={errores.plataformas}
+              seleccion={d.plataformas}
               onChange={(v) => set("plataformas", v)}
-              opciones={["Instagram", "TikTok", "YouTube", "Twitch", "LinkedIn", "Podcast"]} />
+              opciones={["Instagram", "TikTok", "YouTube", "Twitch", "LinkedIn", "Podcast", "Embajador"]} />
             <GrupoRadio label="Tamaño de audiencia deseado" name="audiencia"
               valor={d.tamanoAudiencia} onChange={(v) => set("tamanoAudiencia", v)}
               opciones={[
