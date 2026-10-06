@@ -29,17 +29,23 @@ export function CampaignTabs({ pestanas }: { pestanas: PestanaCampana[] }) {
 
   return (
     <Tabs defaultValue={pestanas[0].valor} className="gap-4">
-      {/* overflow-x-auto: en movil las cinco pestanas no caben, y es
-          preferible deslizarlas a que se apilen y empujen la ficha. */}
-      <div className="overflow-x-auto">
-        <TabsList>
-          {pestanas.map((p) => (
-            <TabsTrigger key={p.valor} value={p.valor} className="whitespace-nowrap">
-              {p.etiqueta}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </div>
+      {/* Las pestanas ocupan todo el ancho y se reparten en partes
+          iguales: w-full en la lista mas el flex-1 que el boton ya
+          trae. Sin barra de desplazamiento -- en pantallas estrechas
+          la etiqueta parte en dos lineas (whitespace-normal) y la
+          lista crece con ella (h-auto), en vez de esconder pestanas
+          detras de un deslizamiento que no se ve que este ahi. */}
+      <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full">
+        {pestanas.map((p) => (
+          <TabsTrigger
+            key={p.valor}
+            value={p.valor}
+            className="h-auto py-1.5 text-center whitespace-normal"
+          >
+            {p.etiqueta}
+          </TabsTrigger>
+        ))}
+      </TabsList>
 
       {pestanas.map((p) => (
         <TabsContent key={p.valor} value={p.valor} className="space-y-6">
