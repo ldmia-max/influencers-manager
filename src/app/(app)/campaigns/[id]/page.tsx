@@ -41,6 +41,10 @@ import { EditarMargen } from "@/components/campaigns/editar-margen";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
 import { MetricasCampana } from "@/components/campaigns/metricas-campana";
+import {
+  CampaignTabs,
+  type PestanaCampana,
+} from "@/components/campaigns/campaign-tabs";
 import { historicoDeCampana } from "@/data-access/metricas";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
 
@@ -276,6 +280,443 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     }
   };
 
+
+  /* Las secciones de la ficha, repartidas en pestanas. Se arman aqui,
+     en el servidor, de modo que cambiar de pestana no vuelve a consultar
+     la base de datos: los paneles viajan ya renderizados.
+
+     Las que no aplican no se anaden. Una campana que todavia no arranco
+     no tiene nada que entregar ni que medir, y una pestana vacia invita
+     a pulsarla para no encontrar nada. */
+  const pestanas: PestanaCampana[] = [
+    {
+      valor: "general",
+      etiqueta: "General",
+      contenido: (
+        <>
+          {/* Contacto, fechas y el resumen economico. Resumen va el
+              ultimo porque es el que se consulta con mas detenimiento:
+              los otros dos se leen de un golpe. */}
+          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {/* Contacto */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Contacto
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="font-medium">
+                  {campaign.clientContact.firstName}{" "}
+                  {campaign.clientContact.lastName}
+                </p>
+                {campaign.clientContact.position && (
+                  <p className="text-sm text-gray-500">
+                    {campaign.clientContact.position}
+                  </p>
+                )}
+                <p className="text-sm text-gray-500">
+                  {campaign.clientContact.email}
+                </p>
+                {campaign.clientContact.phone && (
+                  <p className="text-sm text-gray-500">
+                    {campaign.clientContact.phone}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Fechas */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Fechas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Inicio:</span>
+                  <span>
+                    {campaign.startDate
+                      ? new Date(campaign.startDate).toLocaleDateString("es-CO")
+                      : "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Fin:</span>
+                  <span>
+                    {campaign.endDate
+                      ? new Date(campaign.endDate).toLocaleDateString("es-CO")
+                      : "-"}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Creado:</span>
+                  <span>
+                    {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Por:</span>
+                  <span>{campaign.createdBy.name}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Resumen */}
+            <Card className={isOverBudget ? "border-red-300" : ""}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Resumen
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Presupuesto:</span>
+                  <span className="font-bold">
+                    ${formatNumber(budget.toString())}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 text-gray-500">
+                    Margen:
+                    {esAdmin && (
+                      <EditarMargen
+                        campaignId={campaign.id}
+                        markupActual={campaign.markupPercentage}
+                        yaEnviadaAlCliente={campaign.status !== "DRAFT"}
+                      />
+                    )}
+                  </span>
+                  <span className="font-medium">
+                    {Math.round(campaign.markupPercentage * 1000) / 10}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total:</span>
+                  <span
+                    className={`font-bold ${
+                      isOverBudget ? "text-red-600" : "text-green-600"
+                    }`}
+                  >
+                    ${formatNumber(totalCampaign.toFixed(0))}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-gray-500">
+                    {isOverBudget ? "Excedente:" : "Disponible:"}
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      isOverBudget ? "text-red-600" : "text-blue-600"
+                    }`}
+                  >
+                    ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Composicion de la campana, a lo ancho.
+              Estos desgloses vivian dentro de Resumen, en una columna
+              estrecha donde cada formato y cada departamento caia en su
+              propia linea y la tarjeta crecia sin fin. En una franja
+              horizontal se leen de un vistazo y Resumen se queda con lo que
+              de verdad es: las cifras de dinero. */}
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-3 py-4">
+              {totalReach > 0 && (
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-gray-500">Alcance Estimado:</span>
+                  <span className="font-bold text-green-600">
+                    {formatCompactNumber(totalReach)}{" "}
+                    <span className="text-sm font-normal text-gray-500">
+                      ({totalReach.toLocaleString()})
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Perfiles:</span>
+                <span className="font-medium">{profileCounts.total}</span>
+              </div>
+
+              {formatCounts.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-gray-500">Formatos:</span>
+                  {[...formatCounts.entries()].map(([name, count]) => (
+                    <Badge key={name} variant="secondary" className="text-xs">
+                      {name} ({count})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {genderCounts.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-gray-500">Géneros:</span>
+                  {[...genderCounts.entries()].map(([name, count]) => (
+                    <Badge key={name} variant="outline" className="text-xs">
+                      {name} ({count})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {departmentCounts.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-gray-500">Departamentos:</span>
+                  {[...departmentCounts.entries()].map(([name, count]) => (
+                    <Badge key={name} variant="outline" className="text-xs">
+                      {name} ({count})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Descripción */}
+          {campaign.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Descripción</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">{campaign.description}</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ),
+    },
+    {
+      valor: "perfiles",
+      etiqueta: "Perfiles y formatos",
+      contenido: (
+        <>
+          {/* Perfiles y Formatos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Perfiles y Formatos
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  ({campaign.profiles.length} perfil
+                  {campaign.profiles.length !== 1 ? "es" : ""})
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {campaign.profiles.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  No hay perfiles asignados a esta campaña.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {campaign.profiles.map((cp) => (
+                    <div key={cp.id} className={`border rounded-lg p-4 ${
+                      cp.status === "REJECTED" ? "border-red-300 bg-red-50" :
+                      cp.status === "APPROVED" ? "border-green-300 bg-green-50" : ""
+                    }`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <h3 className="font-medium">{cp.profile.name}</h3>
+                            <Badge variant="secondary" className="mt-1">
+                              {cp.profile.type === "INFLUENCER"
+                                ? "Influencer"
+                                : cp.profile.type === "UGC"
+                                ? "UGC"
+                                : "Ambos"}
+                            </Badge>
+                          </div>
+                        </div>
+                        {/* Estado del perfil en la campaña */}
+                        {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
+                          <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
+                            {PROFILE_STATUS_LABELS[cp.status]}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Motivo de rechazo */}
+                      {cp.status === "REJECTED" && cp.rejectionReason && (
+                        <div className="mb-4 p-3 bg-red-100 rounded-lg">
+                          <p className="text-sm text-red-800">
+                            <strong>Motivo de rechazo:</strong> {cp.rejectionReason}
+                          </p>
+                        </div>
+                      )}
+
+                      {cp.platforms.map((cpp) => {
+                        const followers = cpp.socialAccount.followers || 0;
+                        const reach = calculateReach(followers, reachRanges);
+                        const reachPercent = getReachPercentage(followers, reachRanges);
+
+                        return (
+                          <div key={cpp.id} className="ml-4 mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                {getPlatformIcon(cpp.socialAccount.platform.name)}
+                                <span className="font-medium">
+                                  {cpp.socialAccount.platform.displayName}
+                                </span>
+                                <Badge variant="outline">
+                                  @{cpp.socialAccount.username}
+                                </Badge>
+                              </div>
+                              {followers > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  <span>{followers.toLocaleString()} seguidores</span>
+                                  <span className="mx-2">|</span>
+                                  <span className="text-green-600">
+                                    {reach?.toLocaleString()} alcance ({reachPercent}%)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Formato</TableHead>
+                                  <TableHead className="text-center">
+                                    Cantidad
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Precio
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Subtotal
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {cpp.services.map((cs) => {
+                                  const basePrice = Number(cs.basePrice);
+                                  const price = calculateMarkupPrice(
+                                    basePrice,
+                                    campaign.markupPercentage
+                                  );
+                                  const subtotal = price * cs.quantity;
+
+                                  return (
+                                    <TableRow key={cs.id}>
+                                      <TableCell>
+                                        {cs.esCombo ? (
+                                          <>
+                                            Combo
+                                            {cs.comboDescripcion && (
+                                              <span className="ml-1 text-xs text-gray-500">
+                                                ({cs.comboDescripcion})
+                                              </span>
+                                            )}
+                                          </>
+                                        ) : (
+                                          cs.profileService!.serviceType.displayName
+                                        )}
+                                        {cs.clientNotes && (
+                                          <p className="text-xs text-muted-foreground mt-1 italic">
+                                            Tema: &ldquo;{cs.clientNotes}&rdquo;
+                                          </p>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {cs.quantity}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        ${formatNumber(price.toFixed(0))}
+                                      </TableCell>
+                                      <TableCell className="text-right font-medium">
+                                        ${formatNumber(subtotal.toFixed(0))}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sustituciones: solo con la campana en marcha. Antes de activarla
+              los cambios se hacen en el editor, que permite mucho mas. */}
+          {campaign.status === "ACTIVE" && (
+            <ReemplazarInfluencer
+              campaignId={id}
+              profiles={catalogoParaSustituir}
+              presupuestoLiberado={totales.liberado}
+              totalActual={totalCampaign}
+              presupuesto={budget}
+              pendientes={pendientesDeAprobacion}
+              markup={campaign.markupPercentage}
+            />
+          )}
+        </>
+      ),
+    },
+  ];
+
+  if (yaArranco) {
+    pestanas.push({
+      valor: "entregas",
+      etiqueta: "Entregas de contenido",
+      contenido: (
+        <EntregasCampana
+          campaignId={id}
+          perfiles={perfilesEntregas}
+          puedeEditar={enMarcha}
+        />
+      ),
+    });
+
+    pestanas.push({
+      valor: "impacto",
+      etiqueta: "Impacto del contenido",
+      contenido: (
+        <MetricasCampana
+          campaignId={id}
+          capturas={capturas}
+          puedeRefrescar={campaign.status === "ACTIVE" || campaign.status === "COMPLETED"}
+        />
+      ),
+    });
+  }
+
+  // El enlace tambien en campanas ACTIVE: de ahi sale el enlace con el
+  // que el cliente aprueba un reemplazo.
+  if (
+    campaign.approvalTokens.length > 0 ||
+    campaign.status === "REVIEW" ||
+    campaign.status === "ACTIVE"
+  ) {
+    pestanas.push({
+      valor: "aprobacion",
+      etiqueta: "Enlace de aprobación",
+      contenido: (
+        <ApprovalTokensCard
+          campaignId={id}
+          tokens={campaign.approvalTokens}
+          campaignStatus={campaign.status}
+        />
+      ),
+    });
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -301,165 +742,39 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Acciones de estado */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Acciones</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CampaignStatusActions
-            campaignId={id}
-            currentStatus={campaign.status}
-            profilesCount={profileCounts.total}
-            approvedCount={profileCounts.approved}
-            rejectedCount={profileCounts.rejected}
-            pendingCount={profileCounts.pending}
-          />
-        </CardContent>
-      </Card>
+      {/* Cliente y acciones quedan fuera de las pestanas: de quien es la
+          campana y que se puede hacer con ella se consultan desde
+          cualquier pestana, y esconderlas en una obligaria a volver a
+          General para cada cosa. */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          {/* Cliente */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="font-medium">{campaign.client.companyName}</p>
+              <p className="text-sm text-gray-500">{campaign.client.email}</p>
+            </CardContent>
+          </Card>
 
-      {/* Resumen, cliente, contacto y fechas: los datos de cabecera
-          de la campana, en una fila. Antes vivian en una columna
-          lateral, donde habia que bajar hasta el final para saber de
-          que cliente era la campana. */}
-      {/* Cliente, contacto, fechas y el resumen economico, en una fila.
-          Resumen va el ultimo porque es el que se consulta con mas
-          detenimiento: los otros tres se leen de un golpe. */}
-      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {/* Cliente */}
-        <Card>
+        {/* Acciones de estado */}
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Cliente
-            </CardTitle>
+            <CardTitle>Acciones</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium">{campaign.client.companyName}</p>
-            <p className="text-sm text-gray-500">{campaign.client.email}</p>
-          </CardContent>
-        </Card>
-
-        {/* Contacto */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Contacto
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium">
-              {campaign.clientContact.firstName}{" "}
-              {campaign.clientContact.lastName}
-            </p>
-            {campaign.clientContact.position && (
-              <p className="text-sm text-gray-500">
-                {campaign.clientContact.position}
-              </p>
-            )}
-            <p className="text-sm text-gray-500">
-              {campaign.clientContact.email}
-            </p>
-            {campaign.clientContact.phone && (
-              <p className="text-sm text-gray-500">
-                {campaign.clientContact.phone}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Fechas */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Fechas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Inicio:</span>
-              <span>
-                {campaign.startDate
-                  ? new Date(campaign.startDate).toLocaleDateString("es-CO")
-                  : "-"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Fin:</span>
-              <span>
-                {campaign.endDate
-                  ? new Date(campaign.endDate).toLocaleDateString("es-CO")
-                  : "-"}
-              </span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Creado:</span>
-              <span>
-                {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Por:</span>
-              <span>{campaign.createdBy.name}</span>
-            </div>
-          </CardContent>
-        </Card>
-        {/* Resumen */}
-        <Card className={isOverBudget ? "border-red-300" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Resumen
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Presupuesto:</span>
-              <span className="font-bold">
-                ${formatNumber(budget.toString())}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1 text-gray-500">
-                Margen:
-                {esAdmin && (
-                  <EditarMargen
-                    campaignId={campaign.id}
-                    markupActual={campaign.markupPercentage}
-                    yaEnviadaAlCliente={campaign.status !== "DRAFT"}
-                  />
-                )}
-              </span>
-              <span className="font-medium">
-                {Math.round(campaign.markupPercentage * 1000) / 10}%
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Total:</span>
-              <span
-                className={`font-bold ${
-                  isOverBudget ? "text-red-600" : "text-green-600"
-                }`}
-              >
-                ${formatNumber(totalCampaign.toFixed(0))}
-              </span>
-            </div>
-            <Separator />
-            <div className="flex justify-between">
-              <span className="text-gray-500">
-                {isOverBudget ? "Excedente:" : "Disponible:"}
-              </span>
-              <span
-                className={`font-bold ${
-                  isOverBudget ? "text-red-600" : "text-blue-600"
-                }`}
-              >
-                ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
-              </span>
-            </div>
+          <CardContent>
+            <CampaignStatusActions
+              campaignId={id}
+              currentStatus={campaign.status}
+              profilesCount={profileCounts.total}
+              approvedCount={profileCounts.approved}
+              rejectedCount={profileCounts.rejected}
+              pendingCount={profileCounts.pending}
+            />
           </CardContent>
         </Card>
       </div>
@@ -479,274 +794,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      {/* Composicion de la campana, a lo ancho.
-          Estos desgloses vivian dentro de Resumen, en una columna
-          estrecha donde cada formato y cada departamento caia en su
-          propia linea y la tarjeta crecia sin fin. En una franja
-          horizontal se leen de un vistazo y Resumen se queda con lo que
-          de verdad es: las cifras de dinero. */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-3 py-4">
-          {totalReach > 0 && (
-            <div className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-gray-500">Alcance Estimado:</span>
-              <span className="font-bold text-green-600">
-                {formatCompactNumber(totalReach)}{" "}
-                <span className="text-sm font-normal text-gray-500">
-                  ({totalReach.toLocaleString()})
-                </span>
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Perfiles:</span>
-            <span className="font-medium">{profileCounts.total}</span>
-          </div>
-
-          {formatCounts.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500">Formatos:</span>
-              {[...formatCounts.entries()].map(([name, count]) => (
-                <Badge key={name} variant="secondary" className="text-xs">
-                  {name} ({count})
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {genderCounts.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500">Géneros:</span>
-              {[...genderCounts.entries()].map(([name, count]) => (
-                <Badge key={name} variant="outline" className="text-xs">
-                  {name} ({count})
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {departmentCounts.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500">Departamentos:</span>
-              {[...departmentCounts.entries()].map(([name, count]) => (
-                <Badge key={name} variant="outline" className="text-xs">
-                  {name} ({count})
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-
-      {/* Descripción */}
-      {campaign.description && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Descripción</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">{campaign.description}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Perfiles y Formatos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Perfiles y Formatos
-            <span className="text-sm font-normal text-gray-500 ml-2">
-              ({campaign.profiles.length} perfil
-              {campaign.profiles.length !== 1 ? "es" : ""})
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {campaign.profiles.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">
-              No hay perfiles asignados a esta campaña.
-            </p>
-          ) : (
-            <div className="space-y-6">
-              {campaign.profiles.map((cp) => (
-                <div key={cp.id} className={`border rounded-lg p-4 ${
-                  cp.status === "REJECTED" ? "border-red-300 bg-red-50" :
-                  cp.status === "APPROVED" ? "border-green-300 bg-green-50" : ""
-                }`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <h3 className="font-medium">{cp.profile.name}</h3>
-                        <Badge variant="secondary" className="mt-1">
-                          {cp.profile.type === "INFLUENCER"
-                            ? "Influencer"
-                            : cp.profile.type === "UGC"
-                            ? "UGC"
-                            : "Ambos"}
-                        </Badge>
-                      </div>
-                    </div>
-                    {/* Estado del perfil en la campaña */}
-                    {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
-                      <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
-                        {PROFILE_STATUS_LABELS[cp.status]}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Motivo de rechazo */}
-                  {cp.status === "REJECTED" && cp.rejectionReason && (
-                    <div className="mb-4 p-3 bg-red-100 rounded-lg">
-                      <p className="text-sm text-red-800">
-                        <strong>Motivo de rechazo:</strong> {cp.rejectionReason}
-                      </p>
-                    </div>
-                  )}
-
-                  {cp.platforms.map((cpp) => {
-                    const followers = cpp.socialAccount.followers || 0;
-                    const reach = calculateReach(followers, reachRanges);
-                    const reachPercent = getReachPercentage(followers, reachRanges);
-
-                    return (
-                      <div key={cpp.id} className="ml-4 mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {getPlatformIcon(cpp.socialAccount.platform.name)}
-                            <span className="font-medium">
-                              {cpp.socialAccount.platform.displayName}
-                            </span>
-                            <Badge variant="outline">
-                              @{cpp.socialAccount.username}
-                            </Badge>
-                          </div>
-                          {followers > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              <span>{followers.toLocaleString()} seguidores</span>
-                              <span className="mx-2">|</span>
-                              <span className="text-green-600">
-                                {reach?.toLocaleString()} alcance ({reachPercent}%)
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Formato</TableHead>
-                              <TableHead className="text-center">
-                                Cantidad
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Precio
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Subtotal
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {cpp.services.map((cs) => {
-                              const basePrice = Number(cs.basePrice);
-                              const price = calculateMarkupPrice(
-                                basePrice,
-                                campaign.markupPercentage
-                              );
-                              const subtotal = price * cs.quantity;
-
-                              return (
-                                <TableRow key={cs.id}>
-                                  <TableCell>
-                                    {cs.esCombo ? (
-                                      <>
-                                        Combo
-                                        {cs.comboDescripcion && (
-                                          <span className="ml-1 text-xs text-gray-500">
-                                            ({cs.comboDescripcion})
-                                          </span>
-                                        )}
-                                      </>
-                                    ) : (
-                                      cs.profileService!.serviceType.displayName
-                                    )}
-                                    {cs.clientNotes && (
-                                      <p className="text-xs text-muted-foreground mt-1 italic">
-                                        Tema: &ldquo;{cs.clientNotes}&rdquo;
-                                      </p>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {cs.quantity}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    ${formatNumber(price.toFixed(0))}
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">
-                                    ${formatNumber(subtotal.toFixed(0))}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      {/* Sustituciones: solo con la campana en marcha. Antes de activarla
-          los cambios se hacen en el editor, que permite mucho mas. */}
-      {campaign.status === "ACTIVE" && (
-        <ReemplazarInfluencer
-          campaignId={id}
-          profiles={catalogoParaSustituir}
-          presupuestoLiberado={totales.liberado}
-          totalActual={totalCampaign}
-          presupuesto={budget}
-          pendientes={pendientesDeAprobacion}
-          markup={campaign.markupPercentage}
-        />
-      )}
-
-      {/* Entregas: solo tiene sentido cuando la campana ya esta en marcha.
-          En borrador o revision los formatos aun pueden cambiar. */}
-      {yaArranco && (
-        <EntregasCampana
-          campaignId={id}
-          perfiles={perfilesEntregas}
-          puedeEditar={enMarcha}
-        />
-      )}
-
-      {/* Impacto: solo cuando ya hay contenido publicado que medir. */}
-      {yaArranco && (
-        <MetricasCampana
-          campaignId={id}
-          capturas={capturas}
-          puedeRefrescar={campaign.status === "ACTIVE" || campaign.status === "COMPLETED"}
-        />
-      )}
-
-      {/* Enlace de aprobacion. Tambien en campanas ACTIVE: de ahi sale el
-          enlace con el que el cliente aprueba un reemplazo. */}
-      {(campaign.approvalTokens.length > 0 ||
-        campaign.status === "REVIEW" ||
-        campaign.status === "ACTIVE") && (
-        <ApprovalTokensCard
-          campaignId={id}
-          tokens={campaign.approvalTokens}
-          campaignStatus={campaign.status}
-        />
-      )}
-
+      <CampaignTabs pestanas={pestanas} />
     </div>
   );
 }
