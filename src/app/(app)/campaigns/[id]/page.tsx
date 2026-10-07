@@ -293,68 +293,70 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       etiqueta: "General",
       contenido: (
         <>
-          {/* Contacto y fechas, en una sola tarjeta a lo ancho y en
-              horizontal. Eran dos tarjetas de media pantalla cada una
-              para seis datos cortos, y leerlos obligaba a recorrerlos
-              en vertical de uno en uno. */}
-          <Card>
-            {/* Los once datos fluyen en horizontal, pero cada grupo se
-                mueve entero: si las fechas no caben al lado del
-                contacto bajan las cuatro juntas, en vez de dejar
-                "Inicio" arriba y el resto en la linea siguiente. */}
-            <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-3 py-4">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {/* Contacto y fechas, cada uno en su tarjeta y lado a lado.
+              El titulo arriba y los datos debajo, en una fila: son
+              datos cortos que no merecen una linea cada uno, pero
+              tampoco mezclarse con los de al lado. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardContent className="space-y-3 py-4">
                 <span className="flex items-center gap-2 font-semibold">
                   <User className="h-5 w-5" />
                   Contacto
                 </span>
-                <span className="font-medium">
-                  {campaign.clientContact.firstName}{" "}
-                  {campaign.clientContact.lastName}
-                </span>
-                {campaign.clientContact.position && (
-                  <span className="text-sm text-gray-500">
-                    {campaign.clientContact.position}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <span className="font-medium">
+                    {campaign.clientContact.firstName}{" "}
+                    {campaign.clientContact.lastName}
                   </span>
-                )}
-                <span className="text-sm text-gray-500">
-                  {campaign.clientContact.email}
-                </span>
-                {campaign.clientContact.phone && (
+                  {campaign.clientContact.position && (
+                    <span className="text-sm text-gray-500">
+                      {campaign.clientContact.position}
+                    </span>
+                  )}
                   <span className="text-sm text-gray-500">
-                    {campaign.clientContact.phone}
+                    {campaign.clientContact.email}
                   </span>
-                )}
-              </div>
+                  {campaign.clientContact.phone && (
+                    <span className="text-sm text-gray-500">
+                      {campaign.clientContact.phone}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <Card>
+              <CardContent className="space-y-3 py-4">
                 <span className="flex items-center gap-2 font-semibold">
                   <Calendar className="h-5 w-5" />
                   Fechas
                 </span>
-                <span className="text-sm">
-                  <span className="text-gray-500">Inicio: </span>
-                  {campaign.startDate
-                    ? new Date(campaign.startDate).toLocaleDateString("es-CO")
-                    : "-"}
-                </span>
-                <span className="text-sm">
-                  <span className="text-gray-500">Fin: </span>
-                  {campaign.endDate
-                    ? new Date(campaign.endDate).toLocaleDateString("es-CO")
-                    : "-"}
-                </span>
-                <span className="text-sm">
-                  <span className="text-gray-500">Creado: </span>
-                  {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
-                </span>
-                <span className="text-sm">
-                  <span className="text-gray-500">Por: </span>
-                  {campaign.createdBy.name}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <span className="text-sm">
+                    <span className="text-gray-500">Inicio: </span>
+                    {campaign.startDate
+                      ? new Date(campaign.startDate).toLocaleDateString("es-CO")
+                      : "-"}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-gray-500">Fin: </span>
+                    {campaign.endDate
+                      ? new Date(campaign.endDate).toLocaleDateString("es-CO")
+                      : "-"}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-gray-500">Creado: </span>
+                    {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-gray-500">Por: </span>
+                    {campaign.createdBy.name}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Resumen economico, tambien a lo ancho. Son cuatro cifras
               que se comparan entre si, y en una columna de un tercio
