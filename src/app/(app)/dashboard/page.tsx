@@ -99,7 +99,7 @@ export default async function DashboardPage() {
                 <Link
                   key={campaign.id}
                   href={`/campaigns/${campaign.id}`}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/10 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate">
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
                 <Link
                   key={campaign.id}
                   href={`/campaigns/${campaign.id}`}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/10 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate">

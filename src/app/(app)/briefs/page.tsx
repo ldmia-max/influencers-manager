@@ -87,7 +87,7 @@ async function ListaBriefs() {
               {briefs.map((b) => {
                 const estado = ESTADO_BRIEF[b.status];
                 return (
-                  <TableRow key={b.id} className="cursor-pointer hover:bg-gray-50">
+                  <TableRow key={b.id} className="cursor-pointer">
                     <TableCell className="font-medium">
                       <Link href={`/briefs/${b.id}`} className="hover:underline">
                         {b.nombreCampana}

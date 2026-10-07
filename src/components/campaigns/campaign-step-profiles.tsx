@@ -378,7 +378,7 @@ export function CampaignStepProfiles() {
                         "relative flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-all",
                         isSelected
                           ? "bg-primary/5 border-primary"
-                          : "hover:bg-muted/50 border-transparent"
+                          : "hover:bg-accent/10 border-transparent"
                       )}
                     >
                       <Checkbox

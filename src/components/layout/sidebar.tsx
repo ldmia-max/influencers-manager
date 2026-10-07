@@ -46,7 +46,7 @@ export function Sidebar({ role }: SidebarProps) {
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 pathname === item.href
                   ? "bg-gray-100 text-gray-900"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
               )}
             >
               <NavIcon name={item.icon} />
@@ -68,7 +68,7 @@ export function Sidebar({ role }: SidebarProps) {
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   pathname === item.href
                     ? "bg-gray-100 text-gray-900"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
                 )}
               >
                 <NavIcon name={item.icon} />
