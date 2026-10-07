@@ -41,7 +41,7 @@ export function PrevisionCampana({
           <span className="font-semibold">Previsión</span>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
             <span className="flex items-center gap-2 text-gray-500">
-              Seguidores contratados:
+              Total seguidores:
               <span className="font-semibold text-gray-900">
                 {formatNumber(seguidores)}
               </span>
