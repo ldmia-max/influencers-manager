@@ -38,6 +38,10 @@ import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card"
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
 import {
+  PrevisionCampana,
+  type FilaPrevision,
+} from "@/components/campaigns/prevision-campana";
+import {
   BarraPresupuesto,
   colorDeTexto,
   porcentajeUsado,
@@ -91,6 +95,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const totales = calcularTotalCampana(campaign.profiles, campaign.markupPercentage);
   const totalCampaign = totales.conMargen;
   let totalReach = 0;
+  let totalSeguidores = 0;
   const accountsProcessed = new Set<string>();
   const formatCounts = new Map<string, number>();
   const genderCounts = new Map<string, number>();
@@ -124,6 +129,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       if (!accountsProcessed.has(cpp.socialAccountId)) {
         accountsProcessed.add(cpp.socialAccountId);
         const followers = cpp.socialAccount.followers || 0;
+        totalSeguidores += followers;
         const reach = calculateReach(followers, reachRanges);
         if (reach) totalReach += reach;
       }
@@ -157,6 +163,61 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       username: cpp.socialAccount.username,
     };
   });
+
+  // Lo conseguido hasta ahora, de la ultima captura de cada entrega --
+  // la misma base de la que vive Impacto del contenido, para que las
+  // dos secciones no puedan dar cifras distintas de lo mismo. Sumar
+  // todas las capturas contaria varias veces la misma publicacion:
+  // las metricas son acumuladas, no incrementos.
+  const ultimaPorEntrega = new Map<string, (typeof capturas)[number]>();
+  for (const c of capturas) {
+    const previa = ultimaPorEntrega.get(c.entregaId);
+    if (!previa || c.capturadoEn > previa.capturadoEn) {
+      ultimaPorEntrega.set(c.entregaId, c);
+    }
+  }
+  const medidas = [...ultimaPorEntrega.values()];
+  // Null, no cero, cuando ninguna publicacion da la cifra: un cero
+  // afirmaria que nadie la vio, que es otra cosa.
+  const sumaMedida = (clave: "vistas" | "meGusta" | "comentarios") => {
+    const conDato = medidas.filter((c) => c[clave] !== null);
+    if (conDato.length === 0) return null;
+    return conDato.reduce((suma, c) => suma + (c[clave] ?? 0), 0);
+  };
+
+  // La prevision: una cadena de factores fijos sobre los seguidores
+  // contratados. El alcance solo lo reporta Instagram, pero el factor
+  // se aplica sobre el total de visualizaciones, no sobre su parte.
+  const previsionVisualizaciones = totalSeguidores * 0.25;
+  const previsionAlcance = previsionVisualizaciones * 0.4;
+  const previsionLikes = previsionAlcance * 0.03;
+  const previsionComentarios = previsionLikes * 0.1;
+
+  const filasPrevision: FilaPrevision[] = [
+    {
+      etiqueta: "Visualizaciones",
+      prevision: previsionVisualizaciones,
+      resultado: sumaMedida("vistas"),
+    },
+    {
+      // Sin contraparte medida: el alcance de una publicacion solo lo
+      // ve su autor en su propio panel, ningun scraper lo alcanza.
+      etiqueta: "Alcance",
+      prevision: previsionAlcance,
+      resultado: null,
+      nota: "Ninguna red publica el alcance de una publicación",
+    },
+    {
+      etiqueta: "Likes",
+      prevision: previsionLikes,
+      resultado: sumaMedida("meGusta"),
+    },
+    {
+      etiqueta: "Comentarios",
+      prevision: previsionComentarios,
+      resultado: sumaMedida("comentarios"),
+    },
+  ];
 
   // Formatos que se pueden señalar al registrar una entrega, agrupados
   // por plataforma. Salen del catálogo, no del tarifario del influencer:
@@ -503,6 +564,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Previsión frente a resultado. Sin seguidores contratados
+              la cadena entera sale en cero y la seccion no diria nada. */}
+          {totalSeguidores > 0 && (
+            <PrevisionCampana
+              seguidores={totalSeguidores}
+              filas={filasPrevision}
+            />
+          )}
 
           {/* Descripción */}
           {campaign.description && (
