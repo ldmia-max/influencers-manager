@@ -4,6 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* El rosa de la marca, disponible como bg-marca, text-marca,
+     border-marca y con opacidad (bg-marca/10). Un solo sitio del
+     que sale todo el resalte de la aplicacion. */
+  --color-marca: var(--marca);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -47,6 +51,7 @@
 }
 
 :root {
+  --marca: #ec2b70;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -60,17 +65,17 @@
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  /* Resalte al pasar el raton, el rosa de la marca.
+  /* Resalte al pasar el raton: el mismo rosa de la marca.
 
      Vive en --accent porque es el token que los botones de contorno y
      los fantasma ya usaban para el hover; apuntando aqui tambien los
      menus y las filas de tabla, todo el hover de la aplicacion cambia
      desde una sola linea.
 
-     El texto encima va en blanco: sobre #ff3d86 el negro contrasta
-     mejor en numeros (6.3:1 contra 3.3:1), pero deja un bloque rosa
-     con letra negra que no se parece a nada mas de la interfaz. */
-  --accent: #ff3d86;
+     El texto encima va en blanco: sobre el rosa el negro contrasta
+     mejor en numeros, pero deja un bloque con letra negra que no se
+     parece a nada mas de la interfaz. */
+  --accent: var(--marca);
   --accent-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
@@ -85,7 +90,7 @@
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #ff3d86;
+  --sidebar-accent: var(--marca);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
@@ -104,7 +109,7 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: #ff3d86;
+  --accent: var(--marca);
   --accent-foreground: #ffffff;
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
@@ -119,7 +124,7 @@
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #ff3d86;
+  --sidebar-accent: var(--marca);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);

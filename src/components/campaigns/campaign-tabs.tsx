@@ -40,7 +40,7 @@ export function CampaignTabs({ pestanas }: { pestanas: PestanaCampana[] }) {
           <TabsTrigger
             key={p.valor}
             value={p.valor}
-            className="h-auto py-1.5 text-center whitespace-normal data-[state=inactive]:hover:bg-accent/10"
+            className="h-auto py-1.5 text-center whitespace-normal data-[state=active]:bg-marca data-[state=active]:text-white data-[state=inactive]:hover:bg-accent/10"
           >
             {p.etiqueta}
           </TabsTrigger>

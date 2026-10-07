@@ -28,6 +28,19 @@ export const adminNavItems = [
   { href: "/admin/auditoria", label: "Auditoría", icon: "shield" },
 ];
 
+/**
+ * Si la ruta actual pertenece a esta opcion del menu.
+ *
+ * Por segmento completo y no por igualdad: dentro de una campana la
+ * ruta es /campaigns/<id>, y con una comparacion exacta el menu se
+ * quedaba sin nada marcado justo cuando mas falta hace saber donde
+ * esta uno. Es la misma regla que usa RUTAS_PRIVADAS para no confundir
+ * /brief con /briefs.
+ */
+export function esRutaActiva(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
 
@@ -44,8 +57,8 @@ export function Sidebar({ role }: SidebarProps) {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                pathname === item.href
-                  ? "bg-gray-100 text-gray-900"
+                esRutaActiva(pathname, item.href)
+                  ? "bg-marca text-white"
                   : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
               )}
             >
@@ -66,8 +79,8 @@ export function Sidebar({ role }: SidebarProps) {
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  pathname === item.href
-                    ? "bg-gray-100 text-gray-900"
+                  esRutaActiva(pathname, item.href)
+                    ? "bg-marca text-white"
                     : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
                 )}
               >

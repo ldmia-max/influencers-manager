@@ -47,7 +47,7 @@ export function PrevisionCampana({
               </span>
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ff3d86]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-marca" />
               Resultado
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
@@ -84,7 +84,7 @@ export function PrevisionCampana({
                     <Barra
                       valor={f.resultado}
                       escala={escala}
-                      className="bg-[#ff3d86]"
+                      className="bg-marca"
                     />
                   )}
                   <Barra
@@ -101,7 +101,7 @@ export function PrevisionCampana({
                     x === null
                       ? "text-gray-300"
                       : x >= 1
-                        ? "text-[#ff3d86]"
+                        ? "text-marca"
                         : "text-gray-400"
                   )}
                 >

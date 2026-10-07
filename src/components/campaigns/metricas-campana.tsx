@@ -597,16 +597,21 @@ export function MetricasCampana({
               {datos.totales
                 .filter((t) => t.disponible)
                 .map((t) => (
-                  <div key={t.clave} className="rounded-lg bg-gray-50 p-3">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <t.icono className="h-3.5 w-3.5" style={{ color: t.color }} />
+                  <div key={t.clave} className="rounded-lg bg-marca p-3 text-white">
+                    {/* El icono va en blanco y no en el color de su serie:
+                        sobre el rosa, el violeta o el verde de las
+                        graficas quedarian ilegibles. El color de cada
+                        serie sigue estando donde hace falta, que es en
+                        las graficas. */}
+                    <div className="flex items-center gap-1.5 text-xs text-white/80">
+                      <t.icono className="h-3.5 w-3.5" />
                       {t.nombre}
                     </div>
-                    <p className="mt-1 text-xl font-semibold text-gray-900">
+                    <p className="mt-1 text-xl font-semibold">
                       {formatNumber(t.valor)}
                     </p>
                     {t.cobertura < datos.publicaciones && (
-                      <p className="text-[11px] text-gray-400">
+                      <p className="text-[11px] text-white/70">
                         de {t.cobertura} de {datos.publicaciones} publicaciones
                       </p>
                     )}
@@ -747,7 +752,7 @@ export function MetricasCampana({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marca text-[11px] font-semibold text-white">
                             {i + 1}
                           </span>
                           <span className="font-medium text-gray-900">
@@ -872,7 +877,7 @@ export function MetricasCampana({
                                   cuenta.piezas.map((pieza) => (
                                     <tr
                                       key={pieza.entregaId}
-                                      className="border-t border-gray-100 text-gray-600 odd:bg-gray-50/80"
+                                      className="border-t border-gray-100 text-gray-600 odd:bg-marca/5"
                                     >
                                       <td className="px-2 py-1 whitespace-nowrap text-gray-500">
                                         {cuenta.plataforma}

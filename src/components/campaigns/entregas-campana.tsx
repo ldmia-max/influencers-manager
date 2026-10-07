@@ -377,7 +377,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                       return (
                         <div
                           key={formato.id}
-                          className="rounded-lg bg-gray-50 p-3"
+                          className="rounded-lg bg-marca/5 p-3"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">

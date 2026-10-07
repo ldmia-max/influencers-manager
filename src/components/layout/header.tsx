@@ -21,7 +21,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { userNavItems, adminNavItems, NavIcon } from "@/components/layout/sidebar";
+import {
+  userNavItems,
+  adminNavItems,
+  NavIcon,
+  esRutaActiva,
+} from "@/components/layout/sidebar";
 import { CartHeaderButton } from "@/components/cart";
 import type { UserRole } from "@prisma/client";
 
@@ -70,8 +75,8 @@ export function Header({ user }: HeaderProps) {
                       onClick={() => setOpen(false)}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                        pathname === item.href
-                          ? "bg-gray-100 text-gray-900"
+                        esRutaActiva(pathname, item.href)
+                          ? "bg-marca text-white"
                           : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
@@ -93,8 +98,8 @@ export function Header({ user }: HeaderProps) {
                         onClick={() => setOpen(false)}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                          pathname === item.href
-                            ? "bg-gray-100 text-gray-900"
+                          esRutaActiva(pathname, item.href)
+                            ? "bg-marca text-white"
                             : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
                         )}
                       >
