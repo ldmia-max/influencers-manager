@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -294,134 +293,128 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       etiqueta: "General",
       contenido: (
         <>
-          {/* Contacto, fechas y el resumen economico. Resumen va el
-              ultimo porque es el que se consulta con mas detenimiento:
-              los otros dos se leen de un golpe. */}
-          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {/* Contacto */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+          {/* Contacto y fechas, en una sola tarjeta a lo ancho y en
+              horizontal. Eran dos tarjetas de media pantalla cada una
+              para seis datos cortos, y leerlos obligaba a recorrerlos
+              en vertical de uno en uno. */}
+          <Card>
+            {/* Los once datos fluyen en horizontal, pero cada grupo se
+                mueve entero: si las fechas no caben al lado del
+                contacto bajan las cuatro juntas, en vez de dejar
+                "Inicio" arriba y el resto en la linea siguiente. */}
+            <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-3 py-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <span className="flex items-center gap-2 font-semibold">
                   <User className="h-5 w-5" />
                   Contacto
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="font-medium">
+                </span>
+                <span className="font-medium">
                   {campaign.clientContact.firstName}{" "}
                   {campaign.clientContact.lastName}
-                </p>
+                </span>
                 {campaign.clientContact.position && (
-                  <p className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-500">
                     {campaign.clientContact.position}
-                  </p>
+                  </span>
                 )}
-                <p className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500">
                   {campaign.clientContact.email}
-                </p>
+                </span>
                 {campaign.clientContact.phone && (
-                  <p className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-500">
                     {campaign.clientContact.phone}
-                  </p>
+                  </span>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Fechas */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <span className="flex items-center gap-2 font-semibold">
                   <Calendar className="h-5 w-5" />
                   Fechas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Inicio:</span>
-                  <span>
-                    {campaign.startDate
-                      ? new Date(campaign.startDate).toLocaleDateString("es-CO")
-                      : "-"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Fin:</span>
-                  <span>
-                    {campaign.endDate
-                      ? new Date(campaign.endDate).toLocaleDateString("es-CO")
-                      : "-"}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Creado:</span>
-                  <span>
-                    {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Por:</span>
-                  <span>{campaign.createdBy.name}</span>
-                </div>
-              </CardContent>
-            </Card>
+                </span>
+                <span className="text-sm">
+                  <span className="text-gray-500">Inicio: </span>
+                  {campaign.startDate
+                    ? new Date(campaign.startDate).toLocaleDateString("es-CO")
+                    : "-"}
+                </span>
+                <span className="text-sm">
+                  <span className="text-gray-500">Fin: </span>
+                  {campaign.endDate
+                    ? new Date(campaign.endDate).toLocaleDateString("es-CO")
+                    : "-"}
+                </span>
+                <span className="text-sm">
+                  <span className="text-gray-500">Creado: </span>
+                  {new Date(campaign.createdAt).toLocaleDateString("es-CO")}
+                </span>
+                <span className="text-sm">
+                  <span className="text-gray-500">Por: </span>
+                  {campaign.createdBy.name}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Resumen */}
-            <Card className={isOverBudget ? "border-red-300" : ""}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Resumen
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Presupuesto:</span>
-                  <span className="font-bold">
-                    ${formatNumber(budget.toString())}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-gray-500">
-                    Margen:
-                    {esAdmin && (
-                      <EditarMargen
-                        campaignId={campaign.id}
-                        markupActual={campaign.markupPercentage}
-                        yaEnviadaAlCliente={campaign.status !== "DRAFT"}
-                      />
-                    )}
-                  </span>
-                  <span className="font-medium">
-                    {Math.round(campaign.markupPercentage * 1000) / 10}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total:</span>
-                  <span
-                    className={`font-bold ${
-                      isOverBudget ? "text-red-600" : "text-green-600"
-                    }`}
-                  >
-                    ${formatNumber(totalCampaign.toFixed(0))}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-gray-500">
-                    {isOverBudget ? "Excedente:" : "Disponible:"}
-                  </span>
-                  <span
-                    className={`font-bold ${
-                      isOverBudget ? "text-red-600" : "text-blue-600"
-                    }`}
-                  >
-                    ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Resumen economico, tambien a lo ancho. Son cuatro cifras
+              que se comparan entre si, y en una columna de un tercio
+              de pantalla habia que bajar la vista para enfrentar el
+              presupuesto con el total. */}
+          <Card className={isOverBudget ? "border-red-300" : ""}>
+            <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-3 py-4">
+              <span className="flex items-center gap-2 font-semibold">
+                <DollarSign className="h-5 w-5" />
+                Resumen
+              </span>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Presupuesto:</span>
+                <span className="font-bold">
+                  ${formatNumber(budget.toString())}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-sm text-gray-500">
+                  Margen:
+                  {esAdmin && (
+                    <EditarMargen
+                      campaignId={campaign.id}
+                      markupActual={campaign.markupPercentage}
+                      yaEnviadaAlCliente={campaign.status !== "DRAFT"}
+                    />
+                  )}
+                </span>
+                <span className="font-medium">
+                  {Math.round(campaign.markupPercentage * 1000) / 10}%
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Total:</span>
+                <span
+                  className={`font-bold ${
+                    isOverBudget ? "text-red-600" : "text-green-600"
+                  }`}
+                >
+                  ${formatNumber(totalCampaign.toFixed(0))}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">
+                  {isOverBudget ? "Excedente:" : "Disponible:"}
+                </span>
+                <span
+                  className={`font-bold ${
+                    isOverBudget ? "text-red-600" : "text-blue-600"
+                  }`}
+                >
+                  ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Composicion de la campana, a lo ancho.
               Estos desgloses vivian dentro de Resumen, en una columna
