@@ -79,3 +79,21 @@ export const participacionSchema = z.discriminatedUnion("accion", [
   }),
   z.object({ accion: z.literal("reactivar") }),
 ]);
+
+/**
+ * Cifras de una publicacion que ningun scraper puede leer.
+ *
+ * Las tres son opcionales por separado y `null` las borra, pero tiene
+ * que llegar alguna clave: se anota lo que se sabe hoy y lo demas mas
+ * tarde, sin que escribir una borre las otras.
+ */
+export const cifrasDePublicacionSchema = z
+  .object({
+    /** Solo Instagram, y nunca en un formato efímero. */
+    alcance: cifra.nullish(),
+    compartidos: cifra.nullish(),
+    reposteos: cifra.nullish(),
+  })
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "No hay nada que cambiar",
+  });

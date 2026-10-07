@@ -712,3 +712,112 @@ export async function formatosHistoricosDeInfluencer(profileId: string) {
     },
   });
 }
+
+/**
+ * Anota a mano las cifras que ningun scraper puede leer.
+ *
+ * El alcance solo lo mide Instagram y solo lo ve el autor en su propio
+ * panel; los compartidos y los reposteos Instagram no los publica en
+ * absoluto. Se escriben sobre la entrega y se corrigen las veces que
+ * haga falta, a diferencia de las cifras de una historia, que son
+ * capturas: alli cada anotacion es un dato nuevo de una publicacion que
+ * sigue viva, y aqui es el mismo dato mejor sabido.
+ */
+export async function actualizarCifrasDeEntrega(
+  entregaId: string,
+  cifras: {
+    alcance?: number | null;
+    compartidos?: number | null;
+    reposteos?: number | null;
+  }
+) {
+  const entrega = await prisma.campaignEntrega.findUnique({
+    where: { id: entregaId },
+    select: {
+      id: true,
+      serviceType: { select: { esEfimero: true } },
+      campaignService: {
+        select: {
+          esCombo: true,
+          profileService: { select: { serviceType: { select: { esEfimero: true } } } },
+          campaignProfilePlatform: {
+            select: {
+              socialAccount: { select: { platform: { select: { name: true } } } },
+              campaignProfile: {
+                select: {
+                  campaign: { select: { id: true, name: true, status: true } },
+                  profile: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!entrega) throw new NotFoundError("Entrega no encontrada");
+
+  const cpp = entrega.campaignService.campaignProfilePlatform;
+  const campana = cpp.campaignProfile.campaign;
+
+  // Una campana cerrada o cancelada es historia comercial: sus cifras
+  // son las que se le entregaron al cliente, y cambiarlas despues
+  // reescribiria lo que ya se reporto.
+  if (campana.status === "COMPLETED" || campana.status === "CANCELLED") {
+    throw new ValidationError(
+      "La campaña ya está cerrada: sus cifras no se pueden editar."
+    );
+  }
+
+  // El formato senalado al registrar manda sobre el contratado, igual
+  // que en el resto de reglas de entregas.
+  const esEfimero = entrega.serviceType
+    ? entrega.serviceType.esEfimero
+    : !entrega.campaignService.esCombo &&
+      (entrega.campaignService.profileService?.serviceType.esEfimero ?? false);
+
+  const esInstagram =
+    cpp.socialAccount.platform.name.toLowerCase() === "instagram";
+
+  if (cifras.alcance != null) {
+    // Una historia no tiene alcance que anotar: lo que su autor ve es un
+    // recuento de vistas, que ya se registra por otro camino.
+    if (!esInstagram) {
+      throw new ValidationError("El alcance solo existe en Instagram.");
+    }
+    if (esEfimero) {
+      throw new ValidationError(
+        "Una historia no reporta alcance: anota sus vistas."
+      );
+    }
+  }
+
+  const datos: {
+    alcance?: number | null;
+    compartidosReportados?: number | null;
+    reposteosReportados?: number | null;
+    cifrasAnotadasEn: Date;
+  } = { cifrasAnotadasEn: new Date() };
+  if ("alcance" in cifras) datos.alcance = cifras.alcance ?? null;
+  if ("compartidos" in cifras) datos.compartidosReportados = cifras.compartidos ?? null;
+  if ("reposteos" in cifras) datos.reposteosReportados = cifras.reposteos ?? null;
+
+  const actualizada = await prisma.campaignEntrega.update({
+    where: { id: entregaId },
+    data: datos,
+    select: {
+      id: true,
+      alcance: true,
+      compartidosReportados: true,
+      reposteosReportados: true,
+      cifrasAnotadasEn: true,
+    },
+  });
+
+  // La auditoria la escribe la ruta, que es quien conoce la sesion.
+  return {
+    cifras: actualizada,
+    campana: { id: campana.id, name: campana.name },
+    influencer: cpp.campaignProfile.profile.name,
+  };
+}

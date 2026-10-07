@@ -763,6 +763,33 @@ model CampaignEntrega {
   publicadoEn DateTime?
   notas       String?
 
+  /// Alcance de la publicacion, anotado a mano.
+  ///
+  /// Solo Instagram lo mide, y solo su autor lo ve en su propio panel:
+  /// ningun scraper lo alcanza. O lo escribe alguien o no existe.
+  ///
+  /// Vive aqui y no en CampaignEntregaMetrica, que es donde estan las
+  /// demas cifras, por una razon concreta: el refresco diario crea una
+  /// captura nueva cada manana y ahi el alcance iria nulo, de modo que
+  /// desapareceria de todas las vistas —que leen siempre la ultima
+  /// captura de cada entrega— al dia siguiente de escribirlo. Las
+  /// cifras reportadas de un formato efimero si pueden ser capturas
+  /// porque esas entregas no tienen enlace y el refresco no las toca.
+  alcance Int?
+
+  /// Compartidos y reposteos anotados a mano, por el mismo motivo.
+  ///
+  /// Instagram no publica ninguno de los dos, asi que para sus
+  /// publicaciones la unica fuente es el panel del creador. Donde Apify
+  /// si los lee —TikTok— manda lo medido: esto solo rellena el hueco.
+  compartidosReportados Int?
+  reposteosReportados   Int?
+
+  /// Cuando se anotaron esas tres cifras por ultima vez. Quien lo hizo
+  /// queda en la auditoria, que es donde vive el resto de la trazabilidad
+  /// de la campana.
+  cifrasAnotadasEn DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

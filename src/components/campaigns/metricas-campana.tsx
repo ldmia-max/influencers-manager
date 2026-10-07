@@ -19,15 +19,27 @@ import {
   Heart,
   Loader2,
   MessageCircle,
+  Pencil,
   RefreshCw,
   Repeat2,
   Share2,
+  Target,
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
-import { apiPost } from "@/services/api";
+import { apiPatch, apiPost } from "@/services/api";
 
 export interface CapturaMetrica {
   capturadoEn: string;
@@ -55,11 +67,69 @@ export interface CapturaMetrica {
   username: string;
 }
 
+/**
+ * Una publicacion registrada, con las cifras que se escriben a mano.
+ *
+ * Llega aparte de las capturas porque una entrega de hoy todavia no
+ * tiene medicion y aun asi hay que poder anotarle el alcance.
+ */
+export interface Publicacion {
+  entregaId: string;
+  influencer: string;
+  plataforma: string;
+  username: string;
+  url: string | null;
+  formato: string | null;
+  esInstagram: boolean;
+  esEfimero: boolean;
+  /** Solo Instagram lo mide y solo lo ve su autor. */
+  alcance: number | null;
+  compartidosReportados: number | null;
+  reposteosReportados: number | null;
+}
+
+/** Lo medido y lo anotado, ya fundidos: es lo que se pinta y lo que se suma. */
+interface Pieza {
+  entregaId: string;
+  influencer: string;
+  plataforma: string;
+  username: string;
+  url: string | null;
+  formato: string | null;
+  esInstagram: boolean;
+  esEfimero: boolean;
+  origen: string;
+  vistas: number | null;
+  meGusta: number | null;
+  comentarios: number | null;
+  compartidos: number | null;
+  reposteos: number | null;
+  guardados: number | null;
+  interacciones: number | null;
+  alcance: number | null;
+  /** Que cifras de esta fila las escribio una persona, no el scraper. */
+  aMano: { compartidos: boolean; reposteos: boolean };
+}
+
+/** Lo que el modal puede cambiar de una publicacion. */
+type CifrasAMano = {
+  alcance: number | null;
+  compartidosReportados: number | null;
+  reposteosReportados: number | null;
+};
+
 interface Props {
   campaignId: string;
   capturas: CapturaMetrica[];
+  /** Una por entrega registrada, haya sido medida o no. */
+  publicaciones?: Publicacion[];
   /** El portal del cliente solo mira: no refresca ni gasta crédito. */
   puedeRefrescar?: boolean;
+  /**
+   * Cerrada la campana sus cifras son historia comercial: lo que se le
+   * entrego al cliente, y no se reescribe.
+   */
+  puedeEditarCifras?: boolean;
 }
 
 const SERIES = [
@@ -103,11 +173,37 @@ function dia(iso: string): string {
   return iso.slice(0, 10);
 }
 
-export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }: Props) {
+export function MetricasCampana({
+  campaignId,
+  capturas,
+  publicaciones = [],
+  puedeRefrescar = false,
+  puedeEditarCifras = false,
+}: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Lo que se acaba de anotar, dibujado por el propio componente.
+   *
+   * `router.refresh()` no repinta en la compilacion de produccion, asi
+   * que esperar al servidor dejaria la tabla congelada hasta recargar.
+   * Cuando el servidor vuelve a mandar la publicacion con esas cifras,
+   * el valor de aqui y el de alli ya coinciden y no se duplica nada.
+   */
+  const [cifrasLocales, setCifrasLocales] = useState<Record<string, CifrasAMano>>({});
+  const [editando, setEditando] = useState<Pieza | null>(null);
+
+  /**
+   * Si la columna de alcance tiene algo que decir.
+   *
+   * En el portal del cliente no se puede escribir y no llegan cifras
+   * anotadas, asi que seria una columna entera de rayas: ruido que
+   * ademas insinua que falta un dato.
+   */
+  const hayAlcance =
+    puedeEditarCifras || publicaciones.some((pub) => pub.alcance !== null);
 
   const datos = useMemo(() => {
     // Ultima captura de cada entrega. Sumar todas las capturas contaria
@@ -120,7 +216,78 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
         ultimaPorEntrega.set(c.entregaId, c);
       }
     }
-    const actuales = [...ultimaPorEntrega.values()];
+
+    // Una fila por publicacion registrada, no por captura: una entrega
+    // de hoy todavia no tiene medicion y aun asi tiene que poder
+    // anotarse. Lo medido y lo escrito a mano se funden aqui, antes de
+    // sumar nada, para que las tarjetas, los totales por red, el aporte
+    // por influencer y las filas de abajo salgan del mismo sitio y no
+    // puedan discrepar.
+    const actuales: Pieza[] = [];
+    const vistos = new Set<string>();
+    for (const pub of publicaciones) {
+      const local = cifrasLocales[pub.entregaId];
+      const alcance = local ? local.alcance : pub.alcance;
+      const compartidosAMano = local
+        ? local.compartidosReportados
+        : pub.compartidosReportados;
+      const reposteosAMano = local
+        ? local.reposteosReportados
+        : pub.reposteosReportados;
+      const c = ultimaPorEntrega.get(pub.entregaId);
+      vistos.add(pub.entregaId);
+      actuales.push({
+        entregaId: pub.entregaId,
+        influencer: pub.influencer,
+        plataforma: pub.plataforma,
+        username: pub.username,
+        url: pub.url,
+        formato: pub.formato,
+        esInstagram: pub.esInstagram,
+        esEfimero: pub.esEfimero,
+        origen: c?.origen ?? "MEDIDA",
+        vistas: c?.vistas ?? null,
+        meGusta: c?.meGusta ?? null,
+        comentarios: c?.comentarios ?? null,
+        interacciones: c?.interacciones ?? null,
+        guardados: c?.guardados ?? null,
+        // Lo escrito a mano manda sobre lo medido: alguien miro el panel
+        // del creador —la unica fuente donde Instagram publica estas dos
+        // cifras— y corrigio lo que habia.
+        compartidos: compartidosAMano ?? c?.compartidos ?? null,
+        reposteos: reposteosAMano ?? c?.reposteos ?? null,
+        alcance,
+        aMano: {
+          compartidos: compartidosAMano !== null,
+          reposteos: reposteosAMano !== null,
+        },
+      });
+    }
+    // Una medicion de una entrega que no llego en la lista no deberia
+    // existir, pero perderla en silencio seria peor que pintarla.
+    for (const c of ultimaPorEntrega.values()) {
+      if (vistos.has(c.entregaId)) continue;
+      actuales.push({
+        entregaId: c.entregaId,
+        influencer: c.influencer,
+        plataforma: c.plataforma,
+        username: c.username,
+        url: c.url ?? null,
+        formato: c.formato ?? null,
+        esInstagram: c.plataforma.toLowerCase() === "instagram",
+        esEfimero: false,
+        origen: c.origen,
+        vistas: c.vistas,
+        meGusta: c.meGusta,
+        comentarios: c.comentarios,
+        interacciones: c.interacciones ?? null,
+        guardados: c.guardados,
+        compartidos: c.compartidos,
+        reposteos: c.reposteos ?? null,
+        alcance: null,
+        aMano: { compartidos: false, reposteos: false },
+      });
+    }
 
     const totales = SERIES.map((s) => {
       // Si ninguna publicacion da el dato, no se muestra la tarjeta: un
@@ -210,18 +377,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
              * numero, porque las dos salen de la misma ultima captura de
              * cada entrega.
              */
-            piezas: {
-              entregaId: string;
-              url: string | null;
-              formato: string | null;
-              vistas: number | null;
-              meGusta: number | null;
-              comentarios: number | null;
-              compartidos: number | null;
-              reposteos: number | null;
-              interacciones: number | null;
-              origen: string;
-            }[];
+            piezas: Pieza[];
           }
         >;
       }
@@ -306,18 +462,7 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           conInteracciones: 0,
           piezas: [],
         };
-      cuenta.piezas.push({
-        entregaId: c.entregaId,
-        url: c.url ?? null,
-        formato: c.formato ?? null,
-        vistas: c.vistas,
-        meGusta: c.meGusta,
-        comentarios: c.comentarios,
-        compartidos: c.compartidos,
-        reposteos: c.reposteos ?? null,
-        interacciones: c.interacciones ?? null,
-        origen: c.origen,
-      });
+      cuenta.piezas.push(c);
       cuenta.vistas += c.vistas ?? 0;
       cuenta.interacciones += interacciones;
       cuenta.publicaciones += 1;
@@ -376,11 +521,13 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
       plataformas: [...plataformas.values()].sort((a, b) => b.vistas - a.vistas),
       publicaciones: actuales.length,
       reportadas,
-      capturadoEn: actuales.length
-        ? actuales.reduce((m, c) => (c.capturadoEn > m ? c.capturadoEn : m), "")
+      // Cuando se midio por ultima vez. Sale de las capturas y no de
+      // las piezas: una cifra escrita a mano no es una medicion.
+      capturadoEn: capturas.length
+        ? capturas.reduce((m, c) => (c.capturadoEn > m ? c.capturadoEn : m), "")
         : null,
     };
-  }, [capturas]);
+  }, [capturas, publicaciones, cifrasLocales]);
 
   const refrescar = async () => {
     setRefrescando(true);
@@ -694,85 +841,116 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
                           </div>
                         ))}
 
-                        {/* Publicacion a publicacion. Sumadas dan el total
-                            de arriba: las dos cifras salen de la misma
-                            ultima captura de cada entrega, asi que no
-                            pueden discrepar. */}
+                        {/* Publicacion a publicacion, en tabla.
+                            En lista, el enlace quedaba pegado al borde
+                            izquierdo y sus cifras al derecho, y relacionar
+                            los dos extremos de una fila a otra era el
+                            trabajo del que leia. En columnas cada dato
+                            cae bajo su titulo y el sombreado alterno
+                            mantiene unida la fila. */}
                         {persona.plataformas.flatMap((c) => c.piezas).length > 0 && (
-                          <ul className="mt-2 space-y-1 border-t border-dashed border-gray-200 pt-2">
-                            {persona.plataformas.flatMap((cuenta) =>
-                              cuenta.piezas.map((pieza) => (
-                                <li
-                                  key={pieza.entregaId}
-                                  className="flex flex-wrap items-center justify-between gap-2 text-[11px]"
-                                >
-                                  <span className="flex min-w-0 items-center gap-1 text-gray-500">
-                                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
-                                      {pieza.formato ?? cuenta.plataforma}
-                                    </span>
-                                    {pieza.url ? (
-                                      <a
-                                        href={pieza.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="min-w-0 truncate text-violet-700 hover:underline"
-                                      >
-                                        {pieza.url.replace(/^https?:\/\/(www\.)?/, "")}
-                                      </a>
-                                    ) : (
-                                      <span className="text-gray-400">sin enlace</span>
-                                    )}
-                                  </span>
-                                  <span className="flex shrink-0 gap-3 text-gray-600">
-                                    <span title="Vistas">
-                                      {pieza.vistas !== null
-                                        ? formatNumber(pieza.vistas)
-                                        : "—"}{" "}
-                                      <Eye className="inline h-3 w-3 text-violet-500" />
-                                    </span>
-                                    <span title="Comentarios" className="font-medium text-gray-800">
-                                      {pieza.comentarios !== null
-                                        ? formatNumber(pieza.comentarios)
-                                        : "—"}{" "}
-                                      <MessageCircle className="inline h-3 w-3 text-sky-500" />
-                                    </span>
-                                    <span
-                                      title={
-                                        pieza.interacciones != null
-                                          ? "Interacciones (respuestas y reacciones)"
-                                          : "Me gusta"
-                                      }
+                          <div className="mt-3 overflow-x-auto border-t border-dashed border-gray-200 pt-2">
+                            <table className="w-full min-w-[46rem] text-[11px]">
+                              <thead>
+                                <tr className="text-gray-500">
+                                  <th className="px-2 py-1 text-left font-medium">Red</th>
+                                  <th className="px-2 py-1 text-left font-medium">Formato</th>
+                                  <th className="px-2 py-1 text-left font-medium">Publicación</th>
+                                  <th className="px-2 py-1 text-right font-medium">Vistas</th>
+                                  <th className="px-2 py-1 text-right font-medium">Coment.</th>
+                                  <th className="px-2 py-1 text-right font-medium">Me gusta</th>
+                                  <th className="px-2 py-1 text-right font-medium">Compart.</th>
+                                  <th className="px-2 py-1 text-right font-medium">Repost.</th>
+                                  {hayAlcance && (
+                                    <th className="px-2 py-1 text-right font-medium">Alcance</th>
+                                  )}
+                                  {puedeEditarCifras && <th className="w-8 px-2 py-1" />}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {persona.plataformas.flatMap((cuenta) =>
+                                  cuenta.piezas.map((pieza) => (
+                                    <tr
+                                      key={pieza.entregaId}
+                                      className="border-t border-gray-100 text-gray-600 odd:bg-gray-50/80"
                                     >
-                                      {pieza.interacciones != null
-                                        ? formatNumber(pieza.interacciones)
-                                        : pieza.meGusta !== null
-                                          ? formatNumber(pieza.meGusta)
-                                          : "—"}{" "}
-                                      <Heart className="inline h-3 w-3 text-pink-500" />
-                                    </span>
-                                    {/* Compartidos solo los publica TikTok.
-                                        Se pinta siempre, con raya donde la
-                                        red no lo da: quitar la columna en
-                                        unas filas y no en otras desalinea
-                                        la lista y esconde que el dato
-                                        existe. */}
-                                    <span title="Compartidos">
-                                      {pieza.compartidos !== null
-                                        ? formatNumber(pieza.compartidos)
-                                        : "—"}{" "}
-                                      <Share2 className="inline h-3 w-3 text-green-600" />
-                                    </span>
-                                    <span title="Reposteos">
-                                      {pieza.reposteos !== null
-                                        ? formatNumber(pieza.reposteos)
-                                        : "—"}{" "}
-                                      <Repeat2 className="inline h-3 w-3 text-orange-500" />
-                                    </span>
-                                  </span>
-                                </li>
-                              ))
-                            )}
-                          </ul>
+                                      <td className="px-2 py-1 whitespace-nowrap text-gray-500">
+                                        {cuenta.plataforma}
+                                      </td>
+                                      <td className="px-2 py-1 whitespace-nowrap">
+                                        <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+                                          {pieza.formato ?? cuenta.plataforma}
+                                        </span>
+                                      </td>
+                                      <td className="max-w-[16rem] px-2 py-1">
+                                        {pieza.url ? (
+                                          <a
+                                            href={pieza.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block truncate text-violet-700 hover:underline"
+                                          >
+                                            {pieza.url.replace(/^https?:\/\/(www\.)?/, "")}
+                                          </a>
+                                        ) : (
+                                          <span className="text-gray-400">sin enlace</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-1 text-right tabular-nums">
+                                        {pieza.vistas !== null ? formatNumber(pieza.vistas) : "—"}
+                                      </td>
+                                      <td className="px-2 py-1 text-right font-medium tabular-nums text-gray-800">
+                                        {pieza.comentarios !== null
+                                          ? formatNumber(pieza.comentarios)
+                                          : "—"}
+                                      </td>
+                                      <td
+                                        className="px-2 py-1 text-right tabular-nums"
+                                        title={
+                                          pieza.interacciones != null
+                                            ? "Interacciones (respuestas y reacciones)"
+                                            : "Me gusta"
+                                        }
+                                      >
+                                        {pieza.interacciones != null
+                                          ? formatNumber(pieza.interacciones)
+                                          : pieza.meGusta !== null
+                                            ? formatNumber(pieza.meGusta)
+                                            : "—"}
+                                      </td>
+                                      <CeldaCifra
+                                        valor={pieza.compartidos}
+                                        aMano={pieza.aMano.compartidos}
+                                      />
+                                      <CeldaCifra
+                                        valor={pieza.reposteos}
+                                        aMano={pieza.aMano.reposteos}
+                                      />
+                                      {hayAlcance && (
+                                        <CeldaAlcance
+                                          pieza={pieza}
+                                          editable={puedeEditarCifras}
+                                          onEditar={() => setEditando(pieza)}
+                                        />
+                                      )}
+                                      {puedeEditarCifras && (
+                                        <td className="px-2 py-1 text-right">
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditando(pieza)}
+                                            title="Anotar alcance, compartidos y reposteos"
+                                            className="rounded p-1 text-gray-400 hover:bg-accent/10 hover:text-gray-700"
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -817,6 +995,233 @@ export function MetricasCampana({ campaignId, capturas, puedeRefrescar = false }
           </>
         )}
       </CardContent>
+
+      <ModalCifras
+        campaignId={campaignId}
+        pieza={editando}
+        onCerrar={() => setEditando(null)}
+        onGuardado={(entregaId, cifras) =>
+          setCifrasLocales((previas) => ({ ...previas, [entregaId]: cifras }))
+        }
+      />
     </Card>
+  );
+}
+
+/** Una cifra de la tabla, marcada cuando la escribio una persona. */
+function CeldaCifra({ valor, aMano }: { valor: number | null; aMano: boolean }) {
+  return (
+    <td
+      className={`px-2 py-1 text-right tabular-nums ${aMano ? "text-sky-700" : ""}`}
+      title={aMano ? "Anotado a mano" : undefined}
+    >
+      {valor !== null ? formatNumber(valor) : "—"}
+    </td>
+  );
+}
+
+/**
+ * La casilla del alcance.
+ *
+ * Solo Instagram lo mide, y una historia ni eso: lo que su autor ve ahi
+ * es un recuento de vistas, que se anota por otro camino. En el resto de
+ * las filas se pinta una raya en vez de una casilla vacia, que invitaria
+ * a escribir algo que no existe.
+ */
+function CeldaAlcance({
+  pieza,
+  editable,
+  onEditar,
+}: {
+  pieza: Pieza;
+  editable: boolean;
+  onEditar: () => void;
+}) {
+  if (!pieza.esInstagram || pieza.esEfimero) {
+    return (
+      <td
+        className="px-2 py-1 text-right text-gray-300"
+        title={
+          pieza.esEfimero
+            ? "Una historia no reporta alcance"
+            : "El alcance solo existe en Instagram"
+        }
+      >
+        —
+      </td>
+    );
+  }
+
+  if (pieza.alcance === null && !editable) {
+    return <td className="px-2 py-1 text-right text-gray-300">—</td>;
+  }
+
+  const contenido =
+    pieza.alcance !== null ? (
+      <span className="font-medium tabular-nums text-sky-700">
+        {formatNumber(pieza.alcance)}
+      </span>
+    ) : (
+      <span className="text-gray-400">Anotar</span>
+    );
+
+  return (
+    <td className="px-2 py-1 text-right">
+      {editable ? (
+        <button
+          type="button"
+          onClick={onEditar}
+          className="rounded border border-dashed border-gray-300 px-2 py-0.5 hover:border-gray-400 hover:bg-accent/10"
+        >
+          {contenido}
+        </button>
+      ) : (
+        contenido
+      )}
+    </td>
+  );
+}
+
+/**
+ * Anotar lo que ningun scraper lee.
+ *
+ * Las tres cifras juntas en un modal y no tres casillas sueltas en la
+ * tabla: se consultan de una vez en el panel del creador, y escribirlas
+ * de una vez es una sola visita y una sola peticion.
+ */
+function ModalCifras({
+  campaignId,
+  pieza,
+  onCerrar,
+  onGuardado,
+}: {
+  campaignId: string;
+  pieza: Pieza | null;
+  onCerrar: () => void;
+  onGuardado: (entregaId: string, cifras: CifrasAMano) => void;
+}) {
+  const [alcance, setAlcance] = useState("");
+  const [compartidos, setCompartidos] = useState("");
+  const [reposteos, setReposteos] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [abiertaPara, setAbiertaPara] = useState<string | null>(null);
+
+  // Al abrir con otra publicacion, las casillas parten de lo que esa
+  // publicacion tiene ahora.
+  if (pieza && abiertaPara !== pieza.entregaId) {
+    setAbiertaPara(pieza.entregaId);
+    setAlcance(pieza.alcance !== null ? String(pieza.alcance) : "");
+    setCompartidos(pieza.compartidos !== null ? String(pieza.compartidos) : "");
+    setReposteos(pieza.reposteos !== null ? String(pieza.reposteos) : "");
+    setError(null);
+  }
+
+  const admiteAlcance = !!pieza && pieza.esInstagram && !pieza.esEfimero;
+
+  // Vacio significa "sin dato", que es distinto de cero: borrar la
+  // casilla retira la cifra en vez de afirmar que nadie lo compartio.
+  const aNumero = (texto: string) => {
+    const limpio = texto.trim();
+    if (limpio === "") return null;
+    const n = Number(limpio);
+    return Number.isFinite(n) ? Math.round(n) : NaN;
+  };
+
+  const guardar = async () => {
+    if (!pieza) return;
+    const cuerpo = {
+      ...(admiteAlcance ? { alcance: aNumero(alcance) } : {}),
+      compartidos: aNumero(compartidos),
+      reposteos: aNumero(reposteos),
+    };
+    if (Object.values(cuerpo).some((v) => Number.isNaN(v))) {
+      setError("Escribe números enteros, o deja la casilla vacía.");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      const guardada = await apiPatch<{
+        alcance: number | null;
+        compartidosReportados: number | null;
+        reposteosReportados: number | null;
+      }>(`/api/campaigns/${campaignId}/entregas/${pieza.entregaId}/cifras`, cuerpo);
+      onGuardado(pieza.entregaId, {
+        alcance: guardada.alcance,
+        compartidosReportados: guardada.compartidosReportados,
+        reposteosReportados: guardada.reposteosReportados,
+      });
+      onCerrar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron guardar las cifras");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!pieza} onOpenChange={(abierto) => !abierto && onCerrar()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Cifras de la publicación
+          </DialogTitle>
+          <DialogDescription>
+            {pieza?.formato ?? pieza?.plataforma} de {pieza?.influencer}. Son las
+            cifras que la red no publica y solo aparecen en el panel del creador.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {admiteAlcance && (
+            <div className="space-y-1.5">
+              <Label htmlFor="alcance">Alcance</Label>
+              <Input
+                id="alcance"
+                inputMode="numeric"
+                value={alcance}
+                onChange={(e) => setAlcance(e.target.value)}
+                placeholder="Cuántas cuentas distintas lo vieron"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="compartidos">Compartidos</Label>
+            <Input
+              id="compartidos"
+              inputMode="numeric"
+              value={compartidos}
+              onChange={(e) => setCompartidos(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reposteos">Reposteos</Label>
+            <Input
+              id="reposteos"
+              inputMode="numeric"
+              value={reposteos}
+              onChange={(e) => setReposteos(e.target.value)}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            Deja una casilla vacía para retirar su cifra. Lo que escribas aquí
+            manda sobre lo que mida el refresco automático.
+          </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCerrar} disabled={guardando}>
+            Cancelar
+          </Button>
+          <Button onClick={guardar} disabled={guardando}>
+            {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

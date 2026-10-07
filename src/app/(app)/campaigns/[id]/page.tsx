@@ -48,7 +48,10 @@ import {
 } from "@/components/campaigns/barra-presupuesto";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
-import { MetricasCampana } from "@/components/campaigns/metricas-campana";
+import {
+  MetricasCampana,
+  type Publicacion,
+} from "@/components/campaigns/metricas-campana";
 import {
   CampaignTabs,
   type PestanaCampana,
@@ -164,6 +167,48 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     };
   });
 
+  // Una entrada por entrega registrada, con las cifras que se escriben
+  // a mano. Van aparte de las capturas porque una entrega de hoy aun no
+  // tiene medicion y aun asi tiene que poder anotarse.
+  const publicaciones: Publicacion[] = campaign.profiles.flatMap((cp) =>
+    cp.platforms.flatMap((cpp) =>
+      cpp.services.flatMap((cs) =>
+        cs.entregas.map((e) => ({
+          entregaId: e.id,
+          influencer: cp.profile.name,
+          plataforma: cpp.socialAccount.platform.displayName,
+          username: cpp.socialAccount.username,
+          url: e.url,
+          // El formato senalado manda sobre el contratado, como en el
+          // resto de reglas de entregas.
+          formato:
+            e.serviceType?.displayName ??
+            (cs.esCombo
+              ? "Combo"
+              : (cs.profileService?.serviceType.displayName ?? null)),
+          esInstagram:
+            cpp.socialAccount.platform.name.toLowerCase() === "instagram",
+          esEfimero: e.serviceType
+            ? e.serviceType.esEfimero
+            : !cs.esCombo &&
+              (cs.profileService?.serviceType.esEfimero ?? false),
+          alcance: e.alcance,
+          compartidosReportados: e.compartidosReportados,
+          reposteosReportados: e.reposteosReportados,
+        }))
+      )
+    )
+  );
+
+  // El alcance conseguido: solo Instagram lo mide, y solo lo que haya
+  // anotado alguien. Null mientras no haya ni una cifra, para que la
+  // barra diga "sin dato" en vez de un cero que se leeria como "no
+  // llego a nadie".
+  const conAlcance = publicaciones.filter((pub) => pub.alcance !== null);
+  const alcanceMedido = conAlcance.length
+    ? conAlcance.reduce((suma, pub) => suma + (pub.alcance ?? 0), 0)
+    : null;
+
   // Lo conseguido hasta ahora, de la ultima captura de cada entrega --
   // la misma base de la que vive Impacto del contenido, para que las
   // dos secciones no puedan dar cifras distintas de lo mismo. Sumar
@@ -200,12 +245,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       resultado: sumaMedida("vistas"),
     },
     {
-      // Sin contraparte medida: el alcance de una publicacion solo lo
-      // ve su autor en su propio panel, ningun scraper lo alcanza.
+      // Ningun scraper lo alcanza: solo lo ve el autor en su panel, asi
+      // que llega a mano desde Impacto del contenido.
       etiqueta: "Alcance",
       prevision: previsionAlcance,
-      resultado: null,
-      nota: "Ninguna red publica el alcance de una publicación",
+      resultado: alcanceMedido,
+      nota: "Anótalo en Impacto del contenido: ninguna red lo publica",
     },
     {
       etiqueta: "Likes",
@@ -781,7 +826,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         <MetricasCampana
           campaignId={id}
           capturas={capturas}
+          publicaciones={publicaciones}
           puedeRefrescar={campaign.status === "ACTIVE" || campaign.status === "COMPLETED"}
+          puedeEditarCifras={campaign.status === "ACTIVE"}
         />
       ),
     });
