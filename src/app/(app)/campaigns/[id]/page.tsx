@@ -741,7 +741,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campana y que se puede hacer con ella se consultan desde
           cualquier pestana, y esconderlas en una obligaria a volver a
           General para cada cosa. */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      {/* Sin items-start: las dos tarjetas se estiran a la misma
+          altura. Con cada una a su aire quedaban desparejas y la
+          fila se leia como dos bloques sin relacion. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Cliente */}
           <Card>
             <CardHeader>

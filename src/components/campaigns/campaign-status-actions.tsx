@@ -132,12 +132,296 @@ export function CampaignStatusActions({
 
   return (
     <div className="space-y-4">
-      {/* Estado actual */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-500">Estado:</span>
-        <Badge className={CAMPAIGN_STATUS_COLORS[currentStatus]}>
-          {CAMPAIGN_STATUS_LABELS[currentStatus]}
-        </Badge>
+      {/* El estado a la izquierda y las acciones a la derecha, en
+          una sola linea. Apilados ocupaban dos alturas para cuatro
+          palabras y un par de botones, y la tarjeta quedaba mas
+          alta que la del cliente que tiene al lado. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">Estado:</span>
+          <Badge className={CAMPAIGN_STATUS_COLORS[currentStatus]}>
+            {CAMPAIGN_STATUS_LABELS[currentStatus]}
+          </Badge>
+        </div>
+
+        {/* Acciones disponibles */}
+        <div className="flex flex-wrap gap-2">
+          {/* Enviar a revisión (desde DRAFT) */}
+          {currentStatus === "DRAFT" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={!canSendToReview || loading !== null}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar a Revisión
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Enviar a Revisión</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña será enviada al cliente para su aprobación.
+                    El cliente podrá aprobar o rechazar cada perfil individualmente.
+                    <br /><br />
+                    <strong>Perfiles incluidos:</strong> {profilesCount}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("REVIEW")}
+                    disabled={loading !== null}
+                  >
+                    {loading === "REVIEW" ? "Enviando..." : "Confirmar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Activar directamente (desde DRAFT - para campañas ya negociadas) */}
+          {currentStatus === "DRAFT" && profilesCount > 0 && (
+            <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+              <AlertDialogTrigger asChild>
+                <Button variant="secondary" disabled={loading !== null}>
+                  <Play className="h-4 w-4 mr-2" />
+                  Activar Directamente
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Activar Campaña Directamente</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña será activada sin pasar por revisión del cliente.
+                    Usa esta opción cuando la campaña ya fue negociada previamente.
+                    <br /><br />
+                    <strong>Perfiles incluidos:</strong> {profilesCount} (se marcarán como aprobados)
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="activation-reason-draft" className="text-sm font-medium">
+                    Motivo de activación (opcional)
+                  </Label>
+                  <Textarea
+                    id="activation-reason-draft"
+                    placeholder="Ej: Campaña negociada por teléfono, cliente confirmó por WhatsApp..."
+                    value={activationReason}
+                    onChange={(e) => setActivationReason(e.target.value)}
+                    className="mt-2"
+                    rows={3}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setActivationReason("")}>
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("ACTIVE", activationReason || undefined)}
+                    disabled={loading !== null}
+                  >
+                    {loading === "ACTIVE" ? "Activando..." : "Activar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Reenviar a revisión (desde PENDING) */}
+          {currentStatus === "PENDING" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={loading !== null}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reenviar a Revisión
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reenviar a Revisión</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña será reenviada al cliente para revisión.
+                    Todos los perfiles volverán a estado pendiente.
+                    <br /><br />
+                    Asegúrate de haber realizado los ajustes necesarios antes de reenviar.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("REVIEW")}
+                    disabled={loading !== null}
+                  >
+                    {loading === "REVIEW" ? "Enviando..." : "Confirmar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Volver a borrador (desde REVIEW) */}
+          {currentStatus === "REVIEW" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={loading !== null}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Volver a Borrador
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Volver a Borrador</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña volverá a estado borrador y podrás editarla nuevamente.
+                    Se perderá cualquier revisión pendiente del cliente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("DRAFT")}
+                    disabled={loading !== null}
+                  >
+                    {loading === "DRAFT" ? "Procesando..." : "Confirmar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Activar campaña (desde REVIEW cuando todos los perfiles están aprobados) */}
+          {currentStatus === "REVIEW" && approvedCount === profilesCount && profilesCount > 0 && (
+            <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+              <AlertDialogTrigger asChild>
+                <Button disabled={loading !== null}>
+                  <Play className="h-4 w-4 mr-2" />
+                  Activar Campaña
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Activar Campaña</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Todos los perfiles han sido aprobados. La campaña pasará a estado activo
+                    y comenzará su ejecución.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="activation-reason" className="text-sm font-medium">
+                    Motivo de activación (opcional)
+                  </Label>
+                  <Textarea
+                    id="activation-reason"
+                    placeholder="Ej: Cliente confirmó inicio de campaña por email..."
+                    value={activationReason}
+                    onChange={(e) => setActivationReason(e.target.value)}
+                    className="mt-2"
+                    rows={3}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setActivationReason("")}>
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("ACTIVE", activationReason || undefined)}
+                    disabled={loading !== null}
+                  >
+                    {loading === "ACTIVE" ? "Activando..." : "Activar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Marcar completada (desde ACTIVE) */}
+          {currentStatus === "ACTIVE" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="secondary" disabled={loading !== null}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Marcar Completada
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Marcar como Completada</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña será marcada como completada.
+                    Esto indica que todas las entregas han sido realizadas.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("COMPLETED")}
+                    disabled={loading !== null}
+                  >
+                    {loading === "COMPLETED" ? "Procesando..." : "Confirmar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Cancelar. Pide el motivo porque es terminal: la campana no
+              se reabre, y esa linea es todo lo que queda de por que se
+              cayo. */}
+          {(currentStatus === "DRAFT" ||
+            currentStatus === "REVIEW" ||
+            currentStatus === "PENDING" ||
+            currentStatus === "ACTIVE") && (
+            <AlertDialog
+              open={showCancelDialog}
+              onOpenChange={(abierto) => {
+                setShowCancelDialog(abierto);
+                if (!abierto) setCancelReason("");
+              }}
+            >
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={loading !== null}>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancelar Campaña
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancelar Campaña</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La campaña quedará cancelada y no se podrá reabrir.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-2">
+                  <Label htmlFor="cancel-reason" className="text-sm font-medium">
+                    ¿Por qué se cancela?
+                  </Label>
+                  <Textarea
+                    id="cancel-reason"
+                    placeholder="Ej: el cliente aplazó el lanzamiento, no se llegó a acuerdo de presupuesto..."
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="mt-2"
+                    rows={3}
+                    maxLength={500}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Queda guardado en la campaña. Dentro de unos meses será lo
+                    único que explique qué pasó.
+                  </p>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>No, volver</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleStatusChange("CANCELLED", cancelReason.trim())}
+                    disabled={loading !== null || cancelReason.trim().length === 0}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {loading === "CANCELLED" ? "Cancelando..." : "Sí, cancelar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+        </div>
       </div>
 
       {/* Info de perfiles en revisión */}
@@ -164,285 +448,6 @@ export function CampaignStatusActions({
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
-
-      {/* Acciones disponibles */}
-      <div className="flex flex-wrap gap-2">
-        {/* Enviar a revisión (desde DRAFT) */}
-        {currentStatus === "DRAFT" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button disabled={!canSendToReview || loading !== null}>
-                <Send className="h-4 w-4 mr-2" />
-                Enviar a Revisión
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Enviar a Revisión</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña será enviada al cliente para su aprobación.
-                  El cliente podrá aprobar o rechazar cada perfil individualmente.
-                  <br /><br />
-                  <strong>Perfiles incluidos:</strong> {profilesCount}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("REVIEW")}
-                  disabled={loading !== null}
-                >
-                  {loading === "REVIEW" ? "Enviando..." : "Confirmar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Activar directamente (desde DRAFT - para campañas ya negociadas) */}
-        {currentStatus === "DRAFT" && profilesCount > 0 && (
-          <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
-            <AlertDialogTrigger asChild>
-              <Button variant="secondary" disabled={loading !== null}>
-                <Play className="h-4 w-4 mr-2" />
-                Activar Directamente
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Activar Campaña Directamente</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña será activada sin pasar por revisión del cliente.
-                  Usa esta opción cuando la campaña ya fue negociada previamente.
-                  <br /><br />
-                  <strong>Perfiles incluidos:</strong> {profilesCount} (se marcarán como aprobados)
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="py-4">
-                <Label htmlFor="activation-reason-draft" className="text-sm font-medium">
-                  Motivo de activación (opcional)
-                </Label>
-                <Textarea
-                  id="activation-reason-draft"
-                  placeholder="Ej: Campaña negociada por teléfono, cliente confirmó por WhatsApp..."
-                  value={activationReason}
-                  onChange={(e) => setActivationReason(e.target.value)}
-                  className="mt-2"
-                  rows={3}
-                />
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setActivationReason("")}>
-                  Cancelar
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("ACTIVE", activationReason || undefined)}
-                  disabled={loading !== null}
-                >
-                  {loading === "ACTIVE" ? "Activando..." : "Activar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Reenviar a revisión (desde PENDING) */}
-        {currentStatus === "PENDING" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button disabled={loading !== null}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reenviar a Revisión
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reenviar a Revisión</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña será reenviada al cliente para revisión.
-                  Todos los perfiles volverán a estado pendiente.
-                  <br /><br />
-                  Asegúrate de haber realizado los ajustes necesarios antes de reenviar.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("REVIEW")}
-                  disabled={loading !== null}
-                >
-                  {loading === "REVIEW" ? "Enviando..." : "Confirmar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Volver a borrador (desde REVIEW) */}
-        {currentStatus === "REVIEW" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={loading !== null}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver a Borrador
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Volver a Borrador</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña volverá a estado borrador y podrás editarla nuevamente.
-                  Se perderá cualquier revisión pendiente del cliente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("DRAFT")}
-                  disabled={loading !== null}
-                >
-                  {loading === "DRAFT" ? "Procesando..." : "Confirmar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Activar campaña (desde REVIEW cuando todos los perfiles están aprobados) */}
-        {currentStatus === "REVIEW" && approvedCount === profilesCount && profilesCount > 0 && (
-          <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
-            <AlertDialogTrigger asChild>
-              <Button disabled={loading !== null}>
-                <Play className="h-4 w-4 mr-2" />
-                Activar Campaña
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Activar Campaña</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Todos los perfiles han sido aprobados. La campaña pasará a estado activo
-                  y comenzará su ejecución.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="py-4">
-                <Label htmlFor="activation-reason" className="text-sm font-medium">
-                  Motivo de activación (opcional)
-                </Label>
-                <Textarea
-                  id="activation-reason"
-                  placeholder="Ej: Cliente confirmó inicio de campaña por email..."
-                  value={activationReason}
-                  onChange={(e) => setActivationReason(e.target.value)}
-                  className="mt-2"
-                  rows={3}
-                />
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setActivationReason("")}>
-                  Cancelar
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("ACTIVE", activationReason || undefined)}
-                  disabled={loading !== null}
-                >
-                  {loading === "ACTIVE" ? "Activando..." : "Activar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Marcar completada (desde ACTIVE) */}
-        {currentStatus === "ACTIVE" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="secondary" disabled={loading !== null}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Marcar Completada
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Marcar como Completada</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña será marcada como completada.
-                  Esto indica que todas las entregas han sido realizadas.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("COMPLETED")}
-                  disabled={loading !== null}
-                >
-                  {loading === "COMPLETED" ? "Procesando..." : "Confirmar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Cancelar. Pide el motivo porque es terminal: la campana no
-            se reabre, y esa linea es todo lo que queda de por que se
-            cayo. */}
-        {(currentStatus === "DRAFT" ||
-          currentStatus === "REVIEW" ||
-          currentStatus === "PENDING" ||
-          currentStatus === "ACTIVE") && (
-          <AlertDialog
-            open={showCancelDialog}
-            onOpenChange={(abierto) => {
-              setShowCancelDialog(abierto);
-              if (!abierto) setCancelReason("");
-            }}
-          >
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={loading !== null}>
-                <XCircle className="h-4 w-4 mr-2" />
-                Cancelar Campaña
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancelar Campaña</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La campaña quedará cancelada y no se podrá reabrir.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="py-2">
-                <Label htmlFor="cancel-reason" className="text-sm font-medium">
-                  ¿Por qué se cancela?
-                </Label>
-                <Textarea
-                  id="cancel-reason"
-                  placeholder="Ej: el cliente aplazó el lanzamiento, no se llegó a acuerdo de presupuesto..."
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  className="mt-2"
-                  rows={3}
-                  maxLength={500}
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Queda guardado en la campaña. Dentro de unos meses será lo
-                  único que explique qué pasó.
-                </p>
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel>No, volver</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleStatusChange("CANCELLED", cancelReason.trim())}
-                  disabled={loading !== null || cancelReason.trim().length === 0}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {loading === "CANCELLED" ? "Cancelando..." : "Sí, cancelar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-      </div>
 
       {/* Mensaje cuando no hay acciones */}
       {currentStatus === "COMPLETED" && (
