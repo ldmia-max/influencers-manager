@@ -6,12 +6,10 @@ import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/format";
 import { useCampaignWizard } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
-
-function getProgressBarColor(percentage: number) {
-  if (percentage <= 50) return "bg-green-500";
-  if (percentage <= 80) return "bg-yellow-500";
-  return "bg-red-500";
-}
+import {
+  BarraPresupuesto,
+  colorDeTexto,
+} from "@/components/campaigns/barra-presupuesto";
 
 export function CampaignNavigationBar() {
   const { onPrevious, onNext, onCancel } = useCampaignWizard();
@@ -61,28 +59,11 @@ export function CampaignNavigationBar() {
               <span className="font-semibold ml-2">{selectedProfilesCount}</span>
             </div>
           </div>
-          <span
-            className={cn(
-              "text-xs font-medium",
-              budgetPercentage <= 50
-                ? "text-green-600"
-                : budgetPercentage <= 80
-                ? "text-yellow-600"
-                : "text-red-600"
-            )}
-          >
+          <span className={cn("text-xs font-medium", colorDeTexto(budgetPercentage))}>
             {budgetPercentage.toFixed(0)}% usado
           </span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className={cn(
-              "h-full transition-all duration-300 rounded-full",
-              getProgressBarColor(budgetPercentage)
-            )}
-            style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
-          />
-        </div>
+        <BarraPresupuesto porcentaje={budgetPercentage} />
         {totalServicesPrice > budget && (
           <p className="text-xs text-red-600">
             Has excedido el presupuesto por ${formatNumber((totalServicesPrice - budget).toFixed(0))}

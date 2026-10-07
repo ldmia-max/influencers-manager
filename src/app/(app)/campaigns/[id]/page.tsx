@@ -37,6 +37,11 @@ import { CampaignStatusActions } from "@/components/campaigns/campaign-status-ac
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
 import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
+import {
+  BarraPresupuesto,
+  colorDeTexto,
+  porcentajeUsado,
+} from "@/components/campaigns/barra-presupuesto";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
 import { MetricasCampana } from "@/components/campaigns/metricas-campana";
@@ -126,6 +131,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   });
   const budget = Number(campaign.budget);
   const isOverBudget = totalCampaign > budget;
+  const porcentajeDelPresupuesto = porcentajeUsado(totalCampaign, budget);
 
   // Contar estados de perfiles
   // Historico de metricas para las graficas. Se aplana aqui: el
@@ -358,27 +364,31 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             </Card>
           </div>
 
-          {/* Resumen economico, tambien a lo ancho. Son cuatro cifras
-              que se comparan entre si, y en una columna de un tercio
-              de pantalla habia que bajar la vista para enfrentar el
-              presupuesto con el total. */}
+          {/* Resumen economico: el titulo arriba y las cifras en una
+              fila debajo, como contacto y fechas. */}
           <Card className={isOverBudget ? "border-red-300" : ""}>
-            <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-3 py-4">
+            <CardContent className="space-y-3 py-4">
               <span className="flex items-center gap-2 font-semibold">
                 <DollarSign className="h-5 w-5" />
                 Resumen
               </span>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Presupuesto:</span>
-                <span className="font-bold">
-                  ${formatNumber(budget.toString())}
-                </span>
-              </div>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Presupuesto:</span>
+                  <span className="font-bold">
+                    ${formatNumber(budget.toString())}
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-sm text-gray-500">
-                  Margen:
+                {/* El lapiz va detras del porcentaje, no entre la
+                    etiqueta y su valor: quien mira busca el margen, y
+                    solo despues decide si lo cambia. */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Margen:</span>
+                  <span className="font-medium">
+                    {Math.round(campaign.markupPercentage * 1000) / 10}%
+                  </span>
                   {esAdmin && (
                     <EditarMargen
                       campaignId={campaign.id}
@@ -386,35 +396,50 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                       yaEnviadaAlCliente={campaign.status !== "DRAFT"}
                     />
                   )}
-                </span>
-                <span className="font-medium">
-                  {Math.round(campaign.markupPercentage * 1000) / 10}%
-                </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Total:</span>
+                  <span
+                    className={`font-bold ${
+                      isOverBudget ? "text-red-600" : "text-green-600"
+                    }`}
+                  >
+                    ${formatNumber(totalCampaign.toFixed(0))}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {isOverBudget ? "Excedente:" : "Disponible:"}
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      isOverBudget ? "text-red-600" : "text-blue-600"
+                    }`}
+                  >
+                    ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Total:</span>
-                <span
-                  className={`font-bold ${
-                    isOverBudget ? "text-red-600" : "text-green-600"
-                  }`}
-                >
-                  ${formatNumber(totalCampaign.toFixed(0))}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {isOverBudget ? "Excedente:" : "Disponible:"}
-                </span>
-                <span
-                  className={`font-bold ${
-                    isOverBudget ? "text-red-600" : "text-blue-600"
-                  }`}
-                >
-                  ${formatNumber(Math.abs(budget - totalCampaign).toFixed(0))}
-                </span>
-              </div>
+              {/* Cuanto del presupuesto se lleva gastado, la misma barra
+                  que el asistente muestra mientras se arma la campana.
+                  Las cifras dicen cuanto queda; la barra dice si eso es
+                  mucho o poco sin tener que dividir de cabeza. */}
+              {budget > 0 && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Uso del presupuesto</span>
+                    <span
+                      className={`font-medium ${colorDeTexto(porcentajeDelPresupuesto)}`}
+                    >
+                      {porcentajeDelPresupuesto.toFixed(0)}% usado
+                    </span>
+                  </div>
+                  <BarraPresupuesto porcentaje={porcentajeDelPresupuesto} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
