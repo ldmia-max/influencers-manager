@@ -190,6 +190,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               : (cs.profileService?.serviceType.displayName ?? null)),
           esInstagram:
             cpp.socialAccount.platform.name.toLowerCase() === "instagram",
+          // Igual que el alcance: solo Instagram. Ver el comentario de
+          // actualizarCifrasDeEntrega.
+          admiteReposteos:
+            cpp.socialAccount.platform.name.toLowerCase() === "instagram",
           esEfimero: e.serviceType
             ? e.serviceType.esEfimero
             : !cs.esCombo &&

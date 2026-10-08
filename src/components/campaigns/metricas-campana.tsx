@@ -84,6 +84,14 @@ export interface Publicacion {
   esEfimero: boolean;
   /** Solo Instagram lo mide y solo lo ve su autor. */
   alcance: number | null;
+  /**
+   * Si en esta red se cuentan reposteos. Solo Instagram.
+   *
+   * Es una decision de la agencia, no de las redes: TikTok publica un
+   * repostCount y se sigue guardando, pero aqui no se muestra ni se
+   * suma. En YouTube y Kick no existe el concepto.
+   */
+  admiteReposteos: boolean;
   compartidosReportados: number | null;
   reposteosReportados: number | null;
 }
@@ -98,6 +106,7 @@ interface Pieza {
   formato: string | null;
   esInstagram: boolean;
   esEfimero: boolean;
+  admiteReposteos: boolean;
   origen: string;
   vistas: number | null;
   meGusta: number | null;
@@ -245,6 +254,7 @@ export function MetricasCampana({
         formato: pub.formato,
         esInstagram: pub.esInstagram,
         esEfimero: pub.esEfimero,
+        admiteReposteos: pub.admiteReposteos,
         origen: c?.origen ?? "MEDIDA",
         vistas: c?.vistas ?? null,
         meGusta: c?.meGusta ?? null,
@@ -255,11 +265,13 @@ export function MetricasCampana({
         // del creador —la unica fuente donde Instagram publica estas dos
         // cifras— y corrigio lo que habia.
         compartidos: compartidosAMano ?? c?.compartidos ?? null,
-        reposteos: reposteosAMano ?? c?.reposteos ?? null,
+        reposteos: pub.admiteReposteos
+          ? (reposteosAMano ?? c?.reposteos ?? null)
+          : null,
         alcance,
         aMano: {
           compartidos: compartidosAMano !== null,
-          reposteos: reposteosAMano !== null,
+          reposteos: pub.admiteReposteos && reposteosAMano !== null,
         },
       });
     }
@@ -276,6 +288,7 @@ export function MetricasCampana({
         formato: c.formato ?? null,
         esInstagram: c.plataforma.toLowerCase() === "instagram",
         esEfimero: false,
+        admiteReposteos: c.plataforma.toLowerCase() === "instagram",
         origen: c.origen,
         vistas: c.vistas,
         meGusta: c.meGusta,
@@ -283,7 +296,8 @@ export function MetricasCampana({
         interacciones: c.interacciones ?? null,
         guardados: c.guardados,
         compartidos: c.compartidos,
-        reposteos: c.reposteos ?? null,
+        reposteos:
+          c.plataforma.toLowerCase() === "instagram" ? (c.reposteos ?? null) : null,
         alcance: null,
         aMano: { compartidos: false, reposteos: false },
       });
@@ -930,6 +944,8 @@ export function MetricasCampana({
                                       <CeldaCifra
                                         valor={pieza.reposteos}
                                         aMano={pieza.aMano.reposteos}
+                                        noAplica={!pieza.admiteReposteos}
+                                        porQue={`No se cuentan reposteos en ${pieza.plataforma}`}
                                       />
                                       {hayAlcance && (
                                         <CeldaAlcance
@@ -1013,8 +1029,31 @@ export function MetricasCampana({
   );
 }
 
-/** Una cifra de la tabla, marcada cuando la escribio una persona. */
-function CeldaCifra({ valor, aMano }: { valor: number | null; aMano: boolean }) {
+/**
+ * Una cifra de la tabla, marcada cuando la escribio una persona.
+ *
+ * "NA" y la raya dicen cosas distintas: la raya es "no hay dato
+ * todavia", NA es "en esta red no se cuenta". Pintar un cero en
+ * cualquiera de los dos casos seria afirmar que nadie lo hizo.
+ */
+function CeldaCifra({
+  valor,
+  aMano,
+  noAplica,
+  porQue,
+}: {
+  valor: number | null;
+  aMano: boolean;
+  noAplica?: boolean;
+  porQue?: string;
+}) {
+  if (noAplica) {
+    return (
+      <td className="px-2 py-1 text-right text-gray-300" title={porQue}>
+        NA
+      </td>
+    );
+  }
   return (
     <td
       className={`px-2 py-1 text-right tabular-nums ${aMano ? "text-sky-700" : ""}`}
@@ -1123,6 +1162,7 @@ function ModalCifras({
   }
 
   const admiteAlcance = !!pieza && pieza.esInstagram && !pieza.esEfimero;
+  const admiteReposteos = !!pieza && pieza.admiteReposteos;
 
   // Vacio significa "sin dato", que es distinto de cero: borrar la
   // casilla retira la cifra en vez de afirmar que nadie lo compartio.
@@ -1138,7 +1178,7 @@ function ModalCifras({
     const cuerpo = {
       ...(admiteAlcance ? { alcance: aNumero(alcance) } : {}),
       compartidos: aNumero(compartidos),
-      reposteos: aNumero(reposteos),
+      ...(admiteReposteos ? { reposteos: aNumero(reposteos) } : {}),
     };
     if (Object.values(cuerpo).some((v) => Number.isNaN(v))) {
       setError("Escribe números enteros, o deja la casilla vacía.");
@@ -1206,9 +1246,15 @@ function ModalCifras({
             <Input
               id="reposteos"
               inputMode="numeric"
-              value={reposteos}
+              value={admiteReposteos ? reposteos : "NA"}
               onChange={(e) => setReposteos(e.target.value)}
+              disabled={!admiteReposteos}
             />
+            {!admiteReposteos && (
+              <p className="text-xs text-gray-500">
+                No se cuentan reposteos en {pieza?.plataforma}.
+              </p>
+            )}
           </div>
           <p className="text-xs text-gray-500">
             Deja una casilla vacía para retirar su cifra. Lo que escribas aquí

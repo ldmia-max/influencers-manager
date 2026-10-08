@@ -857,7 +857,7 @@ export async function actualizarCifrasDeEntrega(
           profileService: { select: { serviceType: { select: { esEfimero: true } } } },
           campaignProfilePlatform: {
             select: {
-              socialAccount: { select: { platform: { select: { name: true } } } },
+              socialAccount: { select: { platform: { select: { name: true, displayName: true } } } },
               campaignProfile: {
                 select: {
                   campaign: { select: { id: true, name: true, status: true } },
@@ -893,6 +893,18 @@ export async function actualizarCifrasDeEntrega(
 
   const esInstagram =
     cpp.socialAccount.platform.name.toLowerCase() === "instagram";
+
+  // Los reposteos solo se anotan en Instagram.
+  //
+  // Decision de la agencia, no de las redes: TikTok si publica un
+  // repostCount y el refresco diario lo sigue guardando, pero en la
+  // aplicacion no se muestra ni se cuenta. En YouTube y Kick no existe
+  // el concepto. Volver a mostrarlo es cambiar esta constante.
+  if (cifras.reposteos != null && !esInstagram) {
+    throw new ValidationError(
+      `Los reposteos no aplican en ${cpp.socialAccount.platform.displayName}.`
+    );
+  }
 
   if (cifras.alcance != null) {
     // Una historia no tiene alcance que anotar: lo que su autor ve es un
