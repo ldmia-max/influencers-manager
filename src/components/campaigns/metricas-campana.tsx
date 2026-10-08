@@ -94,6 +94,13 @@ export interface Publicacion {
   admiteReposteos: boolean;
   compartidosReportados: number | null;
   reposteosReportados: number | null;
+  /**
+   * Contenido que el creador publico por su cuenta, fuera del contrato.
+   *
+   * Cuenta igual —son vistas reales— pero no es lo contratado, asi que
+   * se puede mirar aparte: la campana sola, lo extra solo, o todo junto.
+   */
+  esExtra: boolean;
 }
 
 /** Lo medido y lo anotado, ya fundidos: es lo que se pinta y lo que se suma. */
@@ -107,6 +114,7 @@ interface Pieza {
   esInstagram: boolean;
   esEfimero: boolean;
   admiteReposteos: boolean;
+  esExtra: boolean;
   origen: string;
   vistas: number | null;
   meGusta: number | null;
@@ -140,6 +148,24 @@ interface Props {
    */
   puedeEditarCifras?: boolean;
 }
+
+const VISTAS = [
+  {
+    clave: "campana" as const,
+    nombre: "Campaña",
+    explica: "Solo el contenido contratado",
+  },
+  {
+    clave: "extra" as const,
+    nombre: "Extra",
+    explica: "Solo lo que el creador publicó por su cuenta",
+  },
+  {
+    clave: "general" as const,
+    nombre: "General",
+    explica: "Todo junto: lo contratado y lo extra",
+  },
+];
 
 const SERIES = [
   { clave: "vistas" as const, nombre: "Vistas", color: "#7c3aed", icono: Eye },
@@ -203,6 +229,16 @@ export function MetricasCampana({
    */
   const [cifrasLocales, setCifrasLocales] = useState<Record<string, CifrasAMano>>({});
   const [editando, setEditando] = useState<Pieza | null>(null);
+  /**
+   * Que contenido se esta mirando.
+   *
+   * Lo contratado y lo que el creador publico de mas responden a
+   * preguntas distintas —si la campana cumplio, y cuanto regalo el
+   * creador— y sumarlos siempre las confunde. Tambien hace falta el
+   * total, que es lo que de verdad vio la gente.
+   */
+  const [vista, setVista] = useState<"campana" | "extra" | "general">("campana");
+  const hayExtra = publicaciones.some((p) => p.esExtra);
 
   /**
    * Si la columna de alcance tiene algo que decir.
@@ -218,8 +254,21 @@ export function MetricasCampana({
     // Ultima captura de cada entrega. Sumar todas las capturas contaria
     // varias veces la misma publicacion: las metricas son acumuladas, no
     // incrementos.
+    // Que publicaciones entran. Se filtra aqui, antes de cualquier
+    // cuenta, para que las tarjetas, los totales por red, el aporte por
+    // influencer, la evolucion y las filas hablen todas del mismo
+    // conjunto y no puedan discrepar.
+    const entra = (extra: boolean) =>
+      vista === "general" ? true : vista === "extra" ? extra : !extra;
+    const extraPorEntrega = new Map(
+      publicaciones.map((pub) => [pub.entregaId, pub.esExtra])
+    );
+    const capturasDeLaVista = capturas.filter((c) =>
+      entra(extraPorEntrega.get(c.entregaId) ?? false)
+    );
+
     const ultimaPorEntrega = new Map<string, CapturaMetrica>();
-    for (const c of capturas) {
+    for (const c of capturasDeLaVista) {
       const previa = ultimaPorEntrega.get(c.entregaId);
       if (!previa || c.capturadoEn > previa.capturadoEn) {
         ultimaPorEntrega.set(c.entregaId, c);
@@ -235,6 +284,7 @@ export function MetricasCampana({
     const actuales: Pieza[] = [];
     const vistos = new Set<string>();
     for (const pub of publicaciones) {
+      if (!entra(pub.esExtra)) continue;
       const local = cifrasLocales[pub.entregaId];
       const alcance = local ? local.alcance : pub.alcance;
       const compartidosAMano = local
@@ -255,6 +305,7 @@ export function MetricasCampana({
         esInstagram: pub.esInstagram,
         esEfimero: pub.esEfimero,
         admiteReposteos: pub.admiteReposteos,
+        esExtra: pub.esExtra,
         origen: c?.origen ?? "MEDIDA",
         vistas: c?.vistas ?? null,
         meGusta: c?.meGusta ?? null,
@@ -289,6 +340,7 @@ export function MetricasCampana({
         esInstagram: c.plataforma.toLowerCase() === "instagram",
         esEfimero: false,
         admiteReposteos: c.plataforma.toLowerCase() === "instagram",
+        esExtra: false,
         origen: c.origen,
         vistas: c.vistas,
         meGusta: c.meGusta,
@@ -318,10 +370,10 @@ export function MetricasCampana({
 
     // Evolucion: total de la campana por dia, con la ultima captura de
     // cada entrega hasta ese dia.
-    const dias = [...new Set(capturas.map((c) => dia(c.capturadoEn)))].sort();
+    const dias = [...new Set(capturasDeLaVista.map((c) => dia(c.capturadoEn)))].sort();
     const evolucion = dias.map((d) => {
       const hasta = new Map<string, CapturaMetrica>();
-      for (const c of capturas) {
+      for (const c of capturasDeLaVista) {
         if (dia(c.capturadoEn) > d) continue;
         const previa = hasta.get(c.entregaId);
         if (!previa || c.capturadoEn > previa.capturadoEn) hasta.set(c.entregaId, c);
@@ -537,11 +589,14 @@ export function MetricasCampana({
       reportadas,
       // Cuando se midio por ultima vez. Sale de las capturas y no de
       // las piezas: una cifra escrita a mano no es una medicion.
-      capturadoEn: capturas.length
-        ? capturas.reduce((m, c) => (c.capturadoEn > m ? c.capturadoEn : m), "")
+      capturadoEn: capturasDeLaVista.length
+        ? capturasDeLaVista.reduce(
+            (m, c) => (c.capturadoEn > m ? c.capturadoEn : m),
+            ""
+          )
         : null,
     };
-  }, [capturas, publicaciones, cifrasLocales]);
+  }, [capturas, publicaciones, cifrasLocales, vista]);
 
   const refrescar = async () => {
     setRefrescando(true);
@@ -595,14 +650,42 @@ export function MetricasCampana({
           </div>
         )}
 
-        {capturas.length === 0 ? (
+        {/* Lo contratado y lo que el creador publico de mas responden a
+            preguntas distintas —si la campana cumplio, y cuanto regalo
+            el creador— y sumarlos siempre las confunde. El selector solo
+            aparece cuando hay algo extra: sin ello, las tres vistas
+            dirian lo mismo. */}
+        {hayExtra && (
+          <div className="inline-flex rounded-lg bg-gray-100 p-[3px] text-xs">
+            {VISTAS.map((v) => (
+              <button
+                key={v.clave}
+                type="button"
+                onClick={() => setVista(v.clave)}
+                className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  vista === v.clave
+                    ? "bg-marca text-white"
+                    : "text-gray-600 hover:bg-accent/10"
+                }`}
+                title={v.explica}
+              >
+                {v.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {datos.publicaciones === 0 ? (
           <div className="py-8 text-center">
             <p className="text-sm text-gray-500">
-              Todavía no hay métricas de los contenidos entregados.
+              {vista === "extra"
+                ? "No hay contenido extra registrado."
+                : "Todavía no hay métricas de los contenidos entregados."}
             </p>
             <p className="mt-1 text-xs text-gray-400">
-              Se actualizan solas a diario durante el primer mes desde que se
-              publica cada contenido.
+              {vista === "extra"
+                ? "Es el que el creador publica por su cuenta, fuera del contrato; se marca al registrarlo."
+                : "Se actualizan solas a diario durante el primer mes desde que se publica cada contenido."}
             </p>
           </div>
         ) : (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -22,6 +23,7 @@ import { formatNumber } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { redDeUrl } from "@/lib/social-handles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -152,6 +154,23 @@ function fechaCorta(iso: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/**
+ * Aviso cuando el link pegado no es de la red elegida.
+ *
+ * No impide guardar: hay casos en los que la pieza vive en una red y
+ * conviene anotarla bajo otra, y cerrar la puerta impedia registrar
+ * contenido real. Pero es casi siempre un descuido —y uno caro: de la
+ * red sale como se cuenta la publicacion en Impacto del contenido—,
+ * asi que se dice en el momento, no despues.
+ */
+function avisoDeRed(url: string, nombreDeLaRed: string | undefined) {
+  if (!url.trim() || !nombreDeLaRed) return null;
+  const deLaUrl = redDeUrl(url);
+  if (!deLaUrl || deLaUrl === nombreDeLaRed.toLowerCase()) return null;
+  const bonito = deLaUrl.charAt(0).toUpperCase() + deLaUrl.slice(1);
+  return `El link es de ${bonito} y la red elegida es ${nombreDeLaRed}.`;
 }
 
 /** Clave de ocupacion mientras se guarda el enlace de una entrega. */
@@ -437,6 +456,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                         perfil.redesDelPerfil.find((r) => r.platformId === redId) ??
                         null;
                       const catalogo = red?.formatos ?? plataforma.formatosDisponibles;
+                      const nombreRed = red?.nombre ?? plataforma.plataforma;
                       const tipoId =
                         tipoElegido[formato.id] ??
                         (redId === plataforma.platformId
@@ -606,18 +626,35 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               emisión y quien la confirmó.
                                             </span>
                                           ) : (
-                                            <Input
-                                              autoFocus
-                                              placeholder="https://… link de la publicación"
-                                              value={borrador.url}
-                                              onChange={(e) =>
-                                                setBorrador((b) => ({
-                                                  ...b,
-                                                  url: e.target.value,
-                                                }))
-                                              }
-                                              className="h-7 min-w-56 text-xs"
-                                            />
+                                            <>
+                                              <Input
+                                                autoFocus
+                                                placeholder="https://… link de la publicación"
+                                                value={borrador.url}
+                                                onChange={(e) =>
+                                                  setBorrador((b) => ({
+                                                    ...b,
+                                                    url: e.target.value,
+                                                  }))
+                                                }
+                                                className="h-7 min-w-56 text-xs"
+                                              />
+                                              {(() => {
+                                                const aviso = avisoDeRed(
+                                                  borrador.url,
+                                                  perfil.redesDelPerfil.find(
+                                                    (r) =>
+                                                      r.platformId === borrador.redId
+                                                  )?.nombre
+                                                );
+                                                return aviso ? (
+                                                  <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
+                                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                                    {aviso}
+                                                  </p>
+                                                ) : null;
+                                              })()}
+                                            </>
                                           )}
                                         </td>
                                         <td className="px-2 py-1 text-center">
@@ -1081,17 +1118,31 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           />
                                         </div>
                                       ) : (
-                                        <Input
-                                          placeholder="https://… link de la publicación"
-                                          value={nuevoLink[formato.id] ?? ""}
-                                          onChange={(e) =>
-                                            setNuevoLink((v) => ({
-                                              ...v,
-                                              [formato.id]: e.target.value,
-                                            }))
-                                          }
-                                          className="h-7 min-w-56 text-xs"
-                                        />
+                                        <>
+                                          <Input
+                                            placeholder="https://… link de la publicación"
+                                            value={nuevoLink[formato.id] ?? ""}
+                                            onChange={(e) =>
+                                              setNuevoLink((v) => ({
+                                                ...v,
+                                                [formato.id]: e.target.value,
+                                              }))
+                                            }
+                                            className="h-7 min-w-56 text-xs"
+                                          />
+                                          {(() => {
+                                            const aviso = avisoDeRed(
+                                              nuevoLink[formato.id] ?? "",
+                                              nombreRed
+                                            );
+                                            return aviso ? (
+                                              <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
+                                                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                                {aviso}
+                                              </p>
+                                            ) : null;
+                                          })()}
+                                        </>
                                       )}
                                     </td>
                                     <td className="px-2 py-1 text-center">

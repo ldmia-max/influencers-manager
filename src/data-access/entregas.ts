@@ -33,30 +33,7 @@ const ANFITRIONES_VALIDOS = [
  * uno mal pegado se descubriria semanas despues, al ver que esa entrega
  * es la unica sin datos.
  */
-/**
- * De que red es cada dominio.
- *
- * Las claves son el `name` de SocialPlatform en minusculas, que es con
- * lo que ya se despacha el sincronizado de Apify.
- */
-const RED_DEL_ANFITRION: Record<string, string> = {
-  "instagram.com": "instagram",
-  "www.instagram.com": "instagram",
-  "tiktok.com": "tiktok",
-  "www.tiktok.com": "tiktok",
-  "vm.tiktok.com": "tiktok",
-  "youtube.com": "youtube",
-  "www.youtube.com": "youtube",
-  "youtu.be": "youtube",
-  "kick.com": "kick",
-  "www.kick.com": "kick",
-};
-
-/**
- * @param red  Nombre de la red de la cuenta contratada, en minusculas.
- *   Cuando se pasa, el enlace tiene que ser de esa red.
- */
-function validarUrl(valor: string, red?: { name: string; displayName: string }): string {
+function validarUrl(valor: string): string {
   const limpia = valor.trim();
   if (!limpia) throw new ValidationError("El link no puede estar vacío");
 
@@ -73,31 +50,19 @@ function validarUrl(valor: string, red?: { name: string; displayName: string }):
     throw new ValidationError("El link debe ser una dirección web (https://)");
   }
 
-  const anfitrion = url.hostname.toLowerCase();
-  if (!ANFITRIONES_VALIDOS.includes(anfitrion)) {
+  if (!ANFITRIONES_VALIDOS.includes(url.hostname.toLowerCase())) {
     throw new ValidationError(
       `«${url.hostname}» no es una red reconocida. Se admiten links de Instagram, TikTok, YouTube y Kick.`
     );
   }
 
-  // Que el enlace sea de la red de la cuenta contratada.
+  // Que el enlace sea de la red del formato senalado NO se exige aqui.
   //
-  // Sin esto, un link de TikTok pegado en el Reel de una cuenta de
-  // Instagram se guardaba sin una queja, y a partir de ahi todo lo que
-  // se dijera de esa publicacion era falso: Impacto del contenido la
-  // contaba como de Instagram —la red sale de la cuenta, no del
-  // enlace— y el refresco diario intentaba leerla con el actor
-  // equivocado. Se registro asi en produccion.
-  if (red) {
-    const deLaUrl = RED_DEL_ANFITRION[anfitrion];
-    if (deLaUrl && deLaUrl !== red.name.toLowerCase()) {
-      throw new ValidationError(
-        `Este formato es de ${red.displayName} y el link es de ${
-          deLaUrl.charAt(0).toUpperCase() + deLaUrl.slice(1)
-        }. Registralo en el formato de esa red.`
-      );
-    }
-  }
+  // Lo fue durante un tiempo y se quito a proposito: hay casos en los
+  // que la pieza vive en una red y conviene anotarla bajo otra, y
+  // cerrar la puerta impedia registrar contenido real. El desajuste se
+  // avisa al pegar el link, en la propia tabla, para que quien lo hace
+  // lo vea y decida.
 
   // Se guarda el enlace de la publicacion, no el rastro de quien lo
   // copio: al pegar desde Instagram viene con ?utm_source=...&stkn=...,
@@ -390,12 +355,7 @@ export async function registrarEntrega(datos: {
     if (!datos.url?.trim()) {
       throw new ValidationError("Pega el link de la publicación");
     }
-    // La red del formato senalado, que es la de la publicacion. La de
-    // la cuenta contratada solo vale cuando no se senalo ninguno.
-    url = validarUrl(
-      datos.url,
-      formato.red ?? servicio.campaignProfilePlatform.socialAccount.platform
-    );
+    url = validarUrl(datos.url);
   }
 
   const perfil = servicio.campaignProfilePlatform.campaignProfile;
@@ -636,17 +596,9 @@ export async function actualizarEntrega(
       ? await resolverFormato(datos.serviceTypeId, servicio)
       : null;
 
-  // La red de la publicacion: la del formato que se esta senalando; si
-  // no se toca el formato, la del que ya tenia; y en ultimo caso la de
-  // la cuenta contratada.
-  const redDeLaPieza =
-    formato?.red ??
-    entrega.serviceType?.platform ??
-    servicio.campaignProfilePlatform.socialAccount.platform;
-
   const url =
     datos.url !== undefined && datos.url !== null && datos.url.trim()
-      ? validarUrl(datos.url, redDeLaPieza)
+      ? validarUrl(datos.url)
       : undefined;
 
   if (url) {

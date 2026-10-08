@@ -207,6 +207,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           alcance: e.alcance,
           compartidosReportados: e.compartidosReportados,
           reposteosReportados: e.reposteosReportados,
+          esExtra: e.esExtra,
         }))
       )
     )

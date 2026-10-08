@@ -175,3 +175,34 @@ export function limpiarUrlPublicacion(url: string): string {
 
   return u.toString();
 }
+
+/**
+ * De que red es un enlace, por su dominio.
+ *
+ * Devuelve el `name` de SocialPlatform en minusculas, o null si el
+ * dominio no es de ninguna red conocida —o si ni siquiera es una URL—.
+ *
+ * Vive aqui y no en apify.ts porque la usa tambien el navegador, para
+ * avisar cuando el link pegado no es de la red elegida, y apify.ts
+ * arrastra `server-only` a traves de uploads.ts.
+ */
+const RED_DEL_ANFITRION: Record<string, string> = {
+  "instagram.com": "instagram",
+  "www.instagram.com": "instagram",
+  "tiktok.com": "tiktok",
+  "www.tiktok.com": "tiktok",
+  "vm.tiktok.com": "tiktok",
+  "youtube.com": "youtube",
+  "www.youtube.com": "youtube",
+  "youtu.be": "youtube",
+  "kick.com": "kick",
+  "www.kick.com": "kick",
+};
+
+export function redDeUrl(valor: string): string | null {
+  try {
+    return RED_DEL_ANFITRION[new URL(valor.trim()).hostname.toLowerCase()] ?? null;
+  } catch {
+    return null;
+  }
+}
