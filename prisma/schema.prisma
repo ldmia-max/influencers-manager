@@ -785,6 +785,14 @@ model CampaignEntrega {
   compartidosReportados Int?
   reposteosReportados   Int?
 
+  /// Contenido entregado de mas, fuera de lo que se contrato.
+  ///
+  /// Se marca a mano al registrarlo. Por ahora solo se dice: no cambia
+  /// cuantas piezas se esperan de un formato ni cuando la campana puede
+  /// cerrarse, porque eso es una decision comercial que nadie ha tomado
+  /// todavia.
+  esExtra Boolean @default(false)
+
   /// Cuando se anotaron esas tres cifras por ultima vez. Quien lo hizo
   /// queda en la auditoria, que es donde vive el resto de la trazabilidad
   /// de la campana.

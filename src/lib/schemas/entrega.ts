@@ -26,6 +26,8 @@ export const registrarEntregaSchema = z.object({
    * el contratado ya lo dice.
    */
   serviceTypeId: z.string().min(1).nullish(),
+  /** Contenido de más, fuera de lo contratado. */
+  esExtra: z.boolean().optional(),
 });
 
 /**
@@ -58,6 +60,7 @@ export const actualizarEntregaSchema = z
     serviceTypeId: z.string().min(1).nullish(),
     /** A qué formato contratado cuenta, si se corrigió la red. */
     campaignServiceId: z.string().min(1).optional(),
+    esExtra: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "No hay nada que cambiar",

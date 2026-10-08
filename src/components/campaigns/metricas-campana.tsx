@@ -814,51 +814,11 @@ export function MetricasCampana({
                       </div>
 
                       <div className="mt-2 space-y-1 border-t border-dashed border-gray-200 pt-2">
-                        {persona.plataformas.map((cuenta) => (
-                          <div
-                            key={cuenta.plataforma}
-                            className="flex flex-wrap items-center justify-between gap-2 text-xs"
-                          >
-                            <span className="text-gray-600">
-                              {cuenta.plataforma}
-                              <span className="ml-1 text-gray-400">
-                                @{cuenta.username}
-                              </span>
-                              {cuenta.reportadas > 0 && (
-                                <span className="ml-1 text-sky-700">
-                                  · {cuenta.reportadas} reportada
-                                  {cuenta.reportadas === 1 ? "" : "s"}
-                                </span>
-                              )}
-                            </span>
-                            <span className="flex gap-4 text-gray-700">
-                              <span>
-                                <Cifra
-                                  valor={cuenta.vistas}
-                                  cuantasLaDan={cuenta.conVistas}
-                                  titulo="Esta red no publica el número de vistas para este tipo de contenido"
-                                />{" "}
-                                vistas
-                              </span>
-                              <span>
-                                <Cifra
-                                  valor={cuenta.comentarios}
-                                  cuantasLaDan={cuenta.conComentarios}
-                                  titulo="Esta red no publica el número de comentarios para este contenido"
-                                />{" "}
-                                comentarios
-                              </span>
-                              <span>
-                                <Cifra
-                                  valor={cuenta.interacciones}
-                                  cuantasLaDan={cuenta.conInteracciones}
-                                  titulo="Ninguna de estas publicaciones expone interacciones"
-                                />{" "}
-                                interacciones
-                              </span>
-                            </span>
-                          </div>
-                        ))}
+                        {/* El desglose por cuenta se quito: repetia la
+                            red y el usuario encima de una tabla que ya
+                            trae la red en su propia columna, publicacion
+                            a publicacion. Las cifras de cada red siguen
+                            en "Total por plataforma", mas arriba. */}
 
                         {/* Publicacion a publicacion, en tabla.
                             En lista, el enlace quedaba pegado al borde

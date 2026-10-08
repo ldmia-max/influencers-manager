@@ -243,6 +243,18 @@ export async function getCampaignDetail(id: string) {
               type: true,
               gender: { select: { displayName: true } },
               department: { select: { name: true } },
+              // Todas sus redes, no solo las contratadas en esta
+              // campana: una pieza puede publicarse en una cuenta que el
+              // creador tiene y que aqui no se contrato.
+              socialAccounts: {
+                select: {
+                  id: true,
+                  username: true,
+                  platform: {
+                    select: { id: true, name: true, displayName: true },
+                  },
+                },
+              },
             },
           },
           platforms: {
@@ -264,9 +276,18 @@ export async function getCampaignDetail(id: string) {
                     orderBy: { entregadoEn: "asc" },
                     include: {
                       // Que formato es la pieza. En un combo es lo unico
-                      // que lo dice: el contratado agrupa varios.
+                      // que lo dice: el contratado agrupa varios. Su red
+                      // es la de la publicacion, que no tiene por que ser
+                      // la de la cuenta contratada.
                       serviceType: {
-                        select: { id: true, displayName: true, esEfimero: true },
+                        select: {
+                          id: true,
+                          displayName: true,
+                          esEfimero: true,
+                          platform: {
+                            select: { id: true, name: true, displayName: true },
+                          },
+                        },
                       },
                       registradoPor: { select: { id: true, name: true } },
                       metricas: {

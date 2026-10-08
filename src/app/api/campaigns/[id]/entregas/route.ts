@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       notas: body.notas ?? null,
       vistasReportadas: body.vistasReportadas ?? null,
       serviceTypeId: body.serviceTypeId ?? null,
+      esExtra: body.esExtra ?? false,
       usuarioId: sesion.userId,
     });
 

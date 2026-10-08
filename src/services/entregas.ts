@@ -12,6 +12,8 @@ export interface RegistrarEntregaPayload {
   interaccionesReportadas?: number | null;
   /** Qué formato es la pieza. La interfaz lo envía siempre. */
   serviceTypeId?: string | null;
+  /** Contenido de más, fuera de lo contratado. */
+  esExtra?: boolean;
 }
 
 export interface EntregaCreada {
@@ -33,6 +35,7 @@ export function actualizarEntrega(
     notas?: string | null;
     serviceTypeId?: string | null;
     campaignServiceId?: string;
+    esExtra?: boolean;
   }
 ) {
   return apiPatch<{ id: string; url: string }>(

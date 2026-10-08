@@ -198,6 +198,16 @@ interface FormatoResuelto {
   id: string | null;
   displayName: string;
   esEfimero: boolean;
+  /**
+   * La red de la publicacion.
+   *
+   * Sale del formato senalado y no de la cuenta contratada: un creador
+   * contratado en Instagram puede publicar la pieza en su TikTok, y es
+   * esta red la que decide si el enlace vale y como se cuenta despues.
+   * Null cuando la entrega no senala formato —las anteriores a que se
+   * pidiera— y se cae al contratado.
+   */
+  red: { name: string; displayName: string } | null;
 }
 
 /**
@@ -213,9 +223,11 @@ interface FormatoResuelto {
  * es exacto —asi siguen valiendo las entregas registradas antes de que
  * existiera este campo y las que entren por API sin indicarlo—.
  *
- * El formato senalado tiene que ser de la misma plataforma de la cuenta:
- * un Reel de Instagram en una entrega de TikTok no describe nada, y sus
- * metricas se irian a leer a la red equivocada.
+ * El formato senalado puede ser de cualquier red que el creador tenga,
+ * no solo de la contratada: contratado en Instagram, puede publicar la
+ * pieza en su TikTok. Lo que no cabe es una red donde no tiene cuenta,
+ * porque entonces la publicacion no seria suya. De esa red salen las
+ * reglas que vienen despues: si el enlace vale y como se cuenta.
  */
 async function resolverFormato(
   serviceTypeId: string | null | undefined,
@@ -225,6 +237,7 @@ async function resolverFormato(
       serviceType: { esEfimero: boolean; displayName: string };
     } | null;
     campaignProfilePlatform: {
+      campaignProfile: { profileId: string };
       socialAccount: {
         platformId: string;
         platform: { name: string; displayName: string };
@@ -235,18 +248,44 @@ async function resolverFormato(
   if (serviceTypeId) {
     const tipo = await prisma.serviceType.findUnique({
       where: { id: serviceTypeId },
-      select: { id: true, displayName: true, esEfimero: true, platformId: true },
+      select: {
+        id: true,
+        displayName: true,
+        esEfimero: true,
+        platformId: true,
+        platform: { select: { name: true, displayName: true } },
+      },
     });
     if (!tipo) throw new NotFoundError("Formato no encontrado");
 
+    // De cualquier red que el creador tenga, no solo de la contratada.
+    //
+    // Un creador contratado en Instagram puede publicar la pieza en su
+    // TikTok, y antes no habia donde registrarla: el formato tenia que
+    // ser de la cuenta contratada. Lo que no cabe es una red que ese
+    // creador no tiene, porque entonces la publicacion no seria suya.
     const cuenta = servicio.campaignProfilePlatform.socialAccount;
     if (tipo.platformId !== cuenta.platformId) {
-      throw new ValidationError(
-        `«${tipo.displayName}» no es un formato de ${cuenta.platform.displayName}.`
-      );
+      const laTiene = await prisma.socialAccount.findFirst({
+        where: {
+          profileId: servicio.campaignProfilePlatform.campaignProfile.profileId,
+          platformId: tipo.platformId,
+        },
+        select: { id: true },
+      });
+      if (!laTiene) {
+        throw new ValidationError(
+          `Este creador no tiene cuenta de ${tipo.platform.displayName}.`
+        );
+      }
     }
 
-    return { id: tipo.id, displayName: tipo.displayName, esEfimero: tipo.esEfimero };
+    return {
+      id: tipo.id,
+      displayName: tipo.displayName,
+      esEfimero: tipo.esEfimero,
+      red: tipo.platform,
+    };
   }
 
   if (servicio.esCombo) {
@@ -257,6 +296,8 @@ async function resolverFormato(
 
   const contratado = servicio.profileService?.serviceType;
   return {
+    // Sin formato senalado, la red es la de la cuenta contratada.
+    red: servicio.campaignProfilePlatform.socialAccount.platform,
     id: null,
     displayName: contratado?.displayName ?? "Formato",
     esEfimero: contratado?.esEfimero ?? false,
@@ -286,6 +327,8 @@ export async function registrarEntrega(datos: {
    * formatos efimeros, porque en el resto las lee Apify con su desglose.
    */
   interaccionesReportadas?: number | null;
+  /** Contenido de mas, fuera de lo contratado. */
+  esExtra?: boolean;
   usuarioId: string;
 }) {
   const servicio = await prisma.campaignService.findUnique({
@@ -306,6 +349,7 @@ export async function registrarEntrega(datos: {
           },
           campaignProfile: {
             select: {
+              profileId: true,
               participacion: true,
               status: true,
               campaign: { select: { id: true, status: true } },
@@ -346,9 +390,11 @@ export async function registrarEntrega(datos: {
     if (!datos.url?.trim()) {
       throw new ValidationError("Pega el link de la publicación");
     }
+    // La red del formato senalado, que es la de la publicacion. La de
+    // la cuenta contratada solo vale cuando no se senalo ninguno.
     url = validarUrl(
       datos.url,
-      servicio.campaignProfilePlatform.socialAccount.platform
+      formato.red ?? servicio.campaignProfilePlatform.socialAccount.platform
     );
   }
 
@@ -397,6 +443,7 @@ export async function registrarEntrega(datos: {
       url,
       publicadoEn: datos.publicadoEn ?? null,
       notas: datos.notas?.trim() || null,
+      esExtra: datos.esExtra ?? false,
       serviceTypeId: formato.id,
       registradoPorId: datos.usuarioId,
     },
@@ -513,6 +560,7 @@ export async function actualizarEntrega(
     url?: string;
     publicadoEn?: Date | null;
     notas?: string | null;
+    esExtra?: boolean;
     /** Que formato se publico. Manda sobre el contratado. */
     serviceTypeId?: string | null;
     /**
@@ -535,6 +583,7 @@ export async function actualizarEntrega(
     campaignProfilePlatform: {
       select: {
         campaignProfileId: true,
+        campaignProfile: { select: { profileId: true } },
         socialAccount: {
           select: {
             platformId: true,
@@ -550,6 +599,9 @@ export async function actualizarEntrega(
     select: {
       id: true,
       campaignServiceId: true,
+      serviceType: {
+        select: { platform: { select: { name: true, displayName: true } } },
+      },
       campaignService: { select: SELECCION_SERVICIO },
     },
   });
@@ -584,12 +636,17 @@ export async function actualizarEntrega(
       ? await resolverFormato(datos.serviceTypeId, servicio)
       : null;
 
+  // La red de la publicacion: la del formato que se esta senalando; si
+  // no se toca el formato, la del que ya tenia; y en ultimo caso la de
+  // la cuenta contratada.
+  const redDeLaPieza =
+    formato?.red ??
+    entrega.serviceType?.platform ??
+    servicio.campaignProfilePlatform.socialAccount.platform;
+
   const url =
     datos.url !== undefined && datos.url !== null && datos.url.trim()
-      ? validarUrl(
-          datos.url,
-          servicio.campaignProfilePlatform.socialAccount.platform
-        )
+      ? validarUrl(datos.url, redDeLaPieza)
       : undefined;
 
   if (url) {
@@ -608,6 +665,7 @@ export async function actualizarEntrega(
       ...(url !== undefined && { url }),
       ...(datos.publicadoEn !== undefined && { publicadoEn: datos.publicadoEn }),
       ...(datos.notas !== undefined && { notas: datos.notas?.trim() || null }),
+      ...(datos.esExtra !== undefined && { esExtra: datos.esExtra }),
       ...(formato && { serviceTypeId: formato.id }),
       ...(servicio.id !== entrega.campaignServiceId && {
         campaignServiceId: servicio.id,

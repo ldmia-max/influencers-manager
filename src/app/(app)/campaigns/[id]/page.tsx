@@ -178,7 +178,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         cs.entregas.map((e) => ({
           entregaId: e.id,
           influencer: cp.profile.name,
-          plataforma: cpp.socialAccount.platform.displayName,
+          plataforma:
+            e.serviceType?.platform.displayName ??
+            cpp.socialAccount.platform.displayName,
           username: cpp.socialAccount.username,
           url: e.url,
           // El formato senalado manda sobre el contratado, como en el
@@ -189,11 +191,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               ? "Combo"
               : (cs.profileService?.serviceType.displayName ?? null)),
           esInstagram:
-            cpp.socialAccount.platform.name.toLowerCase() === "instagram",
+            (
+              e.serviceType?.platform.name ?? cpp.socialAccount.platform.name
+            ).toLowerCase() === "instagram",
           // Igual que el alcance: solo Instagram. Ver el comentario de
           // actualizarCifrasDeEntrega.
           admiteReposteos:
-            cpp.socialAccount.platform.name.toLowerCase() === "instagram",
+            (
+              e.serviceType?.platform.name ?? cpp.socialAccount.platform.name
+            ).toLowerCase() === "instagram",
           esEfimero: e.serviceType
             ? e.serviceType.esEfimero
             : !cs.esCombo &&
@@ -304,8 +310,17 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     origenRetiro: cp.origenRetiro,
     motivoRetiro: cp.motivoRetiro,
     retiradoEn: cp.retiradoEn?.toISOString() ?? null,
+    // Todas las redes del creador, no solo las contratadas aqui: puede
+    // publicar una pieza en una cuenta suya que esta campana no compro,
+    // y hasta ahora no habia donde registrarla.
+    redesDelPerfil: cp.profile.socialAccounts.map((a) => ({
+      platformId: a.platform.id,
+      nombre: a.platform.displayName,
+      formatos: formatosPorPlataforma[a.platform.id] ?? [],
+    })),
     plataformas: cp.platforms.map((cpp) => ({
       id: cpp.id,
+      platformId: cpp.socialAccount.platform.id,
       plataforma: cpp.socialAccount.platform.displayName,
       username: cpp.socialAccount.username,
       formatosDisponibles:
@@ -336,6 +351,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           formato: e.serviceType
             ? { nombre: e.serviceType.displayName, esEfimero: e.serviceType.esEfimero }
             : null,
+          // La red de la publicación sale del formato señalado, no de la
+          // cuenta contratada: son distintas cuando el creador publicó
+          // la pieza en otra red suya.
+          red:
+            e.serviceType?.platform.displayName ??
+            cpp.socialAccount.platform.displayName,
+          platformId:
+            e.serviceType?.platform.id ?? cpp.socialAccount.platform.id,
+          esExtra: e.esExtra,
           entregadoEn: e.entregadoEn.toISOString(),
           publicadoEn: e.publicadoEn?.toISOString() ?? null,
           notas: e.notas,

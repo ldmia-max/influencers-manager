@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -59,6 +60,11 @@ export interface EntregaVista {
    * Nulo en las entregas registradas antes de que se señalara.
    */
   formato: { nombre: string; esEfimero: boolean } | null;
+  /** La red de la publicacion, que sale del formato senalado. */
+  red: string;
+  platformId: string;
+  /** Contenido de mas, fuera de lo contratado. */
+  esExtra: boolean;
   entregadoEn: string;
   publicadoEn: string | null;
   notas: string | null;
@@ -98,6 +104,7 @@ export interface FormatoDisponible {
 
 export interface PlataformaVista {
   id: string;
+  platformId: string;
   plataforma: string;
   username: string;
   /** Catálogo de la red: lo que se puede señalar al registrar una pieza. */
@@ -112,6 +119,19 @@ export interface PerfilVista {
   origenRetiro: string | null;
   motivoRetiro: string | null;
   retiradoEn: string | null;
+  /**
+   * Todas las redes del creador, no solo las contratadas aqui.
+   *
+   * Puede publicar una pieza en una cuenta suya que esta campana no
+   * compro —y hasta ahora no habia donde registrarla—. La entrega sigue
+   * contando contra el formato contratado bajo el que se anota; lo que
+   * cambia es de que red se dice que es.
+   */
+  redesDelPerfil: {
+    platformId: string;
+    nombre: string;
+    formatos: FormatoDisponible[];
+  }[];
   plataformas: PlataformaVista[];
 }
 
@@ -137,31 +157,7 @@ function fechaCorta(iso: string): string {
 /** Clave de ocupacion mientras se guarda el enlace de una entrega. */
 const URL_OCUPADO = (id: string) => "url-" + id;
 
-/**
- * A que formato contratado cuenta una entrega de la red elegida.
- *
- * Se prefiere el contratado que coincide con lo publicado; si no hay
- * ninguno —una Story dentro de un combo— el combo; y en ultimo caso el
- * primero contratado en esa red. Null cuando esa red no tiene nada
- * contratado, y entonces no se puede registrar nada en ella: no seria
- * trabajo encargado a nadie.
- */
-function servicioDestino(
-  perfil: PerfilVista,
-  redId: string,
-  tipoId: string
-): FormatoVista | null {
-  const red = perfil.plataformas.find((p) => p.id === redId);
-  if (!red) return null;
-  return (
-    red.formatos.find((f) => f.formatoContratadoId === tipoId) ??
-    red.formatos.find((f) => f.esCombo) ??
-    red.formatos[0] ??
-    null
-  );
-}
-
-/** Las redes donde este influencer tiene algo contratado en la campana. */
+/** Las redes que tiene el creador, contratadas aqui o no. */
 function SelectorRed({
   perfil,
   valor,
@@ -177,9 +173,9 @@ function SelectorRed({
         <SelectValue placeholder="Red" />
       </SelectTrigger>
       <SelectContent>
-        {perfil.plataformas.map((p) => (
-          <SelectItem key={p.id} value={p.id}>
-            {p.plataforma}
+        {perfil.redesDelPerfil.map((r) => (
+          <SelectItem key={r.platformId} value={r.platformId}>
+            {r.nombre}
           </SelectItem>
         ))}
       </SelectContent>
@@ -248,7 +244,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
     tipoId: "",
     url: "",
     notas: "",
+    esExtra: false,
   });
+  /** La casilla Extra de la proxima pieza de cada formato. */
+  const [extraNueva, setExtraNueva] = useState<Record<string, boolean>>({});
   /** Red elegida para la proxima pieza de cada formato contratado. */
   const [redElegida, setRedElegida] = useState<Record<string, string>>({});
   /**
@@ -261,6 +260,8 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [formatosGuardados, setFormatosGuardados] = useState<
     Record<string, { nombre: string; esEfimero: boolean }>
   >({});
+  const [redesGuardadas, setRedesGuardadas] = useState<Record<string, string>>({});
+  const [extrasGuardados, setExtrasGuardados] = useState<Record<string, boolean>>({});
   const [notasGuardadas, setNotasGuardadas] = useState<Record<string, string>>({});
   // Formato señalado para la próxima pieza de cada bloque.
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
@@ -430,20 +431,22 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                       // contratado, que es lo normal; cambiar la red
                       // recarga los formatos de esa otra y manda la
                       // entrega a lo que alli este contratado.
-                      const redId = redElegida[formato.id] ?? plataforma.id;
+                      const redId =
+                        redElegida[formato.id] ?? plataforma.platformId;
                       const red =
-                        perfil.plataformas.find((p) => p.id === redId) ?? plataforma;
+                        perfil.redesDelPerfil.find((r) => r.platformId === redId) ??
+                        null;
+                      const catalogo = red?.formatos ?? plataforma.formatosDisponibles;
                       const tipoId =
                         tipoElegido[formato.id] ??
-                        (redId === plataforma.id ? formato.formatoContratadoId : null) ??
+                        (redId === plataforma.platformId
+                          ? formato.formatoContratadoId
+                          : null) ??
                         "";
-                      const tipoNuevo = red.formatosDisponibles.find(
-                        (f) => f.id === tipoId
-                      );
+                      const tipoNuevo = catalogo.find((f) => f.id === tipoId);
                       // De lo señalado depende qué se pide: un enlace, o
                       // la fecha de emisión y las vistas.
                       const nuevaEsEfimera = tipoNuevo?.esEfimero ?? false;
-                      const destino = servicioDestino(perfil, redId, tipoId);
                       const mostrarAlta =
                         puedeEditar &&
                         (entregasDe(formato).length === 0 || anadiendo[formato.id]);
@@ -528,6 +531,13 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   <th className="px-2 py-1 font-medium">Red</th>
                                   <th className="px-2 py-1 font-medium">Formato</th>
                                   <th className="px-2 py-1 font-medium">Publicación</th>
+                                  {/* Contenido de mas, fuera de lo
+                                      contratado. Por ahora solo se dice:
+                                      no cambia cuantas piezas se esperan
+                                      ni cuando puede cerrarse la campana. */}
+                                  <th className="px-2 py-1 text-center font-medium">
+                                    Extra
+                                  </th>
                                   <th className="px-2 py-1 font-medium">Descripción</th>
                                   {puedeEditar && (
                                     <th className="w-24 px-2 py-1 text-right font-medium">
@@ -555,17 +565,12 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     notasGuardadas[entrega.id] ?? entrega.notas ?? "";
 
                                   if (editandoFila === entrega.id) {
-                                    const redFila =
-                                      perfil.plataformas.find(
-                                        (p) => p.id === borrador.redId
-                                      ) ?? plataforma;
-                                    const tipoFila = redFila.formatosDisponibles.find(
+                                    const catalogoFila =
+                                      perfil.redesDelPerfil.find(
+                                        (r) => r.platformId === borrador.redId
+                                      )?.formatos ?? plataforma.formatosDisponibles;
+                                    const tipoFila = catalogoFila.find(
                                       (f) => f.id === borrador.tipoId
-                                    );
-                                    const destinoFila = servicioDestino(
-                                      perfil,
-                                      borrador.redId,
-                                      borrador.tipoId
                                     );
                                     return (
                                       <tr
@@ -587,7 +592,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                         </td>
                                         <td className="px-2 py-1">
                                           <SelectorFormato
-                                            formatos={redFila.formatosDisponibles}
+                                            formatos={catalogoFila}
                                             valor={borrador.tipoId}
                                             onCambio={(v) =>
                                               setBorrador((b) => ({ ...b, tipoId: v }))
@@ -615,6 +620,17 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             />
                                           )}
                                         </td>
+                                        <td className="px-2 py-1 text-center">
+                                          <Checkbox
+                                            checked={borrador.esExtra}
+                                            onCheckedChange={(v) =>
+                                              setBorrador((b) => ({
+                                                ...b,
+                                                esExtra: v === true,
+                                              }))
+                                            }
+                                          />
+                                        </td>
                                         <td className="px-2 py-1">
                                           <Input
                                             placeholder="Descripción u observaciones"
@@ -637,7 +653,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               className="text-violet-700 hover:text-violet-900 disabled:opacity-40"
                                               disabled={
                                                 ocupado === URL_OCUPADO(entrega.id) ||
-                                                !destinoFila ||
                                                 !borrador.tipoId ||
                                                 (!tipoFila?.esEfimero &&
                                                   !borrador.url.trim())
@@ -646,8 +661,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                                 conError(
                                                   URL_OCUPADO(entrega.id),
                                                   async () => {
-                                                    const cambiaDeFormato =
-                                                      destinoFila!.id !== formato.id;
                                                     const guardada =
                                                       await actualizarEntrega(
                                                         campaignId,
@@ -661,23 +674,25 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                                           notas:
                                                             borrador.notas.trim() || null,
                                                           serviceTypeId: borrador.tipoId,
-                                                          campaignServiceId:
-                                                            destinoFila!.id,
+                                                          esExtra: borrador.esExtra,
                                                         }
                                                       );
-                                                    // Si cambia de formato
-                                                    // contratado, la fila se
-                                                    // va a otro recuadro y los
-                                                    // contadores cambian:
-                                                    // adivinarlo aqui seria
-                                                    // adivinar mal.
-                                                    if (cambiaDeFormato) {
-                                                      window.location.reload();
-                                                      return;
-                                                    }
                                                     setUrlsGuardadas((u) => ({
                                                       ...u,
                                                       [entrega.id]: guardada.url,
+                                                    }));
+                                                    setExtrasGuardados((x) => ({
+                                                      ...x,
+                                                      [entrega.id]: borrador.esExtra,
+                                                    }));
+                                                    setRedesGuardadas((r) => ({
+                                                      ...r,
+                                                      [entrega.id]:
+                                                        perfil.redesDelPerfil.find(
+                                                          (x) =>
+                                                            x.platformId ===
+                                                            borrador.redId
+                                                        )?.nombre ?? entrega.red,
                                                     }));
                                                     setNotasGuardadas((n) => ({
                                                       ...n,
@@ -721,7 +736,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       className="border-t border-gray-200/70 text-gray-600 odd:bg-white/50"
                                     >
                                       <td className="px-2 py-1 whitespace-nowrap text-gray-500">
-                                        {plataforma.plataforma}
+                                        {redesGuardadas[entrega.id] ?? entrega.red}
                                       </td>
                                       <td className="px-2 py-1 whitespace-nowrap">
                                         <span className="rounded bg-white px-1.5 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
@@ -884,6 +899,16 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           )}
                                         </div>
                                       </td>
+                                      <td className="px-2 py-1 text-center">
+                                        <Checkbox
+                                          checked={
+                                            extrasGuardados[entrega.id] ??
+                                            entrega.esExtra
+                                          }
+                                          disabled
+                                          aria-label="Entrega extra"
+                                        />
+                                      </td>
                                       <td className="max-w-[16rem] px-2 py-1">
                                         {nota ? (
                                           <span className="line-clamp-2 text-gray-600">
@@ -909,16 +934,27 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               title="Editar la entrega"
                                               className="text-gray-400 hover:text-violet-700"
                                               onClick={() => {
+                                                const platformId =
+                                                  entrega.platformId;
+                                                const cat =
+                                                  perfil.redesDelPerfil.find(
+                                                    (r) => r.platformId === platformId
+                                                  )?.formatos ??
+                                                  plataforma.formatosDisponibles;
                                                 setBorrador({
-                                                  redId: plataforma.id,
+                                                  redId: platformId,
                                                   tipoId:
-                                                    plataforma.formatosDisponibles.find(
-                                                      (f) => f.displayName === nombreFormato
+                                                    cat.find(
+                                                      (f) =>
+                                                        f.displayName === nombreFormato
                                                     )?.id ??
                                                     formato.formatoContratadoId ??
                                                     "",
                                                   url: enlace ?? "",
                                                   notas: nota,
+                                                  esExtra:
+                                                    extrasGuardados[entrega.id] ??
+                                                    entrega.esExtra,
                                                 });
                                                 setEditandoFila(entrega.id);
                                               }}
@@ -986,7 +1022,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     </td>
                                     <td className="px-2 py-1">
                                       <SelectorFormato
-                                        formatos={red.formatosDisponibles}
+                                        formatos={catalogo}
                                         valor={tipoId}
                                         onCambio={(v) =>
                                           setTipoElegido((t) => ({
@@ -1058,6 +1094,17 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                         />
                                       )}
                                     </td>
+                                    <td className="px-2 py-1 text-center">
+                                      <Checkbox
+                                        checked={extraNueva[formato.id] ?? false}
+                                        onCheckedChange={(v) =>
+                                          setExtraNueva((x) => ({
+                                            ...x,
+                                            [formato.id]: v === true,
+                                          }))
+                                        }
+                                      />
+                                    </td>
                                     <td className="px-2 py-1">
                                       <Input
                                         placeholder="Descripción u observaciones (opcional)"
@@ -1080,7 +1127,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           className="h-7 shrink-0 text-xs"
                                           disabled={
                                             ocupado === formato.id ||
-                                            !destino ||
                                             !tipoNuevo ||
                                             (nuevaEsEfimera
                                               ? !(fechaEmision[formato.id] ?? "")
@@ -1105,8 +1151,13 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                               const creada = await registrarEntrega(
                                                 campaignId,
                                                 {
-                                                  campaignServiceId: destino!.id,
+                                                  // Cuenta contra el formato
+                                                  // contratado de este
+                                                  // recuadro; la red la dice
+                                                  // el formato senalado.
+                                                  campaignServiceId: formato.id,
                                                   serviceTypeId: tipoId,
+                                                  esExtra: extraNueva[formato.id] ?? false,
                                                   ...(nuevaEsEfimera
                                                     ? {
                                                         publicadoEn,
@@ -1139,13 +1190,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                                 ...a,
                                                 [formato.id]: false,
                                               }));
-                                              // En otra red la fila nace en
-                                              // otro recuadro y cambia sus
-                                              // contadores: se recarga.
-                                              if (destino!.id !== formato.id) {
-                                                window.location.reload();
-                                                return;
-                                              }
+                                              setExtraNueva((v) => ({
+                                                ...v,
+                                                [formato.id]: false,
+                                              }));
                                               pintarYa(formato.id, {
                                                 id: creada.id,
                                                 url: creada.url,
@@ -1153,6 +1201,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                                   nombre: tipoNuevo!.displayName,
                                                   esEfimero: nuevaEsEfimera,
                                                 },
+                                                red: red?.nombre ?? plataforma.plataforma,
+                                                platformId: redId,
+                                                esExtra: extraNueva[formato.id] ?? false,
                                                 entregadoEn: creada.entregadoEn,
                                                 publicadoEn,
                                                 notas: nota,

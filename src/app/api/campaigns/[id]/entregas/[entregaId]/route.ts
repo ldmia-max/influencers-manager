@@ -30,6 +30,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       ...(body.campaignServiceId !== undefined && {
         campaignServiceId: body.campaignServiceId,
       }),
+      ...(body.esExtra !== undefined && { esExtra: body.esExtra }),
     });
 
     revalidateTag("campaigns", "hours");
