@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  Plus,
   ExternalLink,
   Link2,
   Loader2,
@@ -166,6 +167,15 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [notaNueva, setNotaNueva] = useState<Record<string, string>>({});
   const [notaEntrega, setNotaEntrega] = useState<Record<string, string>>({});
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
+  /**
+   * Que formatos tienen abierta la casilla para registrar otra pieza.
+   *
+   * Cerrada por defecto en cuanto el formato ya tiene una entrega: una
+   * casilla vacia debajo de cada formato entregado llenaba la pagina de
+   * sitios donde escribir que nadie habia pedido. Se abre con el mas que
+   * hay junto a la papelera, y se cierra sola al guardar.
+   */
+  const [anadiendo, setAnadiendo] = useState<Record<string, boolean>>({});
   /** Que enlace se esta corrigiendo, y su texto mientras se corrige. */
   const [editandoUrl, setEditandoUrl] = useState<string | null>(null);
   const [urlEntrega, setUrlEntrega] = useState<Record<string, string>>({});
@@ -739,6 +749,24 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   )}
+                                  {/* Anadir otra pieza a este formato. Es la
+                                      unica forma de abrir la casilla cuando
+                                      ya hay algo entregado. */}
+                                  {puedeEditar && !anadiendo[formato.id] && (
+                                    <button
+                                      type="button"
+                                      title="Añadir otra entrega a este formato"
+                                      className="shrink-0 text-gray-400 hover:text-violet-700"
+                                      onClick={() =>
+                                        setAnadiendo((a) => ({
+                                          ...a,
+                                          [formato.id]: true,
+                                        }))
+                                      }
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
                                   </div>
 
                                   {/* La descripcion, bajo su entrega. Suele
@@ -833,7 +861,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                             </ul>
                           )}
 
-                          {puedeEditar && (
+                          {puedeEditar &&
+                            (entregasDe(formato).length === 0 ||
+                              anadiendo[formato.id]) && (
                             // Un solo formulario para todo: se señala qué
                             // formato es la pieza y el campo se adapta.
                             // Antes había dos caminos y el que le tocaba a
@@ -989,6 +1019,13 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             ...v,
                                             [formato.id]: "",
                                           }));
+                                          // Guardado: la casilla se retira.
+                                          // Para otra pieza esta el mas de
+                                          // la entrega.
+                                          setAnadiendo((a) => ({
+                                            ...a,
+                                            [formato.id]: false,
+                                          }));
                                         })
                                       }
                                     >
@@ -1054,6 +1091,13 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                             ...v,
                                             [formato.id]: "",
                                           }));
+                                          // Guardado: la casilla se retira.
+                                          // Para otra pieza esta el mas de
+                                          // la entrega.
+                                          setAnadiendo((a) => ({
+                                            ...a,
+                                            [formato.id]: false,
+                                          }));
                                         })
                                       }
                                     >
@@ -1073,6 +1117,23 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       Guardar
                                     </Button>
                                   </>
+                                )}
+
+                                {entregasDe(formato).length > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 shrink-0 text-gray-500"
+                                    disabled={ocupado === formato.id}
+                                    onClick={() =>
+                                      setAnadiendo((a) => ({
+                                        ...a,
+                                        [formato.id]: false,
+                                      }))
+                                    }
+                                  >
+                                    Cancelar
+                                  </Button>
                                 )}
                               </div>
 
