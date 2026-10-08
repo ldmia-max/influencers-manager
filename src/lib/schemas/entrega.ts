@@ -54,6 +54,10 @@ export const actualizarEntregaSchema = z
     url: z.string().min(1).optional(),
     publicadoEn: z.coerce.date().nullish(),
     notas: z.string().max(500).nullish(),
+    /** Qué formato se publicó. La capa de datos valida que sea de la red. */
+    serviceTypeId: z.string().min(1).nullish(),
+    /** A qué formato contratado cuenta, si se corrigió la red. */
+    campaignServiceId: z.string().min(1).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "No hay nada que cambiar",

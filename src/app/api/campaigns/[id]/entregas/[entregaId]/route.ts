@@ -24,6 +24,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       url: body.url,
       publicadoEn: body.publicadoEn,
       notas: body.notas,
+      ...(body.serviceTypeId !== undefined && {
+        serviceTypeId: body.serviceTypeId,
+      }),
+      ...(body.campaignServiceId !== undefined && {
+        campaignServiceId: body.campaignServiceId,
+      }),
     });
 
     revalidateTag("campaigns", "hours");

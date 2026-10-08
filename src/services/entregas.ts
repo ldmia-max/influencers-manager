@@ -27,7 +27,13 @@ export function registrarEntrega(campaignId: string, datos: RegistrarEntregaPayl
 export function actualizarEntrega(
   campaignId: string,
   entregaId: string,
-  datos: { url?: string; publicadoEn?: string | null; notas?: string | null }
+  datos: {
+    url?: string;
+    publicadoEn?: string | null;
+    notas?: string | null;
+    serviceTypeId?: string | null;
+    campaignServiceId?: string;
+  }
 ) {
   return apiPatch<{ id: string; url: string }>(
     `/api/campaigns/${campaignId}/entregas/${entregaId}`,
