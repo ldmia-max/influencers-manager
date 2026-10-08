@@ -16,8 +16,6 @@ import {
   Heart,
   Save,
   Trash2,
-  UserMinus,
-  UserPlus,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,14 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -46,6 +36,7 @@ import {
   resumirEntregas,
   ETIQUETA_ENTREGA,
   COLOR_ENTREGA,
+  ORIGEN_LEGIBLE,
 } from "@/lib/entregas";
 import {
   registrarEntrega,
@@ -53,7 +44,6 @@ import {
   actualizarEntrega,
   eliminarEntrega,
   fijarFechaLimite,
-  cambiarParticipacion,
 } from "@/services/entregas";
 
 // -----------------------------------------------------------------------------
@@ -133,12 +123,6 @@ interface Props {
   puedeEditar: boolean;
 }
 
-const ORIGEN_LEGIBLE: Record<string, string> = {
-  INFLUENCER: "Decisión del influencer",
-  CLIENTE: "Petición del cliente",
-  AGENCIA: "Decisión interna",
-};
-
 function soloFecha(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
@@ -191,9 +175,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
   const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
   const [interEntrega, setInterEntrega] = useState<Record<string, string>>({});
-  const [retirando, setRetirando] = useState<PerfilVista | null>(null);
-  const [origen, setOrigen] = useState<string>("");
-  const [motivo, setMotivo] = useState("");
 
   // El reloj se lee una vez y se pasa a todos los cálculos, para que dos
   // formatos que vencen al mismo tiempo no se pinten distinto por unos
@@ -328,42 +309,10 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                   )}
                 </div>
 
-                {puedeEditar &&
-                  (retirado ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={ocupado === perfil.id}
-                      onClick={() =>
-                        conError(perfil.id, () =>
-                          cambiarParticipacion(campaignId, perfil.id, {
-                            accion: "reactivar",
-                          })
-                        )
-                      }
-                    >
-                      {ocupado === perfil.id ? (
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <UserPlus className="mr-2 h-3.5 w-3.5" />
-                      )}
-                      Devolver a la campaña
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-gray-500 hover:text-red-600"
-                      onClick={() => {
-                        setRetirando(perfil);
-                        setOrigen("");
-                        setMotivo("");
-                      }}
-                    >
-                      <UserMinus className="mr-2 h-3.5 w-3.5" />
-                      Retirar
-                    </Button>
-                  ))}
+                {/* Retirar y devolver viven en Perfiles y formatos: son
+                    decisiones sobre a quien se tiene contratado, no sobre
+                    el contenido ya publicado, que es de lo que trata
+                    esta seccion. */}
               </div>
 
               {retirado ? (
@@ -1183,73 +1132,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
         )}
       </CardContent>
 
-      {/* Retiro */}
-      <Dialog open={!!retirando} onOpenChange={(v) => !v && setRetirando(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Retirar a {retirando?.nombre}</DialogTitle>
-            <DialogDescription>
-              Sus importes dejarán de contar en el total, liberando ese
-              presupuesto. El registro no se borra y el cliente no ve el motivo.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>¿Quién lo decidió?</Label>
-              <Select value={origen} onValueChange={setOrigen}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ORIGEN_LEGIBLE).map(([valor, etiqueta]) => (
-                    <SelectItem key={valor} value={valor}>
-                      {etiqueta}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Motivo (interno, opcional)</Label>
-              <Input
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Ej: no llegó a acuerdo de fechas"
-                maxLength={500}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRetirando(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!origen || ocupado === retirando?.id}
-              onClick={() => {
-                const perfil = retirando;
-                if (!perfil) return;
-                conError(perfil.id, async () => {
-                  await cambiarParticipacion(campaignId, perfil.id, {
-                    accion: "retirar",
-                    origen: origen as "INFLUENCER" | "CLIENTE" | "AGENCIA",
-                    motivo: motivo || null,
-                  });
-                  setRetirando(null);
-                });
-              }}
-            >
-              {ocupado === retirando?.id && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Retirar de la campaña
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }

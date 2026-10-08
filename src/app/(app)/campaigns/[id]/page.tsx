@@ -48,6 +48,8 @@ import {
 } from "@/components/campaigns/barra-presupuesto";
 import { EntregasCampana } from "@/components/campaigns/entregas-campana";
 import { ReemplazarInfluencer } from "@/components/campaigns/reemplazar-influencer";
+import { RetirarInfluencer } from "@/components/campaigns/retirar-influencer";
+import { ORIGEN_LEGIBLE } from "@/lib/entregas";
 import {
   MetricasCampana,
   type Publicacion,
@@ -674,13 +676,40 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                             </Badge>
                           </div>
                         </div>
-                        {/* Estado del perfil en la campaña */}
-                        {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
-                          <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
-                            {PROFILE_STATUS_LABELS[cp.status]}
-                          </Badge>
-                        )}
+                        <div className="flex flex-col items-end gap-2">
+                          {/* Estado del perfil en la campaña */}
+                          {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
+                            <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
+                              {PROFILE_STATUS_LABELS[cp.status]}
+                            </Badge>
+                          )}
+                          {/* Retirar solo con la campaña en marcha: antes de
+                              activarla los cambios se hacen en el editor,
+                              que permite mucho más. */}
+                          {campaign.status === "ACTIVE" && (
+                            <RetirarInfluencer
+                              campaignId={id}
+                              perfilId={cp.id}
+                              nombre={cp.profile.name}
+                              retirado={cp.participacion === "RETIRADO"}
+                            />
+                          )}
+                        </div>
                       </div>
+
+                      {/* Quien ya no sigue contratado, y por qué. */}
+                      {cp.participacion === "RETIRADO" && (
+                        <div className="mb-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-600">
+                          Retirado
+                          {cp.retiradoEn &&
+                            ` el ${new Date(cp.retiradoEn).toLocaleDateString("es-CO")}`}
+                          {cp.origenRetiro && ` · ${ORIGEN_LEGIBLE[cp.origenRetiro]}`}
+                          {cp.motivoRetiro && ` · ${cp.motivoRetiro}`}
+                          <p className="mt-1 text-xs text-gray-500">
+                            Sus importes ya no cuentan en el total de la campaña.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Motivo de rechazo */}
                       {cp.status === "REJECTED" && cp.rejectionReason && (

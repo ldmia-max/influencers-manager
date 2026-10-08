@@ -24,6 +24,20 @@ export type EstadoEntrega =
   /** El formato no tiene fecha limite puesta todavia. */
   | "SIN_PLAZO";
 
+/**
+ * Quien decidio retirar a un influencer de una campana.
+ *
+ * Aqui y no junto al boton que lo pregunta: la ficha lo lee desde el
+ * servidor, e importar un valor de un modulo "use client" desde un
+ * componente de servidor no trae el objeto sino una referencia, que al
+ * indexarse da undefined.
+ */
+export const ORIGEN_LEGIBLE: Record<string, string> = {
+  INFLUENCER: "Decisión del influencer",
+  CLIENTE: "Petición del cliente",
+  AGENCIA: "Decisión interna",
+};
+
 export const ETIQUETA_ENTREGA: Record<EstadoEntrega, string> = {
   PENDIENTE: "Pendiente",
   INCUMPLIDO: "Incumplido",
