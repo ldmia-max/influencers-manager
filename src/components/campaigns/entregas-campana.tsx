@@ -4,17 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
+  Check,
   CheckCircle2,
   ExternalLink,
   Link2,
   Loader2,
-  Plus,
+  Pencil,
   Eye,
   FileText,
   Heart,
+  Save,
   Trash2,
   UserMinus,
   UserPlus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/format";
@@ -147,6 +150,9 @@ function fechaCorta(iso: string): string {
   });
 }
 
+/** Clave de ocupacion mientras se guarda el enlace de una entrega. */
+const URL_OCUPADO = (id: string) => "url-" + id;
+
 export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -160,6 +166,16 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [notaNueva, setNotaNueva] = useState<Record<string, string>>({});
   const [notaEntrega, setNotaEntrega] = useState<Record<string, string>>({});
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
+  /** Que enlace se esta corrigiendo, y su texto mientras se corrige. */
+  const [editandoUrl, setEditandoUrl] = useState<string | null>(null);
+  const [urlEntrega, setUrlEntrega] = useState<Record<string, string>>({});
+  /**
+   * Enlaces ya corregidos, dibujados por el propio componente.
+   *
+   * `router.refresh()` no repinta en la compilacion de produccion, asi
+   * que la fila se quedaria con el enlace viejo hasta recargar.
+   */
+  const [urlsGuardadas, setUrlsGuardadas] = useState<Record<string, string>>({});
   const [notasGuardadas, setNotasGuardadas] = useState<Record<string, string>>({});
   // Formato señalado para la próxima pieza de cada bloque.
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
@@ -464,15 +480,81 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       {entrega.formato.nombre}
                                     </span>
                                   )}
-                                  {entrega.url ? (
+                                  {editandoUrl === entrega.id ? (
+                                    /* Corregir el enlace donde esta. Antes
+                                       habia que borrar la entrega y volver a
+                                       crearla, y eso se llevaba por delante
+                                       su historico de metricas: un error de
+                                       copiar y pegar costaba la medicion
+                                       entera de la publicacion. */
+                                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                                      <Input
+                                        autoFocus
+                                        placeholder="https://… link de la publicación"
+                                        value={urlEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setUrlEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        className="h-6 min-w-0 flex-1 text-xs"
+                                      />
+                                      <button
+                                        type="button"
+                                        title="Guardar el link"
+                                        className="shrink-0 text-violet-700 hover:text-violet-900 disabled:opacity-40"
+                                        disabled={
+                                          ocupado === URL_OCUPADO(entrega.id) ||
+                                          !(urlEntrega[entrega.id] ?? "").trim()
+                                        }
+                                        onClick={() =>
+                                          conError(URL_OCUPADO(entrega.id), async () => {
+                                            const nueva = (
+                                              urlEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            const guardada = await actualizarEntrega(
+                                              campaignId,
+                                              entrega.id,
+                                              { url: nueva }
+                                            );
+                                            // El servidor devuelve el enlace ya
+                                            // limpio del rastro que deja el
+                                            // copiador, y es ese el que se pinta.
+                                            setUrlsGuardadas((u) => ({
+                                              ...u,
+                                              [entrega.id]: guardada.url,
+                                            }));
+                                            setEditandoUrl(null);
+                                          })
+                                        }
+                                      >
+                                        {ocupado === URL_OCUPADO(entrega.id) ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Check className="h-3.5 w-3.5" />
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        title="Cancelar"
+                                        className="shrink-0 text-gray-400 hover:text-gray-700"
+                                        onClick={() => setEditandoUrl(null)}
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    </span>
+                                  ) : entrega.url ? (
                                     <a
-                                      href={entrega.url}
+                                      href={urlsGuardadas[entrega.id] ?? entrega.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="flex min-w-0 flex-1 items-center gap-1 truncate text-violet-700 hover:underline"
                                     >
                                       <ExternalLink className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{entrega.url}</span>
+                                      <span className="truncate">
+                                        {urlsGuardadas[entrega.id] ?? entrega.url}
+                                      </span>
                                     </a>
                                   ) : (
                                     // Sin enlace, lo que respalda la entrega es
@@ -612,9 +694,34 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                   <span className="shrink-0 text-gray-400">
                                     {fechaCorta(entrega.entregadoEn)}
                                   </span>
+                                  {/* Solo donde hay enlace que corregir: una
+                                      entrega efimera la sostienen su fecha de
+                                      emision y quien la confirmo, no una URL. */}
+                                  {puedeEditar &&
+                                    entrega.url &&
+                                    editandoUrl !== entrega.id && (
+                                      <button
+                                        type="button"
+                                        title="Editar el link"
+                                        className="shrink-0 text-gray-400 hover:text-violet-700"
+                                        onClick={() => {
+                                          setUrlEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]:
+                                              urlsGuardadas[entrega.id] ??
+                                              entrega.url ??
+                                              "",
+                                          }));
+                                          setEditandoUrl(entrega.id);
+                                        }}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                   {puedeEditar && (
                                     <button
                                       type="button"
+                                      title="Eliminar la entrega"
                                       className="shrink-0 text-gray-400 hover:text-red-600"
                                       disabled={ocupado === entrega.id}
                                       onClick={() =>
@@ -950,11 +1057,20 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                         })
                                       }
                                     >
+                                      {/* Dice "Guardar" y no un "+": el boton
+                                          registraba la entrega, pero el mas
+                                          se leia como "anadir otra casilla",
+                                          y quien lo pulsaba no sabia si habia
+                                          guardado algo. Anadir no necesita
+                                          boton: al guardar, la casilla se
+                                          vacia y ya esta lista para el
+                                          siguiente enlace. */}
                                       {ocupado === formato.id ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                                       ) : (
-                                        <Plus className="h-3.5 w-3.5" />
+                                        <Save className="mr-2 h-3.5 w-3.5" />
                                       )}
+                                      Guardar
                                     </Button>
                                   </>
                                 )}
