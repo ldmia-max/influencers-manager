@@ -641,14 +641,6 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Previsión frente a resultado. Sin seguidores contratados
-              la cadena entera sale en cero y la seccion no diria nada. */}
-          {totalSeguidores > 0 && (
-            <PrevisionCampana
-              seguidores={totalSeguidores}
-              filas={filasPrevision}
-            />
-          )}
 
           {/* Descripción */}
           {campaign.description && (
@@ -881,13 +873,26 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       valor: "impacto",
       etiqueta: "Impacto del contenido",
       contenido: (
-        <MetricasCampana
-          campaignId={id}
-          capturas={capturas}
-          publicaciones={publicaciones}
-          puedeRefrescar={campaign.status === "ACTIVE" || campaign.status === "COMPLETED"}
-          puedeEditarCifras={campaign.status === "ACTIVE"}
-        />
+        <>
+          {/* La prevision abre la pestana: es la vara contra la que se
+              leen las cifras que vienen debajo. Sin seguidores
+              contratados la cadena entera sale en cero y no diria nada. */}
+          {totalSeguidores > 0 && (
+            <PrevisionCampana
+              seguidores={totalSeguidores}
+              filas={filasPrevision}
+            />
+          )}
+          <MetricasCampana
+            campaignId={id}
+            capturas={capturas}
+            publicaciones={publicaciones}
+            puedeRefrescar={
+              campaign.status === "ACTIVE" || campaign.status === "COMPLETED"
+            }
+            puedeEditarCifras={campaign.status === "ACTIVE"}
+          />
+        </>
       ),
     });
   }
