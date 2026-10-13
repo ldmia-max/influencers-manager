@@ -55,6 +55,7 @@ const RUTAS_PRIVADAS = [
   "/campaigns",
   "/categories",
   "/briefs",
+  "/pagos",
 ];
 
 /**

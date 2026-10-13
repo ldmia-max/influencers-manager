@@ -26,6 +26,7 @@ const NAV: { href: string; label: string; icon: string; recurso: Recurso | null 
   { href: "/clients", label: "Clientes", icon: "building", recurso: "clientes" },
   { href: "/campaigns", label: "Campañas", icon: "megaphone", recurso: "campanas" },
   { href: "/briefs", label: "Briefs", icon: "file-text", recurso: "briefs" },
+  { href: "/pagos", label: "Pagos", icon: "wallet", recurso: "pagos" },
 ];
 
 /** Las opciones que ese rol puede abrir. */
@@ -129,6 +130,11 @@ export function NavIcon({ name }: { name: string }) {
     tag: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+    ),
+    wallet: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 10a2 2 0 012-2h14a2 2 0 012 2m-18 0v8a2 2 0 002 2h14a2 2 0 002-2v-8m-5 4h2" />
       </svg>
     ),
     shield: (

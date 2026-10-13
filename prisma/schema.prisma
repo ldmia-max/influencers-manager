@@ -521,6 +521,10 @@ model CampaignProfile {
   // Plataformas seleccionadas para este perfil en esta campaña
   platforms CampaignProfilePlatform[]
 
+  /// Lo que se le paga por esta campana. Nace cuando alguien aporta el
+  /// primer dato: antes de eso no hay nada que guardar.
+  pago PagoInfluencer?
+
   @@unique([campaignId, profileId])
 }
 
@@ -837,6 +841,60 @@ model CampaignEntrega {
   @@unique([campaignServiceId, url])
   @@index([campaignServiceId])
   @@index([serviceTypeId])
+}
+
+/// El pago a un influencer por su trabajo en una campana.
+///
+/// Uno por influencer y campana, que es la unidad de las dos hojas de
+/// calculo que esto viene a sustituir: mercadeo lista a quien hay que
+/// pagar, contabilidad registra y paga. Admitira abonos parciales
+/// —un mismo pago se puede ir abonando— cuando se cierre que cifra se
+/// abona, que es la que todavia se esta acordando entre las dos areas.
+///
+/// Lo que NO guarda, a proposito:
+///
+/// - El importe base. Sale de lo contratado en la campana y se calcula
+///   al leer. Guardarlo seria volver a tener dos numeros para lo mismo,
+///   que es justo el problema de partida: en las hojas, el mismo
+///   influencer aparecia con 6.366.667 en una y 6.367.000 en la otra.
+/// - El estado. Se deduce de que hay: sin documentos, con documentos,
+///   o ya registrado por contabilidad. Un estado guardado necesita que
+///   alguien lo mantenga al dia, y el dia que no lo haga miente.
+model PagoInfluencer {
+  id String @id @default(cuid())
+
+  /// El influencer dentro de la campana. De aqui sale el importe.
+  campaignProfile   CampaignProfile @relation(fields: [campaignProfileId], references: [id], onDelete: Cascade)
+  campaignProfileId String          @unique
+
+  // --- Lo que aporta mercadeo ---
+
+  /// La cuenta de cobro que manda el influencer.
+  cuentaCobroUrl    String?
+  cuentaCobroNombre String?
+  /// El certificado bancario, para saber donde consignar.
+  certificadoUrl    String?
+  certificadoNombre String?
+
+  /// Fecha de la cuenta de cobro.
+  ///
+  /// Es el dia desde el que corren los 60 dias de plazo, y tambien la
+  /// fecha del documento contable: en las hojas de calculo las dos
+  /// columnas llevaban siempre el mismo valor.
+  fechaCuentaCobro DateTime?
+
+  // --- Lo que anota contabilidad ---
+
+  /// El consecutivo del sistema contable. Texto libre hasta saber si
+  /// tiene formato.
+  documento String?
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fechaCuentaCobro])
 }
 
 /// Una foto de las metricas de un link en un instante.

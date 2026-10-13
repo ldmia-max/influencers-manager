@@ -35,7 +35,11 @@ import {
 } from "@/lib/campaign-utils";
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
-import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
+import {
+  exigePropiedadParaEscribir,
+  puede,
+  type Rol,
+} from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
 import {
   PrevisionCampana,
@@ -59,6 +63,8 @@ import {
   type PestanaCampana,
 } from "@/components/campaigns/campaign-tabs";
 import { historicoDeCampana } from "@/data-access/metricas";
+import { listarPagos } from "@/data-access/pagos";
+import { PagosCampana } from "@/components/campaigns/pagos-campana";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
 
 interface PageProps {
@@ -83,7 +89,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // El alcance lo decide la tabla de permisos, no el rol: hoy las
   // campanas son de todo el equipo, pero si manana se restringen basta
   // con cambiar la tabla y esta comprobacion sigue valiendo.
-  const esAdmin = session.user.role === "ADMIN";
+  const rol = session.user.role as Rol;
+  const esAdmin = rol === "ADMIN";
 
   if (
     exigePropiedadParaEscribir(session.user.role as Rol, "campanas") &&
@@ -398,6 +405,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     enMarcha ||
     campaign.status === "COMPLETED" ||
     campaign.status === "CANCELLED";
+
+  // A quien hay que pagar en esta campana. Solo con la campana en
+  // marcha: antes no hay trabajo encargado que pagar.
+  const pagos = yaArranco ? await listarPagos({ campaignId: id }) : [];
 
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
@@ -868,6 +879,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         />
       ),
     });
+
+    if (puede(rol, "pagos", "leer")) {
+      pestanas.push({
+        valor: "pagos",
+        etiqueta: "Pagos",
+        contenido: (
+          <PagosCampana
+            pagos={pagos}
+            puedeEditar={
+              campaign.status === "ACTIVE" && puede(rol, "pagos", "actualizar")
+            }
+          />
+        ),
+      });
+    }
 
     pestanas.push({
       valor: "impacto",

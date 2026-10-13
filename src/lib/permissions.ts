@@ -41,6 +41,15 @@ export type Recurso =
   | "clientes"
   | "campanas"
   | "briefs"
+  /**
+   * Los pagos a influencers.
+   *
+   * Contabilidad manda aqui; mercadeo solo aporta la documentacion, y
+   * esa distincion no cabe en esta tabla —es por campo, no por
+   * accion—, asi que la hace la capa de datos con dos funciones
+   * distintas. La tabla decide quien entra; ellas, que puede tocar.
+   */
+  | "pagos"
   | "informes"
   | "aprobacion"
   | "administracion";
@@ -67,6 +76,7 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
     clientes: TODAS,
     campanas: TODAS,
     briefs: TODAS,
+    pagos: TODAS,
     informes: TODAS,
     aprobacion: TODAS,
     administracion: TODAS,
@@ -80,6 +90,9 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
     // Convertir un brief en campana es, en la practica, crear una
     // campana; se concede lo mismo que en campanas menos el borrado.
     briefs: ["crear", "leer", "actualizar"],
+    // Mercadeo entra a los pagos para aportar la cuenta de cobro y el
+    // certificado; lo que registra contabilidad no lo toca.
+    pagos: ["leer", "actualizar"],
     informes: ["crear", "leer"],
     aprobacion: ["actualizar"],
     administracion: [],
@@ -100,6 +113,7 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
     clientes: ["leer"],
     campanas: ["leer"],
     briefs: [],
+    pagos: TODAS,
     informes: ["leer"],
     aprobacion: [],
     administracion: [],
@@ -126,6 +140,7 @@ const PROPIEDAD_PARA_ESCRIBIR: Record<Recurso, boolean> = {
   clientes: false,
   campanas: false,
   briefs: false,
+  pagos: false,
   informes: false,
   aprobacion: false,
   administracion: false,
@@ -139,6 +154,7 @@ const PROPIEDAD_PARA_LEER: Record<Recurso, boolean> = {
   clientes: false,
   campanas: false,
   briefs: false,
+  pagos: false,
   informes: false,
   aprobacion: false,
   administracion: false,
