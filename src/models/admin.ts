@@ -13,7 +13,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "USER";
+  role: "ADMIN" | "USER" | "CONTABILIDAD";
 }
 
 export interface ServiceType {

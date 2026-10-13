@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
-  userNavItems,
+  navDe,
   adminNavItems,
   NavIcon,
   esRutaActiva,
@@ -68,7 +68,7 @@ export function Header({ user }: HeaderProps) {
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                     Menu
                   </h3>
-                  {userNavItems.map((item) => (
+                  {navDe(user.role).map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}

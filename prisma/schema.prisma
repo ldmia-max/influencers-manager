@@ -17,6 +17,9 @@ datasource db {
 enum UserRole {
   ADMIN
   USER
+  /// Contabilidad: ve campanas, clientes y perfiles para pagar, y no
+  /// escribe nada de lo que gestiona mercadeo.
+  CONTABILIDAD
 }
 
 model User {

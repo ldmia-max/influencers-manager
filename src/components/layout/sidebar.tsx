@@ -4,20 +4,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
+import { puede, type Recurso, type Rol } from "@/lib/permissions";
 
 interface SidebarProps {
   role: UserRole;
 }
 
-export const userNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: "home" },
-  { href: "/profiles", label: "Perfiles", icon: "users" },
-  { href: "/busqueda-ia", label: "Búsqueda IA", icon: "sparkles" },
-  { href: "/categories", label: "Categorías", icon: "tag" },
-  { href: "/clients", label: "Clientes", icon: "building" },
-  { href: "/campaigns", label: "Campañas", icon: "megaphone" },
-  { href: "/briefs", label: "Briefs", icon: "file-text" },
+/**
+ * El menu, con el recurso del que depende cada opcion.
+ *
+ * Se filtra con la misma tabla que autoriza las rutas, en vez de
+ * enumerar roles aqui: un rol nuevo no obliga a tocar el menu, y no
+ * puede quedar una opcion visible que al pulsarla responda 403.
+ * `null` es para lo que ve cualquiera que haya entrado.
+ */
+const NAV: { href: string; label: string; icon: string; recurso: Recurso | null }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "home", recurso: null },
+  { href: "/profiles", label: "Perfiles", icon: "users", recurso: "perfiles" },
+  { href: "/busqueda-ia", label: "Búsqueda IA", icon: "sparkles", recurso: "busquedaIa" },
+  { href: "/categories", label: "Categorías", icon: "tag", recurso: "categorias" },
+  { href: "/clients", label: "Clientes", icon: "building", recurso: "clientes" },
+  { href: "/campaigns", label: "Campañas", icon: "megaphone", recurso: "campanas" },
+  { href: "/briefs", label: "Briefs", icon: "file-text", recurso: "briefs" },
 ];
+
+/** Las opciones que ese rol puede abrir. */
+export function navDe(rol: Rol) {
+  return NAV.filter((n) => n.recurso === null || puede(rol, n.recurso, "leer"));
+}
 
 export const adminNavItems = [
   { href: "/admin/users", label: "Usuarios", icon: "user-cog" },
@@ -51,7 +65,7 @@ export function Sidebar({ role }: SidebarProps) {
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
             Menu
           </h3>
-          {userNavItems.map((item) => (
+          {navDe(role).map((item) => (
             <Link
               key={item.href}
               href={item.href}

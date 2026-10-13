@@ -96,8 +96,9 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="USER">Usuario</SelectItem>
+                <SelectItem value="USER">Mercadeo</SelectItem>
                 <SelectItem value="ADMIN">Administrador</SelectItem>
+                <SelectItem value="CONTABILIDAD">Contabilidad</SelectItem>
               </SelectContent>
             </Select>
           </div>

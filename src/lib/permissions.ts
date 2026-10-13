@@ -17,10 +17,26 @@
  * propia y mucho mas pequena.
  */
 
-export type Rol = "ADMIN" | "USER";
+/**
+ * ADMIN        manda.
+ * USER         mercadeo: contrata, arma campanas y registra entregas.
+ * CONTABILIDAD paga: necesita ver de quien y de que campana es cada
+ *              importe, y no toca nada de lo que arma mercadeo.
+ */
+export type Rol = "ADMIN" | "USER" | "CONTABILIDAD";
 
 export type Recurso =
   | "perfiles"
+  /**
+   * La busqueda de prospectos con IA.
+   *
+   * Recurso propio y no "perfiles": cada busqueda gasta credito de
+   * Apify y dos llamadas a Anthropic, asi que no es leer perfiles, es
+   * gastar dinero. Mientras solo hubo ADMIN y USER daba igual —los dos
+   * la tenian—; con un rol mas, colgarla de "perfiles" se la habria
+   * concedido a contabilidad sin que nadie lo decidiera.
+   */
+  | "busquedaIa"
   | "categorias"
   | "clientes"
   | "campanas"
@@ -46,6 +62,7 @@ const TODAS: Accion[] = ["crear", "leer", "actualizar", "borrar"];
 const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
   ADMIN: {
     perfiles: TODAS,
+    busquedaIa: TODAS,
     categorias: TODAS,
     clientes: TODAS,
     campanas: TODAS,
@@ -56,6 +73,7 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
   },
   USER: {
     perfiles: TODAS,
+    busquedaIa: ["leer"],
     categorias: TODAS,
     clientes: ["crear", "leer", "actualizar"],
     campanas: ["crear", "leer", "actualizar"],
@@ -64,6 +82,26 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
     briefs: ["crear", "leer", "actualizar"],
     informes: ["crear", "leer"],
     aprobacion: ["actualizar"],
+    administracion: [],
+  },
+  /**
+   * Contabilidad solo lee, y solo lo que hace falta para pagar: de que
+   * campana es el importe, de que cliente y a que influencer.
+   *
+   * Sin busqueda con IA —gasta credito—, sin categorias ni briefs, que
+   * son del trabajo de mercadeo, y sin aprobacion, que es la decision
+   * del cliente. Cuando exista el modulo de pagos, ahi tendra todo y
+   * mercadeo solo la parte documental.
+   */
+  CONTABILIDAD: {
+    perfiles: ["leer"],
+    busquedaIa: [],
+    categorias: [],
+    clientes: ["leer"],
+    campanas: ["leer"],
+    briefs: [],
+    informes: ["leer"],
+    aprobacion: [],
     administracion: [],
   },
 };
@@ -83,6 +121,7 @@ const MATRIZ: Record<Rol, Record<Recurso, Accion[]>> = {
  */
 const PROPIEDAD_PARA_ESCRIBIR: Record<Recurso, boolean> = {
   perfiles: false,
+  busquedaIa: false,
   categorias: false,
   clientes: false,
   campanas: false,
@@ -95,6 +134,7 @@ const PROPIEDAD_PARA_ESCRIBIR: Record<Recurso, boolean> = {
 /** Recursos cuyo LISTADO se limita a lo propio cuando el rol no es ADMIN. */
 const PROPIEDAD_PARA_LEER: Record<Recurso, boolean> = {
   perfiles: false,
+  busquedaIa: false,
   categorias: false,
   clientes: false,
   campanas: false,

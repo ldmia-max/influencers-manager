@@ -38,7 +38,7 @@ const PLATAFORMA_POR_DEFECTO = "tiktok";
 
 export async function POST(req: Request) {
   try {
-    const sesion = await exigirPermiso("perfiles", "leer");
+    const sesion = await exigirPermiso("busquedaIa", "leer");
     if (sesion instanceof NextResponse) return sesion;
 
     if (!process.env.ANTHROPIC_API_KEY) {

@@ -1,3 +1,4 @@
+import { puede, type Rol } from "@/lib/permissions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export default async function ClientsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
+  const rol = (session?.user.role ?? "USER") as Rol;
   const params = await searchParams;
 
   const page = params.page ? parseInt(params.page) : 1;
@@ -82,9 +84,11 @@ export default async function ClientsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-        <Link href="/clients/new">
-          <Button>Nuevo Cliente</Button>
-        </Link>
+        {puede(rol, "clientes", "crear") && (
+          <Link href="/clients/new">
+            <Button>Nuevo Cliente</Button>
+          </Link>
+        )}
       </div>
 
       <Card>

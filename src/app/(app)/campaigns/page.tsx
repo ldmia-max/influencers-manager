@@ -27,7 +27,7 @@ import {
 } from "@/lib/campaign-utils";
 import { getCachedReachRanges } from "@/lib/cache";
 import { CampaignStatus } from "@prisma/client";
-import { exigePropiedadParaLeer, type Rol } from "@/lib/permissions";
+import { exigePropiedadParaLeer, type Rol, puede } from "@/lib/permissions";
 import { calcularTotalCampana } from "@/lib/campaign-utils";
 
 interface SearchParams {
@@ -44,6 +44,7 @@ export default async function CampaignsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
+  const rol = (session?.user.role ?? "USER") as Rol;
   const params = await searchParams;
 
   const page = params.page ? parseInt(params.page) : 1;
@@ -169,9 +170,11 @@ export default async function CampaignsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
-        <Link href="/campaigns/new">
-          <Button>Nueva Campaña</Button>
-        </Link>
+        {puede(rol, "campanas", "crear") && (
+          <Link href="/campaigns/new">
+            <Button>Nueva Campaña</Button>
+          </Link>
+        )}
       </div>
 
       <Card>

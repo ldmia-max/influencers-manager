@@ -13,6 +13,13 @@ import { CreateUserForm } from "@/components/forms/create-user-form";
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { DeleteUserButton } from "@/components/admin/delete-user-button";
 
+/** Como se llama cada rol en pantalla. El enum es ingles de base. */
+const ETIQUETA_ROL: Record<string, string> = {
+  ADMIN: "Administrador",
+  USER: "Mercadeo",
+  CONTABILIDAD: "Contabilidad",
+};
+
 export default async function UsersPage() {
   const users = await getAllUsersForAdmin();
 
@@ -55,7 +62,7 @@ export default async function UsersPage() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
                       <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
-                        {user.role}
+                        {ETIQUETA_ROL[user.role] ?? user.role}
                       </Badge>
                     </TableCell>
                     <TableCell>{user._count.profiles}</TableCell>

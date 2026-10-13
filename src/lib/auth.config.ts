@@ -6,7 +6,7 @@ import {
 } from "./client-session";
 
 // Definido localmente para evitar importar @prisma/client en Edge runtime
-type UserRole = "ADMIN" | "USER";
+type UserRole = "ADMIN" | "USER" | "CONTABILIDAD";
 
 declare module "next-auth" {
   interface Session {
@@ -48,6 +48,9 @@ const RUTAS_PRIVADAS = [
   "/dashboard",
   "/admin",
   "/profiles",
+  // Faltaba: la pagina se servia sin sesion. La busqueda en si no
+  // corria —su ruta de API si pide permiso— pero el formulario se veia.
+  "/busqueda-ia",
   "/clients",
   "/campaigns",
   "/categories",

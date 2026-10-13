@@ -14,6 +14,7 @@ export const config = {
     "/admin/:path*",
     "/api/admin/:path*",
     "/profiles/:path*",
+    "/busqueda-ia/:path*",
     "/clients/:path*",
     "/campaigns/:path*",
     "/categories/:path*",

@@ -1,3 +1,4 @@
+import { puede, type Rol } from "@/lib/permissions";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export default async function ProfilesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
+  const rol = (session?.user.role ?? "USER") as Rol;
   const params = await searchParams;
 
   // Construir filtros
@@ -97,9 +99,11 @@ export default async function ProfilesPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Perfiles</h1>
-        <Link href="/profiles/new">
-          <Button>Nuevo Perfil</Button>
-        </Link>
+        {puede(rol, "perfiles", "crear") && (
+          <Link href="/profiles/new">
+            <Button>Nuevo Perfil</Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
