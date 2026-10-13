@@ -149,7 +149,17 @@ interface Props {
   puedeEditarCifras?: boolean;
 }
 
+/**
+ * General primero y por defecto: es lo que de verdad vio la gente, y
+ * quien abre Impacto viene a eso. Campana y Extra estan detras para
+ * separar lo contratado de lo que el creador regalo.
+ */
 const VISTAS = [
+  {
+    clave: "general" as const,
+    nombre: "General",
+    explica: "Todo junto: lo contratado y lo extra",
+  },
   {
     clave: "campana" as const,
     nombre: "Campaña",
@@ -159,11 +169,6 @@ const VISTAS = [
     clave: "extra" as const,
     nombre: "Extra",
     explica: "Solo lo que el creador publicó por su cuenta",
-  },
-  {
-    clave: "general" as const,
-    nombre: "General",
-    explica: "Todo junto: lo contratado y lo extra",
   },
 ];
 
@@ -237,7 +242,7 @@ export function MetricasCampana({
    * creador— y sumarlos siempre las confunde. Tambien hace falta el
    * total, que es lo que de verdad vio la gente.
    */
-  const [vista, setVista] = useState<"campana" | "extra" | "general">("campana");
+  const [vista, setVista] = useState<"campana" | "extra" | "general">("general");
   const hayExtra = publicaciones.some((p) => p.esExtra);
 
   /**
