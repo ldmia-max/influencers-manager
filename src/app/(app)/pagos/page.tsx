@@ -1,27 +1,24 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { puede, type Rol } from "@/lib/permissions";
-import { listarPagos } from "@/data-access/pagos";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatNumber } from "@/lib/format";
-import { mesLegible, type EstadoPago } from "@/lib/pagos";
-import { FiltrosPagos } from "@/components/pagos/filtros-pagos";
-import { RegistroContabilidad } from "@/components/pagos/registro-contabilidad";
 import {
-  Adjunto,
-  EstadoBadge,
-  Vencimiento,
-} from "@/components/campaigns/pagos-campana";
+  agruparPorCampana,
+  economiaDeCampanas,
+  listarPagos,
+} from "@/data-access/pagos";
+import { formatNumber } from "@/lib/format";
+import type { EstadoPago } from "@/lib/pagos";
+import { FiltrosPagos } from "@/components/pagos/filtros-pagos";
+import { TablaContabilidad } from "@/components/pagos/tabla-contabilidad";
 
 /**
  * Control de pagos, de todas las campanas.
  *
- * Contabilidad no trabaja por campana sino por mes, asi que necesita
- * esta puerta ademas de la pestana que hay dentro de cada campana. Son
- * la misma informacion por dos recorridos distintos.
+ * Contabilidad trabaja por campana —cada cuadro de su hoja es una— y
+ * compara el total de saldos con el presupuesto para no pasarse. Esta
+ * es esa vista; la pestana dentro de la campana es la de mercadeo.
  *
  * La consulta vive dentro de <Suspense> y detras de connection():
  * `docker build` no tiene base de datos, y con cacheComponents una
@@ -37,13 +34,11 @@ export default async function PagosPage({
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pagos</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Lo que hay que pagar a los influencers, de todas las campañas
+          Lo que hay que pagar a los influencers, campaña por campaña
         </p>
       </div>
 
-      <Suspense
-        fallback={<p className="text-sm text-gray-500">Cargando pagos…</p>}
-      >
+      <Suspense fallback={<p className="text-sm text-gray-500">Cargando pagos…</p>}>
         <Listado searchParams={searchParams} />
       </Suspense>
     </div>
@@ -73,30 +68,28 @@ async function Listado({
     texto: filtros.texto,
   });
 
+  const grupos = agruparPorCampana(pagos);
+  const economia = await economiaDeCampanas(grupos.map((g) => g.campanaId));
+  for (const g of grupos) {
+    const e = economia.get(g.campanaId);
+    g.presupuesto = e?.presupuesto ?? 0;
+    g.cobradoAlCliente = e?.cobradoAlCliente ?? 0;
+    g.utilidad = g.cobradoAlCliente - g.coste;
+  }
+
   // Las opciones de los desplegables salen de lo que hay, no de un
-  // catalogo entero: un cliente sin campanas en marcha no tiene pagos
-  // y ofrecerlo seria ofrecer una lista vacia.
+  // catalogo entero: un cliente sin campanas en marcha no tiene pagos y
+  // ofrecerlo seria ofrecer una lista vacia.
   const todos = await listarPagos({});
   const clientes = [...new Map(todos.map((p) => [p.clienteId, p.cliente])).entries()]
     .map(([id, nombre]) => ({ id, nombre }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  const meses = [...new Set(todos.map((p) => p.mes).filter(Boolean))]
+  const meses = [...new Set(todos.map((p) => p.mesCampana).filter(Boolean))]
     .sort()
     .reverse() as string[];
 
-  const total = pagos.reduce((s, p) => s + p.base, 0);
-  const vencidos = pagos.filter((p) => p.vencido).length;
-
-  // Se agrupa por mes porque es como contabilidad mira su trabajo. Lo
-  // que todavia no tiene cuenta de cobro no tiene mes, y va al final.
-  const porMes = new Map<string, typeof pagos>();
-  for (const p of pagos) {
-    const clave = p.mes ?? "";
-    porMes.set(clave, [...(porMes.get(clave) ?? []), p]);
-  }
-  const grupos = [...porMes.entries()].sort((a, b) =>
-    a[0] === "" ? 1 : b[0] === "" ? -1 : b[0].localeCompare(a[0])
-  );
+  const saldo = pagos.reduce((s, p) => s + p.saldo, 0);
+  const porVencer = pagos.filter((p) => p.avisar && p.estado !== "PAGADO").length;
 
   return (
     <div className="space-y-4">
@@ -104,146 +97,29 @@ async function Listado({
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
         <span className="text-gray-500">
-          {pagos.length} pago{pagos.length === 1 ? "" : "s"}
+          {pagos.length} pago{pagos.length === 1 ? "" : "s"} en {grupos.length}{" "}
+          campaña{grupos.length === 1 ? "" : "s"}
         </span>
         <span className="text-gray-500">
-          Total contratado:{" "}
+          Falta pagar:{" "}
           <span className="font-semibold text-gray-900">
-            ${formatNumber(total.toFixed(0))}
+            ${formatNumber(Math.round(saldo))}
           </span>
         </span>
-        {vencidos > 0 && (
+        {porVencer > 0 && (
           <span className="font-medium text-red-600">
-            {vencidos} vencido{vencidos === 1 ? "" : "s"}
+            {porVencer} con el plazo encima
           </span>
         )}
       </div>
 
-      {pagos.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-gray-500">
-            No hay pagos con esos filtros.
-          </CardContent>
-        </Card>
-      ) : (
-        grupos.map(([mes, filas]) => (
-          <Card key={mes || "sin-mes"}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
-              <CardTitle className="text-base first-letter:uppercase">
-                {mes ? mesLegible(mes) : "Sin cuenta de cobro todavía"}
-              </CardTitle>
-              <span className="text-xs text-gray-500">
-                {filas.length} · $
-                {formatNumber(filas.reduce((s, p) => s + p.base, 0).toFixed(0))}
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[72rem] text-xs">
-                  <thead>
-                    <tr className="text-left text-gray-500">
-                      <th className="px-2 py-1 font-medium">Influencer</th>
-                      <th className="px-2 py-1 font-medium">Nombre completo</th>
-                      <th className="px-2 py-1 font-medium">Campaña</th>
-                      <th className="px-2 py-1 font-medium">Cliente</th>
-                      <th className="px-2 py-1 text-right font-medium">
-                        Contratado
-                      </th>
-                      <th className="px-2 py-1 font-medium">Documentos</th>
-                      <th className="px-2 py-1 font-medium">Fecha cuenta</th>
-                      <th className="px-2 py-1 font-medium">Vence en</th>
-                      <th className="px-2 py-1 font-medium">Documento</th>
-                      <th className="px-2 py-1 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filas.map((p) => (
-                      <tr
-                        key={p.campaignProfileId}
-                        className="border-t border-gray-200/70 align-top text-gray-600 odd:bg-marca/5"
-                      >
-                        <td className="px-2 py-2">
-                          <p className="font-medium text-gray-900">
-                            {p.influencer}
-                          </p>
-                        </td>
-                        <td className="px-2 py-2">
-                          {p.nombreCompleto ? (
-                            <p className="text-gray-900">{p.nombreCompleto}</p>
-                          ) : (
-                            <p className="text-gray-400">sin registrar</p>
-                          )}
-                          {p.documentoIdentidad && (
-                            <p className="text-[11px] text-gray-400">
-                              {p.documentoIdentidad}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-2 py-2">
-                          <Link
-                            href={`/campaigns/${p.campanaId}`}
-                            prefetch={false}
-                            className="text-violet-700 hover:underline"
-                          >
-                            {p.campana}
-                          </Link>
-                        </td>
-                        <td className="px-2 py-2">{p.cliente}</td>
-                        <td className="px-2 py-2 text-right font-medium tabular-nums text-gray-900">
-                          ${formatNumber(p.base.toFixed(0))}
-                        </td>
-                        <td className="px-2 py-2">
-                          <Adjunto
-                            url={p.cuentaCobroUrl}
-                            nombre={p.cuentaCobroNombre}
-                            etiqueta="cuenta de cobro"
-                          />
-                          <Adjunto
-                            url={p.certificadoUrl}
-                            nombre={p.certificadoNombre}
-                            etiqueta="certificado"
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          {p.fechaCuentaCobro ? (
-                            new Date(p.fechaCuentaCobro).toLocaleDateString("es-CO")
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2">
-                          <Vencimiento pago={p} />
-                        </td>
-                        <td className="px-2 py-2">
-                          {puedeRegistrar ? (
-                            <RegistroContabilidad
-                              campaignProfileId={p.campaignProfileId}
-                              documento={p.documento}
-                              fechaCuentaCobro={p.fechaCuentaCobro}
-                            />
-                          ) : (
-                            <span className={p.documento ? "" : "text-gray-400"}>
-                              {p.documento || "sin registrar"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2">
-                          <EstadoBadge estado={p.estado} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+      <TablaContabilidad grupos={grupos} puedeRegistrar={puedeRegistrar} />
 
       <p className="text-[11px] text-gray-500">
-        El importe es lo contratado en la campaña, sin el margen del cliente.
-        Los impuestos, el valor final y los abonos llegarán cuando mercadeo y
-        contabilidad acuerden la fórmula.
+        El precio sale de lo contratado en la campaña, sin el margen del cliente.
+        Los impuestos se calculan según cómo factura cada influencer: natural sin
+        IVA y 10% de retención, jurídica con IVA del 19% y 11% de retención, los
+        dos sobre la base. El reteiva no aplica.
       </p>
     </div>
   );

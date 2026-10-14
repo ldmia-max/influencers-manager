@@ -1,164 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertTriangle,
-  Check,
-  FileText,
-  Loader2,
-  Paperclip,
-  Pencil,
-  X,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, Loader2, Pencil, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
-import { ETIQUETA_PAGO, COLOR_PAGO, type EstadoPago } from "@/lib/pagos";
+import { ETIQUETA_TIPO_PERSONA } from "@/lib/pagos";
+import type { PagoVista } from "@/data-access/pagos";
 import { apiPatch } from "@/services/api";
+import { Adjunto, Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
 
-export interface PagoVista {
-  campaignProfileId: string;
-  influencer: string;
-  nombreCompleto: string | null;
-  documentoIdentidad: string | null;
-  campanaId: string;
-  campana: string;
-  clienteId: string;
-  cliente: string;
-  base: number;
-  estado: EstadoPago;
-  cuentaCobroUrl: string | null;
-  cuentaCobroNombre: string | null;
-  certificadoUrl: string | null;
-  certificadoNombre: string | null;
-  fechaCuentaCobro: string | null;
-  documento: string | null;
-  observaciones: string | null;
-  mes: string | null;
-  vence: string | null;
-  diasRestantes: number | null;
-  vencido: boolean;
-}
-
-/** El plazo, dicho como se lee: lo que falta, no lo transcurrido. */
-export function Vencimiento({ pago }: { pago: PagoVista }) {
-  if (pago.diasRestantes === null) {
-    return <span className="text-gray-400">sin cuenta de cobro</span>;
-  }
-  if (pago.vencido) {
-    return (
-      <span className="flex items-center gap-1 font-medium text-red-600">
-        <AlertTriangle className="h-3 w-3" />
-        vencido hace {Math.abs(pago.diasRestantes)} d
-        {Math.abs(pago.diasRestantes) === 1 ? "ía" : "ías"}
-      </span>
-    );
-  }
-  return (
-    <span className={pago.diasRestantes <= 7 ? "font-medium text-amber-700" : ""}>
-      {pago.diasRestantes} día{pago.diasRestantes === 1 ? "" : "s"}
-    </span>
-  );
-}
-
-export function EstadoBadge({ estado }: { estado: EstadoPago }) {
-  return (
-    <Badge variant="secondary" className={COLOR_PAGO[estado]}>
-      {ETIQUETA_PAGO[estado]}
-    </Badge>
-  );
-}
-
-/** Un adjunto: el enlace si ya está, o el botón para subirlo. */
-export function Adjunto({
-  url,
-  nombre,
-  etiqueta,
-  puedeSubir,
-  onSubido,
-}: {
-  url: string | null;
-  nombre: string | null;
-  etiqueta: string;
-  puedeSubir?: boolean;
-  /**
-   * Opcional a proposito: la pagina de contabilidad es de servidor y no
-   * puede pasar funciones a un componente cliente. Alli solo se mira.
-   */
-  onSubido?: (doc: { url: string; nombre: string }) => Promise<void>;
-}) {
-  const [subiendo, setSubiendo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const subir = async (archivo: File) => {
-    setSubiendo(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append("archivo", archivo);
-      const res = await fetch("/api/pagos/upload", { method: "POST", body: form });
-      const datos = await res.json();
-      if (!res.ok) throw new Error(datos.error ?? "No se pudo subir");
-      await onSubido?.(datos);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo subir");
-    } finally {
-      setSubiendo(false);
-    }
-  };
-
-  return (
-    <div className="space-y-1">
-      {url ? (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-violet-700 hover:underline"
-        >
-          <FileText className="h-3 w-3 shrink-0" />
-          <span className="max-w-[12rem] truncate">{nombre ?? etiqueta}</span>
-        </a>
-      ) : (
-        <span className="text-gray-400">sin {etiqueta}</span>
-      )}
-
-      {puedeSubir && onSubido && (
-        <label className="flex cursor-pointer items-center gap-1 text-[11px] text-violet-700 hover:underline">
-          {subiendo ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Paperclip className="h-3 w-3" />
-          )}
-          {url ? "Reemplazar" : "Subir"}
-          <input
-            type="file"
-            className="hidden"
-            disabled={subiendo}
-            onChange={(e) => {
-              const a = e.target.files?.[0];
-              if (a) subir(a);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      )}
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
-    </div>
-  );
-}
+const SIN_TIPO = "__sin__";
 
 /**
- * Los pagos de una campana, desde la pestana de la campana.
+ * Los pagos de una campana, desde su pestana.
  *
  * Es la vista de mercadeo: a quien hay que pagar, cuanto segun lo
- * contratado, y que documentos faltan. Lo que registra contabilidad se
- * ve, pero no se toca desde aqui.
+ * contratado, que documentos faltan y con que tipo de persona se
+ * negocio. Lo que registra contabilidad se ve, pero no se toca.
  *
  * Tras guardar se recarga la pagina entera en vez de refrescar: el
- * estado y el plazo son calculados y cambian con cada dato que entra,
- * y `router.refresh()` no repinta en la compilacion de produccion.
+ * estado, los impuestos, el plazo y el saldo son calculados y cambian
+ * con cada dato que entra, y `router.refresh()` no repinta en la
+ * compilacion de produccion.
  */
 export function PagosCampana({
   pagos,
@@ -168,7 +39,11 @@ export function PagosCampana({
   puedeEditar: boolean;
 }) {
   const [editando, setEditando] = useState<string | null>(null);
-  const [borrador, setBorrador] = useState({ fecha: "", observaciones: "" });
+  const [borrador, setBorrador] = useState({
+    fecha: "",
+    tipo: SIN_TIPO,
+    observaciones: "",
+  });
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -184,17 +59,27 @@ export function PagosCampana({
     }
   };
 
-  const total = pagos.reduce((s, p) => s + p.base, 0);
-  const pendientes = pagos.filter((p) => p.estado === "PENDIENTE_DOCUMENTOS").length;
+  const coste = pagos.reduce((s, p) => s + p.base, 0);
+  const reserva = pagos.reduce((s, p) => s + p.reserva, 0);
+  const saldo = pagos.reduce((s, p) => s + p.saldo, 0);
+  const sinDocumentos = pagos.filter(
+    (p) => p.estado === "PENDIENTE_DOCUMENTOS"
+  ).length;
+  const sinTipo = pagos.filter((p) => !p.tipoPersona).length;
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base">Pagos a influencers</CardTitle>
-        <span className="text-xs text-gray-500">
-          {pagos.length} por pagar · total contratado{" "}
-          <span className="font-semibold text-gray-900">
-            ${formatNumber(total.toFixed(0))}
+        <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500">
+          <span>
+            Contratado <Dinero valor={coste} destacado />
+          </span>
+          <span title="Lo que hay que tener reservado, con IVA donde aplica">
+            A reservar <Dinero valor={reserva} destacado />
+          </span>
+          <span>
+            Falta pagar <Dinero valor={saldo} destacado />
           </span>
         </span>
       </CardHeader>
@@ -212,34 +97,44 @@ export function PagosCampana({
           </p>
         ) : (
           <>
-            {pendientes > 0 && (
+            {sinDocumentos > 0 && (
               <p className="text-xs text-amber-700">
-                Faltan documentos de {pendientes} influencer
-                {pendientes === 1 ? "" : "s"}: contabilidad no puede registrar el
-                pago hasta que estén.
+                Faltan documentos de {sinDocumentos} influencer
+                {sinDocumentos === 1 ? "" : "s"}: contabilidad no puede registrar
+                el pago hasta que estén.
+              </p>
+            )}
+            {sinTipo > 0 && (
+              <p className="text-xs text-gray-500">
+                De {sinTipo} {sinTipo === 1 ? "influencer" : "influencers"} no se
+                sabe cómo factura, así que se reserva el peor caso —con IVA—
+                hasta que llegue su RUT.
               </p>
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[64rem] text-xs">
+              <table className="w-full min-w-[68rem] text-xs">
                 <thead>
                   <tr className="text-left text-gray-500">
                     <th className="px-2 py-1 font-medium">Influencer</th>
                     <th className="px-2 py-1 font-medium">Nombre completo</th>
+                    <th className="px-2 py-1 font-medium">Cómo factura</th>
                     <th className="px-2 py-1 text-right font-medium">Contratado</th>
+                    <th className="px-2 py-1 text-right font-medium">A reservar</th>
+                    <th className="px-2 py-1 font-medium">Documentos</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
-                    <th className="px-2 py-1 font-medium">Certificado</th>
-                    <th className="px-2 py-1 font-medium">Fecha cuenta</th>
-                    <th className="px-2 py-1 font-medium">Vence en</th>
+                    <th className="px-2 py-1 text-center font-medium">Días</th>
                     <th className="px-2 py-1 font-medium">Estado</th>
-                    {puedeEditar && <th className="w-20 px-2 py-1" />}
+                    {puedeEditar && <th className="w-16 px-2 py-1" />}
                   </tr>
                 </thead>
                 <tbody>
                   {pagos.map((p) => (
                     <tr
                       key={p.campaignProfileId}
-                      className="border-t border-gray-200/70 align-top text-gray-600 odd:bg-marca/5"
+                      className={`border-t border-gray-200/70 align-top text-gray-600 ${
+                        p.estado === "PAGADO" ? "bg-sky-50" : "odd:bg-marca/5"
+                      }`}
                     >
                       <td className="px-2 py-2">
                         <p className="font-medium text-gray-900">{p.influencer}</p>
@@ -256,10 +151,54 @@ export function PagosCampana({
                           </p>
                         )}
                       </td>
-                      <td className="px-2 py-2 text-right font-medium tabular-nums text-gray-900">
-                        ${formatNumber(p.base.toFixed(0))}
-                      </td>
                       <td className="px-2 py-2">
+                        {editando === p.campaignProfileId ? (
+                          <Select
+                            value={borrador.tipo}
+                            onValueChange={(v) =>
+                              setBorrador((b) => ({ ...b, tipo: v }))
+                            }
+                          >
+                            <SelectTrigger className="h-7 w-40 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={SIN_TIPO}>
+                                Todavía no se sabe
+                              </SelectItem>
+                              <SelectItem value="NATURAL">
+                                Persona natural
+                              </SelectItem>
+                              <SelectItem value="JURIDICA">
+                                Persona jurídica
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : p.tipoPersona ? (
+                          <>
+                            <p className="text-gray-900">
+                              {ETIQUETA_TIPO_PERSONA[p.tipoPersona]}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              {p.tipoVerificado
+                                ? "confirmado con el RUT"
+                                : "pactado al negociar"}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-gray-400">sin confirmar</p>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        <Dinero valor={p.base} destacado />
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        <Dinero valor={p.reserva} />
+                        {!p.tipoPersona && (
+                          <p className="text-[11px] text-gray-400">peor caso</p>
+                        )}
+                      </td>
+                      <td className="space-y-1 px-2 py-2">
                         <Adjunto
                           url={p.cuentaCobroUrl}
                           nombre={p.cuentaCobroNombre}
@@ -269,8 +208,6 @@ export function PagosCampana({
                             guardar(p.campaignProfileId, { cuentaCobro: doc })
                           }
                         />
-                      </td>
-                      <td className="px-2 py-2">
                         <Adjunto
                           url={p.certificadoUrl}
                           nombre={p.certificadoNombre}
@@ -280,6 +217,21 @@ export function PagosCampana({
                             guardar(p.campaignProfileId, { certificado: doc })
                           }
                         />
+                        {p.tipoVerificado && !p.rutUrl ? (
+                          <p className="text-[11px] text-gray-400">
+                            RUT ya verificado
+                          </p>
+                        ) : (
+                          <Adjunto
+                            url={p.rutUrl}
+                            nombre={p.rutNombre}
+                            etiqueta="RUT"
+                            puedeSubir={puedeEditar}
+                            onSubido={(doc) =>
+                              guardar(p.campaignProfileId, { rut: doc })
+                            }
+                          />
+                        )}
                       </td>
                       <td className="px-2 py-2">
                         {editando === p.campaignProfileId ? (
@@ -302,7 +254,7 @@ export function PagosCampana({
                                 }))
                               }
                               maxLength={1000}
-                              className="h-7 w-48 text-xs"
+                              className="h-7 w-44 text-xs"
                             />
                           </div>
                         ) : (
@@ -313,18 +265,26 @@ export function PagosCampana({
                               <span className="text-gray-400">—</span>
                             )}
                             {p.observaciones && (
-                              <p className="mt-0.5 max-w-[14rem] text-[11px] text-gray-500">
+                              <p className="mt-0.5 max-w-[12rem] text-[11px] text-gray-500">
                                 {p.observaciones}
                               </p>
                             )}
                           </>
                         )}
                       </td>
-                      <td className="px-2 py-2">
-                        <Vencimiento pago={p} />
+                      <td className="px-2 py-2 text-center">
+                        <Vencimiento
+                          dias={p.dias}
+                          avisar={p.avisar}
+                          vencido={p.vencido}
+                          pagado={p.estado === "PAGADO"}
+                        />
                       </td>
                       <td className="px-2 py-2">
-                        <EstadoBadge estado={p.estado} />
+                        <EstadoBadge
+                          estado={p.estado}
+                          loPagaElCliente={p.loPagaElCliente}
+                        />
                         {p.documento && (
                           <p className="mt-0.5 text-[11px] text-gray-500">
                             doc. {p.documento}
@@ -343,6 +303,10 @@ export function PagosCampana({
                                 onClick={() =>
                                   guardar(p.campaignProfileId, {
                                     fechaCuentaCobro: borrador.fecha || null,
+                                    tipoPersona:
+                                      borrador.tipo === SIN_TIPO
+                                        ? null
+                                        : borrador.tipo,
                                     observaciones: borrador.observaciones || null,
                                   })
                                 }
@@ -365,13 +329,14 @@ export function PagosCampana({
                           ) : (
                             <button
                               type="button"
-                              title="Editar fecha y observaciones"
+                              title="Editar fecha, tipo y observaciones"
                               className="text-gray-400 hover:text-violet-700"
                               onClick={() => {
                                 setBorrador({
                                   fecha: p.fechaCuentaCobro
                                     ? p.fechaCuentaCobro.slice(0, 10)
                                     : "",
+                                  tipo: p.tipoPersona ?? SIN_TIPO,
                                   observaciones: p.observaciones ?? "",
                                 });
                                 setEditando(p.campaignProfileId);
@@ -385,13 +350,27 @@ export function PagosCampana({
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-300 font-semibold text-gray-900">
+                    <td className="px-2 py-2" colSpan={3}>
+                      Total
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums">
+                      ${formatNumber(Math.round(coste))}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums">
+                      ${formatNumber(Math.round(reserva))}
+                    </td>
+                    <td className="px-2 py-2" colSpan={puedeEditar ? 5 : 4} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
             <p className="text-[11px] text-gray-500">
-              El importe sale de lo contratado en la campaña, sin el margen del
-              cliente. Los impuestos y el valor final a pagar llegarán cuando
-              mercadeo y contabilidad acuerden la fórmula.
+              El contratado sale de los formatos de la campaña, sin el margen del
+              cliente. Los impuestos y el valor final los calcula y los registra
+              contabilidad en su pantalla de Pagos.
             </p>
           </>
         )}

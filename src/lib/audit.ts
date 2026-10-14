@@ -98,6 +98,9 @@ export const ACCIONES = {
   /// escritas a mano sobre una publicacion. Quedan sin fuente que las
   /// respalde, asi que la trazabilidad es quien las anoto.
   cifrasDePublicacionAnotadas: "campaign.delivery_figures_set",
+  /// Dinero que sale: un abono a un influencer, y deshacerlo.
+  abonoRegistrado: "pago.abono_registrado",
+  abonoEliminado: "pago.abono_eliminado",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
   /// Quitar un tanteo que el cliente nunca vio. Es el unico borrado real

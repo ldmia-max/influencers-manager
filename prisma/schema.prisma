@@ -14,6 +14,23 @@ datasource db {
 
 // ============ USUARIOS Y AUTENTICACION ============
 
+/// Como factura un influencer, que es lo que decide sus impuestos.
+///
+/// Natural  → sin IVA, retencion del 10%.
+/// Juridica → IVA del 19%, retencion del 11%.
+///
+/// En los dos casos la retencion se calcula sobre la base, no sobre la
+/// factura con IVA, y el reteiva no aplica: solo lo practica un gran
+/// contribuyente y la agencia no lo es.
+///
+/// Null significa que todavia no se sabe. Se pacta al negociar, pero el
+/// RUT manda: mas de una vez el influencer firma creyendo una cosa y su
+/// RUT dice otra, y contabilidad lo ajusta al pagar.
+enum TipoPersona {
+  NATURAL
+  JURIDICA
+}
+
 enum UserRole {
   ADMIN
   USER
@@ -54,6 +71,9 @@ model User {
 
   /// Cifras de historias y directos que ha anotado esta persona.
   metricasReportadas CampaignEntregaMetrica[]
+
+  /// Abonos a influencers que ha registrado esta persona.
+  abonosRegistrados AbonoPago[]
 }
 
 // ============ GENEROS ============
@@ -161,6 +181,13 @@ model Profile {
   /// factura por el, y por eso va aparte de `name` en vez de sustituirlo.
   /// Es dato personal, asi que NO sale de la agencia: ninguna consulta
   /// del portal de aprobacion ni del portal del cliente lo selecciona.
+  /// Como factura, para calcular sus impuestos.
+  ///
+  /// Null mientras no se sepa. `tipoPersonaVerificado` dice si se
+  /// confirmo mirando su RUT: una vez visto, no se vuelve a pedir.
+  tipoPersona           TipoPersona?
+  tipoPersonaVerificado Boolean      @default(false)
+
   nombreCompleto  String?
   tipoDocumento   TipoDocumento?
   /// Se guarda como texto, no como numero: un NIT lleva digito de
@@ -876,25 +903,85 @@ model PagoInfluencer {
   certificadoUrl    String?
   certificadoNombre String?
 
+  /// El RUT, que es lo que decide si factura como natural o juridica.
+  ///
+  /// Llega con la cuenta de cobro. No se pide cuando el perfil ya lo
+  /// tiene verificado de una campana anterior: seria pedir lo que ya se
+  /// tiene.
+  rutUrl    String?
+  rutNombre String?
+
   /// Fecha de la cuenta de cobro.
   ///
-  /// Es el dia desde el que corren los 60 dias de plazo, y tambien la
-  /// fecha del documento contable: en las hojas de calculo las dos
-  /// columnas llevaban siempre el mismo valor.
+  /// Es el dia desde el que corren los 60 dias de plazo. Comprobado
+  /// contra las 17 filas de la hoja de contabilidad: las dos en que la
+  /// fecha de documento difiere —31/8 contra 1/9— cuentan desde esta.
   fechaCuentaCobro DateTime?
 
   // --- Lo que anota contabilidad ---
 
-  /// El consecutivo del sistema contable. Texto libre hasta saber si
-  /// tiene formato.
+  /// Con que tipo se calculo ESTE pago.
+  ///
+  /// Se congela aqui en vez de leerse siempre del perfil: corregir el
+  /// perfil en marzo no debe cambiar solo el importe de un pago de
+  /// enero, que ya se pago con la cifra que se pago. Null mientras nadie
+  /// lo haya fijado; entonces se toma el del perfil.
+  tipoPersona TipoPersona?
+
+  /// El consecutivo que genera la DIAN al reportar el cobro.
   documento String?
 
+  /// Cuando se registro el cobro en la DIAN. No es la fecha de la
+  /// cuenta de cobro: en la hoja hay filas donde difieren.
+  fechaDocumento DateTime?
+
+  /// Ajuste sobre el valor a pagar, con su explicacion.
+  ///
+  /// Positivo o negativo: "sumar 100.000 por transporte", "descontar el
+  /// kit 320.500". El motivo va pegado al numero a proposito —asi lo
+  /// llevan en la hoja— porque un ajuste sin razon es un descuadre.
+  ajuste       Decimal? @db.Decimal(12, 2)
+  motivoAjuste String?
+
+  /// Lo paga el cliente directamente, no la agencia.
+  ///
+  /// Sigue consumiendo presupuesto de la campana y sigue sumando al
+  /// total de saldos, porque es dinero de esa campana; lo que no pide
+  /// es documentacion.
+  loPagaElCliente Boolean @default(false)
+
   observaciones String?
+
+  abonos AbonoPago[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([fechaCuentaCobro])
+}
+
+/// Un pago parcial contra un PagoInfluencer.
+///
+/// Varios por pago: el saldo baja con cada uno y llega a cero cuando se
+/// termino de pagar, que es como contabilidad sabe que esa campana ya no
+/// le pide mas dinero.
+model AbonoPago {
+  id String @id @default(cuid())
+
+  pago   PagoInfluencer @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  pagoId String
+
+  fecha       DateTime
+  valor       Decimal  @db.Decimal(12, 2)
+  observacion String?
+
+  /// Quien lo anoto. Un pago es dinero: conviene saberlo.
+  registradoPor   User?   @relation(fields: [registradoPorId], references: [id])
+  registradoPorId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([pagoId])
 }
 
 /// Una foto de las metricas de un link en un instante.
