@@ -221,10 +221,11 @@ export function PagosCampana({
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[56rem] text-xs">
+              <table className="w-full min-w-[64rem] text-xs">
                 <thead>
                   <tr className="text-left text-gray-500">
                     <th className="px-2 py-1 font-medium">Influencer</th>
+                    <th className="px-2 py-1 font-medium">Nombre completo</th>
                     <th className="px-2 py-1 text-right font-medium">Contratado</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
                     <th className="px-2 py-1 font-medium">Certificado</th>
@@ -242,10 +243,12 @@ export function PagosCampana({
                     >
                       <td className="px-2 py-2">
                         <p className="font-medium text-gray-900">{p.influencer}</p>
-                        {p.nombreCompleto && (
-                          <p className="text-[11px] text-gray-500">
-                            {p.nombreCompleto}
-                          </p>
+                      </td>
+                      <td className="px-2 py-2">
+                        {p.nombreCompleto ? (
+                          <p className="text-gray-900">{p.nombreCompleto}</p>
+                        ) : (
+                          <p className="text-gray-400">sin registrar</p>
                         )}
                         {p.documentoIdentidad && (
                           <p className="text-[11px] text-gray-400">
