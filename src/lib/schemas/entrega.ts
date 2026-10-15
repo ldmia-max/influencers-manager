@@ -85,6 +85,8 @@ export const participacionSchema = z.discriminatedUnion("accion", [
     motivo: z.string().max(500, "Máximo 500 caracteres").nullish(),
   }),
   z.object({ accion: z.literal("reactivar") }),
+  /** Deshacer un rechazo del cliente: vuelve a quedar pendiente. */
+  z.object({ accion: z.literal("devolver-rechazado") }),
 ]);
 
 /**

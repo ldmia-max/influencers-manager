@@ -786,17 +786,27 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                               </Badge>
                             )
                           )}
-                          {/* Retirar solo con la campaña en marcha: antes de
-                              activarla los cambios se hacen en el editor,
-                              que permite mucho más. */}
-                          {campaign.status === "ACTIVE" && (
-                            <RetirarInfluencer
-                              campaignId={id}
-                              perfilId={cp.id}
-                              nombre={cp.profile.name}
-                              retirado={cp.participacion === "RETIRADO"}
-                            />
-                          )}
+                          {/* Retirar solo con la campaña en marcha: antes
+                              de activarla los cambios se hacen en el
+                              editor, que permite mucho más.
+
+                              Deshacer un rechazo, en cambio, también
+                              antes: el cliente puede rechazar a alguien
+                              en Revisión, y si luego cambia de opinión
+                              —o se renegocia el precio— hay que poder
+                              devolverlo sin rehacer la campaña. */}
+                          {(campaign.status === "ACTIVE" ||
+                            cp.status === "REJECTED") &&
+                            campaign.status !== "COMPLETED" &&
+                            campaign.status !== "CANCELLED" && (
+                              <RetirarInfluencer
+                                campaignId={id}
+                                perfilId={cp.id}
+                                nombre={cp.profile.name}
+                                retirado={cp.participacion === "RETIRADO"}
+                                rechazado={cp.status === "REJECTED"}
+                              />
+                            )}
                         </div>
                       </div>
 

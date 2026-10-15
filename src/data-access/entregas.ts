@@ -963,3 +963,73 @@ export async function actualizarCifrasDeEntrega(
     influencer: cpp.campaignProfile.profile.name,
   };
 }
+
+/**
+ * Devuelve a la campana a quien el cliente rechazo.
+ *
+ * Rechazo y retiro son dos ejes distintos —uno dice si el cliente lo
+ * aprobo, el otro si sigue contratado— y hasta ahora solo se podia
+ * deshacer el segundo. Pero un rechazo se renegocia: el cliente cambia
+ * de opinion, o se ajusta el precio y entonces si lo quiere.
+ *
+ * Vuelve como PENDING, no como APPROVED. APPROVED significa "el cliente
+ * dijo que si", y mercadeo no puede decir eso en su nombre: quedaria un
+ * importe contratado que el cliente nunca acepto. Pendiente es lo que
+ * de verdad pasa —esta propuesto otra vez y falta su respuesta— y se
+ * resuelve como cualquier otro pendiente: con un enlace de aprobacion,
+ * o aprobandolo la agencia a sabiendas, que eso ya se audita aparte.
+ *
+ * Se limpia tambien el retiro, porque al pasar a ACTIVE a los
+ * rechazados se les retira automaticamente: si no, volveria aprobable
+ * pero sin contar en la campana, que es medio volver.
+ */
+export async function devolverInfluencerRechazado(campaignProfileId: string) {
+  const perfil = await prisma.campaignProfile.findUnique({
+    where: { id: campaignProfileId },
+    select: {
+      id: true,
+      status: true,
+      participacion: true,
+      rejectionReason: true,
+      campaign: { select: { id: true, name: true, status: true } },
+      profile: { select: { id: true, name: true } },
+    },
+  });
+  if (!perfil) throw new NotFoundError("Influencer no encontrado en la campaña");
+
+  if (perfil.status !== "REJECTED") {
+    throw new ValidationError("Este influencer no está rechazado");
+  }
+
+  if (
+    perfil.campaign.status === "COMPLETED" ||
+    perfil.campaign.status === "CANCELLED"
+  ) {
+    throw new ValidationError(
+      "La campaña ya está cerrada: no se puede cambiar quién participó en ella"
+    );
+  }
+
+  const actualizado = await prisma.campaignProfile.update({
+    where: { id: campaignProfileId },
+    data: {
+      status: "PENDING",
+      rejectionReason: null,
+      reviewedAt: null,
+      // El rechazo del cliente lo habia retirado al activar la campana.
+      participacion: "ACTIVO",
+      origenRetiro: null,
+      motivoRetiro: null,
+      retiradoEn: null,
+    },
+    select: { id: true, status: true, participacion: true },
+  });
+
+  return {
+    ...actualizado,
+    campana: perfil.campaign,
+    influencer: perfil.profile,
+    /** Por que lo habia rechazado el cliente. Se pierde al limpiarlo. */
+    motivoAnterior: perfil.rejectionReason,
+  };
+}

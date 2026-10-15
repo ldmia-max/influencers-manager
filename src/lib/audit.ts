@@ -93,6 +93,10 @@ export const ACCIONES = {
   /// deja rastro igual que el margen.
   influencerRetirado: "campaign.influencer_withdrawn",
   influencerReactivado: "campaign.influencer_reinstated",
+  /// Deshacer un rechazo del cliente. Mercadeo devuelve a la propuesta a
+  /// alguien que el cliente habia descartado, asi que queda constancia
+  /// de quien lo hizo y de por que lo habia rechazado.
+  rechazoDeshecho: "campaign.rejection_undone",
   influencerAnadido: "campaign.influencer_added",
   /// Cifras que ningun scraper lee —alcance, compartidos y reposteos—
   /// escritas a mano sobre una publicacion. Quedan sin fuente que las

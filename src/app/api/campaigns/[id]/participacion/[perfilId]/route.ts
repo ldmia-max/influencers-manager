@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import {
   retirarInfluencer,
   reactivarInfluencer,
+  devolverInfluencerRechazado,
 } from "@/data-access/entregas";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { exigirPermiso } from "@/lib/api-guard";
@@ -63,6 +64,32 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
       revalidateTag("campaigns", "hours");
       return NextResponse.json(resultado);
+    }
+
+    if (body.accion === "devolver-rechazado") {
+      const r = await devolverInfluencerRechazado(perfilId);
+
+      await auditar({
+        action: ACCIONES.rechazoDeshecho,
+        entity: "CampaignProfile",
+        entityId: perfilId,
+        actorType: "USER",
+        actorId: sesion.userId,
+        actorEmail: sesion.email,
+        summary:
+          `Devolvió a ${r.influencer.name} a "${r.campana.name}" pese al rechazo` +
+          ` del cliente; queda pendiente de aprobación`,
+        metadata: {
+          campanaId: r.campana.id,
+          influencerId: r.influencer.id,
+          estadoCampana: r.campana.status,
+          motivoDelRechazo: r.motivoAnterior,
+        },
+        req,
+      });
+
+      revalidateTag("campaigns", "hours");
+      return NextResponse.json(r);
     }
 
     const resultado = await reactivarInfluencer(perfilId);

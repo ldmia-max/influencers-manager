@@ -41,11 +41,18 @@ export function RetirarInfluencer({
   perfilId,
   nombre,
   retirado,
+  rechazado = false,
 }: {
   campaignId: string;
   perfilId: string;
   nombre: string;
   retirado: boolean;
+  /**
+   * El cliente lo rechazo. Manda sobre `retirado`, porque al activar la
+   * campana a un rechazado se le retira solo: devolverlo tiene que
+   * deshacer las dos cosas, y dos botones para lo mismo confundirian.
+   */
+  rechazado?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [origen, setOrigen] = useState("");
@@ -64,6 +71,37 @@ export function RetirarInfluencer({
       setOcupado(false);
     }
   };
+
+  if (rechazado) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={ocupado}
+          onClick={() =>
+            ejecutar(() =>
+              cambiarParticipacion(campaignId, perfilId, {
+                accion: "devolver-rechazado",
+              })
+            )
+          }
+        >
+          {ocupado ? (
+            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserPlus className="mr-2 h-3.5 w-3.5" />
+          )}
+          Devolver a la campaña
+        </Button>
+        <p className="max-w-[16rem] text-right text-[11px] text-gray-500">
+          Vuelve como pendiente: el cliente lo rechazó y solo él —o la
+          agencia en su nombre— puede volver a aprobarlo.
+        </p>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+    );
+  }
 
   if (retirado) {
     return (

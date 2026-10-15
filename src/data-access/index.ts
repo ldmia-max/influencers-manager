@@ -146,6 +146,7 @@ export {
   fijarFechaLimiteDeCampana,
   retirarInfluencer,
   reactivarInfluencer,
+  devolverInfluencerRechazado,
   entregasPendientesDeCampana,
   formatosHistoricosDeInfluencer,
 } from "./entregas";

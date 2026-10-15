@@ -90,7 +90,9 @@ export function fijarFechaLimite(
 
 export type AccionParticipacion =
   | { accion: "retirar"; origen: "INFLUENCER" | "CLIENTE" | "AGENCIA"; motivo?: string | null }
-  | { accion: "reactivar" };
+  | { accion: "reactivar" }
+  /** Deshacer un rechazo del cliente: el influencer vuelve a pendiente. */
+  | { accion: "devolver-rechazado" };
 
 export function cambiarParticipacion(
   campaignId: string,
