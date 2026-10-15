@@ -29,6 +29,11 @@ export async function POST(req: Request) {
       publicadoEn: body.publicadoEn ?? null,
       notas: body.notas ?? null,
       vistasReportadas: body.vistasReportadas ?? null,
+      // Se quedaba fuera: el navegador las mandaba, el esquema las
+      // validaba y aqui se perdian, asi que una historia se registraba
+      // con sus vistas y sin sus interacciones. Solo aparecian al
+      // editarla despues, que es cuando pasan por otra ruta.
+      interaccionesReportadas: body.interaccionesReportadas ?? null,
       serviceTypeId: body.serviceTypeId ?? null,
       esExtra: body.esExtra ?? false,
       usuarioId: sesion.userId,
