@@ -41,6 +41,7 @@ import {
   type Rol,
 } from "@/lib/permissions";
 import { EditarMargen } from "@/components/campaigns/editar-margen";
+import { EditarPrecioFormato } from "@/components/campaigns/editar-precio-formato";
 import {
   PrevisionCampana,
   type FilaPrevision,
@@ -395,6 +396,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // o este ya en marcha. En Revision no: el cliente esta mirando
   // justamente esa lista. En Cerrada o Cancelada tampoco, que son
   // terminales.
+  // Repreciar un formato: mientras la campana no haya terminado y el
+  // creador siga contratado. Lo comprueba ademas el servidor; aqui solo
+  // se decide si se pinta el lapiz.
+  const puedeRepreciar =
+    puede(rol, "campanas", "actualizar") &&
+    campaign.status !== "COMPLETED" &&
+    campaign.status !== "CANCELLED";
+
   const puedeAnadirInfluencers =
     campaign.status === "ACTIVE" ||
     campaign.status === "DRAFT" ||
@@ -891,7 +900,35 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                                         {cs.quantity}
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        ${formatNumber(price.toFixed(0))}
+                                        <span className="inline-flex items-center justify-end gap-1">
+                                          ${formatNumber(price.toFixed(0))}
+                                          {/* Repreciar aqui y no en el
+                                              editor: el editor esta
+                                              cerrado con la campana en
+                                              marcha, y es justo entonces
+                                              cuando se renegocia un
+                                              importe. */}
+                                          {puedeRepreciar && (
+                                            <EditarPrecioFormato
+                                              campaignId={id}
+                                              servicioId={cs.id}
+                                              nombre={
+                                                cs.esCombo
+                                                  ? "el combo"
+                                                  : (cs.profileService
+                                                      ?.serviceType
+                                                      .displayName ?? "el formato")
+                                              }
+                                              basePriceActual={basePrice}
+                                              cantidad={cs.quantity}
+                                              markup={campaign.markupPercentage}
+                                              yaAprobado={
+                                                cp.status === "APPROVED" &&
+                                                cs.isApproved
+                                              }
+                                            />
+                                          )}
+                                        </span>
                                       </TableCell>
                                       <TableCell className="text-right font-medium">
                                         ${formatNumber(subtotal.toFixed(0))}

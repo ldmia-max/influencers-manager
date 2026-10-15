@@ -133,6 +133,7 @@ export {
   agregarInfluencerACampana,
   aprobarInfluencerDeCampana,
   influencersPendientesDeAprobacion,
+  cambiarPrecioDeFormato,
 } from "./campaign-profiles";
 
 // --- Entregas de contenido y participacion ---

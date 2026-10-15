@@ -103,6 +103,10 @@ export const ACCIONES = {
   abonoEliminado: "pago.abono_eliminado",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
+  /// Repreciar un formato ya contratado. Es dinero acordado que
+  /// cambia despues de acordarse: el cliente lo aprobo a un importe y
+  /// pasa a otro, y contabilidad le pagara al influencer por el nuevo.
+  formatoRepreciado: "campaign.service_price_changed",
   /// Quitar un tanteo que el cliente nunca vio. Es el unico borrado real
   /// de un influencer en una campana, asi que se registra aqui lo que
   /// deja de existir en la tabla.

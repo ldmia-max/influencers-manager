@@ -128,3 +128,16 @@ export const agregarInfluencerSchema = z.object({
     )
     .min(1, "Selecciona al menos una plataforma"),
 });
+
+/**
+ * Nuevo precio base de un formato ya contratado.
+ *
+ * Es la base —lo que cobra el influencer—, no el precio del cliente:
+ * de la base sale el otro aplicando el margen de la campaña, y es la
+ * base la que contabilidad acaba pagando.
+ */
+export const precioDeFormatoSchema = z.object({
+  basePrice: z.coerce
+    .number({ message: "Escribe un número" })
+    .positive("El precio debe ser mayor que cero"),
+});

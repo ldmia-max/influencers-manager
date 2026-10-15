@@ -472,3 +472,114 @@ export async function influencersPendientesDeAprobacion(campaignId: string) {
     select: { id: true, profile: { select: { id: true, name: true } } },
   });
 }
+
+/**
+ * Cambia el precio base de UN formato ya contratado.
+ *
+ * La campana activa no se edita a proposito: el editor dejaria cambiar
+ * precios que el cliente aprobo o quitar a quien ya entrego. Pero el
+ * precio de un formato concreto si se renegocia en la vida real —el
+ * cliente comenta el importe, o el influencer sube su tarifa— y hasta
+ * ahora la unica salida era cancelar la campana y rehacerla.
+ *
+ * Asi que esta es la excepcion, y es estrecha a proposito: toca un
+ * unico `basePrice` y nada mas. No mueve cantidades, ni formatos, ni a
+ * quien esta contratado, que es lo que hace peligroso al editor.
+ *
+ * Se toca la BASE, no el precio del cliente: la base es lo que cobra el
+ * influencer —y lo que contabilidad le paga— y de ella sale el precio
+ * del cliente aplicando el margen de la campana. Fijar el del cliente
+ * dejaria la base sin definir, que es justo el numero que importa para
+ * pagar.
+ *
+ * Devuelve lo que hacia falta para auditarlo: de cuanto a cuanto, de
+ * quien, y si el cliente ya lo habia aprobado, que es la diferencia
+ * entre ajustar un borrador y cambiar algo ya acordado.
+ */
+export async function cambiarPrecioDeFormato(
+  campaignId: string,
+  servicioId: string,
+  nuevoPrecio: number
+) {
+  if (!Number.isFinite(nuevoPrecio) || nuevoPrecio <= 0) {
+    throw new ValidationError("El precio debe ser un número mayor que cero");
+  }
+
+  const servicio = await prisma.campaignService.findUnique({
+    where: { id: servicioId },
+    select: {
+      id: true,
+      basePrice: true,
+      quantity: true,
+      esCombo: true,
+      comboDescripcion: true,
+      isApproved: true,
+      profileService: {
+        select: { serviceType: { select: { displayName: true } } },
+      },
+      campaignProfilePlatform: {
+        select: {
+          socialAccount: { select: { platform: { select: { displayName: true } } } },
+          campaignProfile: {
+            select: {
+              status: true,
+              participacion: true,
+              profile: { select: { name: true } },
+              campaign: {
+                select: { id: true, name: true, status: true, markupPercentage: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!servicio) throw new NotFoundError("Formato no encontrado");
+
+  const cp = servicio.campaignProfilePlatform.campaignProfile;
+
+  // Que el formato sea de ESTA campana, y no de otra cuyo id alguien
+  // adivino: cambiar el precio es cambiar dinero contratado.
+  if (cp.campaign.id !== campaignId) {
+    throw new ValidationError("Ese formato no pertenece a esta campaña");
+  }
+
+  // Una campana cerrada o cancelada es historia: lo que costo ya se
+  // facturo o se dejo de hacer, y repreciarla ahora descuadraria lo que
+  // contabilidad tiene por pagado.
+  if (cp.campaign.status === "COMPLETED" || cp.campaign.status === "CANCELLED") {
+    throw new ValidationError(
+      "Esta campaña ya terminó: su precio es historia y no se puede cambiar."
+    );
+  }
+
+  // A un retirado no se le renegocia nada: dejo de estar contratado y
+  // su importe ya no cuenta en la campana.
+  if (cp.participacion !== "ACTIVO") {
+    throw new ValidationError(
+      "Este influencer está retirado de la campaña: su precio ya no cuenta."
+    );
+  }
+
+  const anterior = Number(servicio.basePrice);
+
+  await prisma.campaignService.update({
+    where: { id: servicioId },
+    data: { basePrice: nuevoPrecio },
+  });
+
+  return {
+    campana: cp.campaign,
+    influencer: cp.profile.name,
+    red: servicio.campaignProfilePlatform.socialAccount.platform.displayName,
+    formato: servicio.esCombo
+      ? `Combo${servicio.comboDescripcion ? ` (${servicio.comboDescripcion})` : ""}`
+      : (servicio.profileService?.serviceType.displayName ?? "Formato"),
+    cantidad: servicio.quantity,
+    anterior,
+    nuevo: nuevoPrecio,
+    /** El cliente ya lo habia aprobado: no es ajustar un borrador. */
+    yaAprobado: cp.status === "APPROVED" && servicio.isApproved,
+  };
+}

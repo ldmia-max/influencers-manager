@@ -9,6 +9,9 @@ interface PriceInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Para poder colgarle una <Label htmlFor>. */
+  id?: string;
+  disabled?: boolean;
 }
 
 export function PriceInput({
@@ -16,6 +19,8 @@ export function PriceInput({
   onChange,
   placeholder = "0",
   className,
+  id,
+  disabled,
 }: PriceInputProps) {
   const [displayValue, setDisplayValue] = useState(() => formatNumber(value));
 
@@ -46,6 +51,8 @@ export function PriceInput({
       onChange={handleChange}
       placeholder={placeholder}
       className={className}
+      id={id}
+      disabled={disabled}
     />
   );
 }
