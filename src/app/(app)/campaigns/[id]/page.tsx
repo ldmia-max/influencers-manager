@@ -941,7 +941,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   {
     pestanas.push({
       valor: "entregas",
-      etiqueta: "Entregas de contenido",
+      etiqueta: "Contenido",
       contenido: (
         <EntregasCampana
           campaignId={id}

@@ -326,6 +326,76 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
     ].filter((e) => !quitadas.includes(e.id));
   };
 
+  /** Si una pieza es contenido de mas, contando lo recien editado. */
+  const esExtraLa = (e: EntregaVista) => extrasGuardados[e.id] ?? e.esExtra;
+
+  /**
+   * Las piezas de un formato que cuentan para cumplirlo.
+   *
+   * Las extras se ven en la tabla —se publicaron— pero no cumplen nada:
+   * son contenido fuera de lo contratado. Contarlas dejaria cerrar la
+   * campana con el trabajo encargado sin hacer.
+   */
+  const entregasQueCuentan = (formato: FormatoVista) =>
+    entregasDe(formato).filter((e) => !esExtraLa(e));
+
+  /**
+   * A que formato contratado se engancha una pieza nueva.
+   *
+   * Toda entrega cuelga de un CampaignService: de ahi salen el plazo, el
+   * "X de Y" y el gate que impide cerrar la campana. Con una sola tabla
+   * por creador ya no lo elige la persona escribiendo bajo un recuadro,
+   * asi que hay que deducirlo de la red y el formato que senala.
+   *
+   * Se prefiere lo mas parecido a lo contratado y que ademas siga
+   * faltando, para que el contador siga diciendo algo: si alguien tiene
+   * dos Reels contratados y entrega el primero, el segundo va al que
+   * queda libre y no al que ya estaba cubierto.
+   *
+   * Si en esa red no hay nada contratado, la pieza entra igual —se
+   * publico y hay que poder registrarla— pero marcada como extra y
+   * colgada del primer formato del creador. Asi no infla el "X de Y" de
+   * un formato que nadie encargo en esa red.
+   */
+  const formatoDestino = (
+    perfil: PerfilVista,
+    redId: string,
+    tipoId: string
+  ): { formato: FormatoVista; forzarExtra: boolean } | null => {
+    const falta = (f: FormatoVista) => {
+      const { entregados, esperados } = estadoDeFormato(
+        {
+          quantity: f.quantity,
+          esCombo: f.esCombo,
+          fechaLimite: f.fechaLimite,
+          entregas: entregasQueCuentan(f).map((e) => ({
+            entregadoEn: e.entregadoEn,
+          })),
+        },
+        ahora
+      );
+      return entregados < esperados;
+    };
+
+    const enEsaRed = perfil.plataformas
+      .filter((pl) => pl.platformId === redId)
+      .flatMap((pl) => pl.formatos);
+
+    const mismoTipo = enEsaRed.filter((f) => f.formatoContratadoId === tipoId);
+    const candidato =
+      mismoTipo.find(falta) ??
+      mismoTipo[0] ??
+      // Un combo acepta cualquier cosa: su contenido es texto libre.
+      enEsaRed.filter((f) => f.esCombo).find(falta) ??
+      enEsaRed.find(falta) ??
+      enEsaRed[0];
+
+    if (candidato) return { formato: candidato, forzarExtra: false };
+
+    const cualquiera = perfil.plataformas.flatMap((pl) => pl.formatos)[0];
+    return cualquiera ? { formato: cualquiera, forzarExtra: true } : null;
+  };
+
   /**
    * Se sigue pidiendo al servidor: cuando el refresco si llega, trae lo
    * que la copia local no sabe —quien registro la entrega, las metricas
@@ -351,7 +421,9 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
     .flatMap((p) => p.plataformas.flatMap((pl) => pl.formatos))
     .map((f) => ({
       ...f,
-      entregas: entregasDe(f).map((e) => ({ entregadoEn: e.entregadoEn })),
+      entregas: entregasQueCuentan(f).map((e) => ({
+        entregadoEn: e.entregadoEn,
+      })),
     }));
   const resumen = resumirEntregas(todosLosFormatos, ahora);
 
@@ -360,7 +432,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2 text-base">
           <Link2 className="h-4 w-4" />
-          Entregas de contenido
+          Contenido
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="secondary" className="bg-gray-100 text-gray-700">
@@ -415,11 +487,59 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
 
         {perfiles.map((perfil) => {
           const retirado = perfil.participacion === "RETIRADO";
+
+          // Todas las piezas del creador en una sola lista, vengan del
+          // formato contratado que vengan. Cada una lleva el suyo al
+          // lado: de ahi salen el nombre de respaldo y la red cuando la
+          // entrega no los senala.
+          const piezas = perfil.plataformas.flatMap((plataforma) =>
+            plataforma.formatos.flatMap((formato) =>
+              entregasDe(formato).map((entrega) => ({
+                entrega,
+                formato,
+                plataforma,
+              }))
+            )
+          );
+
+          const formatosDelPerfil = perfil.plataformas.flatMap((pl) =>
+            pl.formatos.map((formato) => ({ formato, plataforma: pl }))
+          );
+          const resumenPerfil = resumirEntregas(
+            formatosDelPerfil.map(({ formato }) => ({
+              ...formato,
+              entregas: entregasQueCuentan(formato).map((e) => ({
+                entregadoEn: e.entregadoEn,
+              })),
+            })),
+            ahora
+          );
+
+          // El alta es una sola por creador, no una por formato: por eso
+          // su estado cuelga del perfil y no del formato contratado.
+          const redId =
+            redElegida[perfil.id] ??
+            perfil.plataformas[0]?.platformId ??
+            perfil.redesDelPerfil[0]?.platformId ??
+            "";
+          const red =
+            perfil.redesDelPerfil.find((r) => r.platformId === redId) ?? null;
+          const catalogo = red?.formatos ?? [];
+          const nombreRed = red?.nombre ?? "";
+          const tipoId = tipoElegido[perfil.id] ?? "";
+          const tipoNuevo = catalogo.find((f) => f.id === tipoId);
+          const nuevaEsEfimera = tipoNuevo?.esEfimero ?? false;
+          const mostrarAlta =
+            puedeEditar && (piezas.length === 0 || anadiendo[perfil.id]);
+          const destino = formatoDestino(perfil, redId, tipoId);
+
           return (
             <div
               key={perfil.id}
               className={`rounded-xl border p-4 ${
-                retirado ? "border-dashed border-gray-300 bg-gray-50" : "border-gray-200"
+                retirado
+                  ? "border-dashed border-gray-300 bg-gray-50"
+                  : "border-gray-200"
               }`}
             >
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -435,16 +555,33 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                     <p className="mt-0.5 text-xs text-gray-500">
                       Retirado
                       {perfil.retiradoEn && ` el ${fechaCorta(perfil.retiradoEn)}`}
-                      {perfil.origenRetiro && ` · ${ORIGEN_LEGIBLE[perfil.origenRetiro]}`}
+                      {perfil.origenRetiro &&
+                        ` · ${ORIGEN_LEGIBLE[perfil.origenRetiro]}`}
                       {perfil.motivoRetiro && ` · ${perfil.motivoRetiro}`}
                     </p>
                   )}
                 </div>
 
-                {/* Retirar y devolver viven en Perfiles y formatos: son
-                    decisiones sobre a quien se tiene contratado, no sobre
-                    el contenido ya publicado, que es de lo que trata
-                    esta seccion. */}
+                {!retirado && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                      {resumenPerfil.completos} de {resumenPerfil.total} formatos
+                    </Badge>
+                    {puedeEditar && !mostrarAlta && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() =>
+                          setAnadiendo((a) => ({ ...a, [perfil.id]: true }))
+                        }
+                      >
+                        <Plus className="mr-1 h-3.5 w-3.5" />
+                        Añadir contenido
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {retirado ? (
@@ -453,898 +590,839 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {perfil.plataformas.map((plataforma) =>
-                    plataforma.formatos.map((formato) => {
-                      const estado = estadoDeFormato(
-                        {
-                          quantity: formato.quantity,
-                          esCombo: formato.esCombo,
-                          fechaLimite: formato.fechaLimite,
-                          entregas: entregasDe(formato).map((e) => ({
-                            entregadoEn: e.entregadoEn,
-                          })),
-                        },
-                        ahora
-                      );
-
-                      // Red y formato de la proxima pieza. Abren con lo
-                      // contratado, que es lo normal; cambiar la red
-                      // recarga los formatos de esa otra y manda la
-                      // entrega a lo que alli este contratado.
-                      const redId =
-                        redElegida[formato.id] ?? plataforma.platformId;
-                      const red =
-                        perfil.redesDelPerfil.find((r) => r.platformId === redId) ??
-                        null;
-                      const catalogo = red?.formatos ?? plataforma.formatosDisponibles;
-                      const nombreRed = red?.nombre ?? plataforma.plataforma;
-                      const tipoId =
-                        tipoElegido[formato.id] ??
-                        (redId === plataforma.platformId
-                          ? formato.formatoContratadoId
-                          : null) ??
-                        "";
-                      const tipoNuevo = catalogo.find((f) => f.id === tipoId);
-                      // De lo señalado depende qué se pide: un enlace, o
-                      // la fecha de emisión y las vistas.
-                      const nuevaEsEfimera = tipoNuevo?.esEfimero ?? false;
-                      const mostrarAlta =
-                        puedeEditar &&
-                        (entregasDe(formato).length === 0 || anadiendo[formato.id]);
-
-                      return (
-                        <div
-                          key={formato.id}
-                          className="rounded-lg bg-marca/5 p-3"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium text-gray-800">
-                                {formato.nombre}
-                              </span>
-                              <Badge
-                                variant="secondary"
-                                className={COLOR_ENTREGA[estado.estado]}
-                              >
-                                {ETIQUETA_ENTREGA[estado.estado]}
-                              </Badge>
-                              {formato.esEfimero && (
+                  {/* Lo contratado, con su plazo. Ya no es un recuadro por
+                      formato con su propia tabla debajo, pero el plazo
+                      sigue siendo de cada formato y aqui es donde se fija. */}
+                  {formatosDelPerfil.length > 0 && (
+                    <div className="rounded-lg bg-marca/5 p-3">
+                      <p className="mb-2 text-xs font-medium text-gray-700">
+                        Formatos contratados
+                      </p>
+                      <div className="space-y-1.5">
+                        {formatosDelPerfil.map(({ formato }) => {
+                          const estado = estadoDeFormato(
+                            {
+                              quantity: formato.quantity,
+                              esCombo: formato.esCombo,
+                              fechaLimite: formato.fechaLimite,
+                              entregas: entregasQueCuentan(formato).map((e) => ({
+                                entregadoEn: e.entregadoEn,
+                              })),
+                            },
+                            ahora
+                          );
+                          return (
+                            <div
+                              key={formato.id}
+                              className="flex flex-wrap items-center justify-between gap-2"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-medium text-gray-800">
+                                  {formato.nombre}
+                                </span>
                                 <Badge
                                   variant="secondary"
-                                  className="bg-sky-100 text-sky-800"
+                                  className={COLOR_ENTREGA[estado.estado]}
                                 >
-                                  Sin enlace
+                                  {ETIQUETA_ENTREGA[estado.estado]}
                                 </Badge>
-                              )}
-                              <span className="text-xs text-gray-500">
-                                {estado.entregados} de {estado.esperados}
-                              </span>
-                            </div>
-
-                            {puedeEditar && (
-                              // El campo iba suelto, sin decir que fecha
-                              // era: al lado del formulario de registro se
-                              // confundia con la fecha de la entrega que se
-                              // esta anotando, cuando es el plazo pactado.
-                              <div className="flex items-center gap-1">
-                                <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
-                                <Label
-                                  htmlFor={`fecha-${formato.id}`}
-                                  className="text-xs font-normal text-gray-500"
-                                >
-                                  Fecha límite de entrega de contenido
-                                </Label>
-                                <Input
-                                  id={`fecha-${formato.id}`}
-                                  type="date"
-                                  defaultValue={soloFecha(formato.fechaLimite)}
-                                  className="h-7 w-36 text-xs"
-                                  onChange={(e) =>
-                                    conError(`fecha-${formato.id}`, () =>
-                                      fijarFechaLimite(campaignId, formato.id, {
-                                        fechaLimite: e.target.value
-                                          ? new Date(e.target.value).toISOString()
-                                          : null,
-                                      })
-                                    )
-                                  }
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {formato.esCombo && formato.comboDescripcion && (
-                            <p className="mt-1 text-xs italic text-gray-500">
-                              Incluye: {formato.comboDescripcion}
-                            </p>
-                          )}
-
-                          {/* El contenido entregado, en tabla.
-                              Cada dato bajo su titulo, y la red a la vista:
-                              era lo unico que no se decia, y por eso un link
-                              de TikTok pegado aqui pasaba por contenido de
-                              Instagram hasta que Impacto del contenido lo
-                              contaba mal. */}
-                          <div className="mt-2 overflow-x-auto">
-                            <table className="w-full min-w-[52rem] text-xs">
-                              <thead>
-                                <tr className="text-left text-gray-500">
-                                  <th className="px-2 py-1 font-medium">Red</th>
-                                  <th className="px-2 py-1 font-medium">Formato</th>
-                                  <th className="px-2 py-1 font-medium">Publicación</th>
-                                  {/* Contenido de mas, fuera de lo
-                                      contratado. Por ahora solo se dice:
-                                      no cambia cuantas piezas se esperan
-                                      ni cuando puede cerrarse la campana. */}
-                                  <th className="px-2 py-1 text-center font-medium">
-                                    Extra
-                                  </th>
-                                  <th className="px-2 py-1 font-medium">Descripción</th>
-                                  {puedeEditar && (
-                                    <th className="w-24 px-2 py-1 text-right font-medium">
-                                      Acciones
-                                    </th>
-                                  )}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {entregasDe(formato).map((entrega) => {
-                                  // Lo efímero se decide por PIEZA, no por el
-                                  // formato contratado: un combo puede llevar
-                                  // un Reel con enlace y una Story sin él.
-                                  const nombreFormato =
-                                    formatosGuardados[entrega.id]?.nombre ??
-                                    entrega.formato?.nombre ??
-                                    formato.nombre;
-                                  const piezaEfimera =
-                                    formatosGuardados[entrega.id]?.esEfimero ??
-                                    entrega.formato?.esEfimero ??
-                                    formato.esEfimero;
-                                  const enlace =
-                                    urlsGuardadas[entrega.id] ?? entrega.url;
-                                  const nota =
-                                    notasGuardadas[entrega.id] ?? entrega.notas ?? "";
-
-                                  if (editandoFila === entrega.id) {
-                                    const catalogoFila =
-                                      perfil.redesDelPerfil.find(
-                                        (r) => r.platformId === borrador.redId
-                                      )?.formatos ?? plataforma.formatosDisponibles;
-                                    const tipoFila = catalogoFila.find(
-                                      (f) => f.id === borrador.tipoId
-                                    );
-                                    return (
-                                      <tr
-                                        key={entrega.id}
-                                        className="border-t border-gray-200/70 bg-white/70"
-                                      >
-                                        <td className="px-2 py-1">
-                                          <SelectorRed
-                                            perfil={perfil}
-                                            valor={borrador.redId}
-                                            onCambio={(v) =>
-                                              setBorrador((b) => ({
-                                                ...b,
-                                                redId: v,
-                                                tipoId: "",
-                                              }))
-                                            }
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1">
-                                          <SelectorFormato
-                                            formatos={catalogoFila}
-                                            valor={borrador.tipoId}
-                                            onCambio={(v) =>
-                                              setBorrador((b) => ({ ...b, tipoId: v }))
-                                            }
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1">
-                                          {tipoFila?.esEfimero ? (
-                                            <span className="text-[11px] text-gray-500">
-                                              Sin enlace: la sostienen su fecha de
-                                              emisión y quien la confirmó.
-                                            </span>
-                                          ) : (
-                                            <>
-                                              <Input
-                                                autoFocus
-                                                placeholder="https://… link de la publicación"
-                                                value={borrador.url}
-                                                onChange={(e) =>
-                                                  setBorrador((b) => ({
-                                                    ...b,
-                                                    url: e.target.value,
-                                                  }))
-                                                }
-                                                className="h-7 min-w-56 text-xs"
-                                              />
-                                              {(() => {
-                                                const aviso = avisoDeRed(
-                                                  borrador.url,
-                                                  perfil.redesDelPerfil.find(
-                                                    (r) =>
-                                                      r.platformId === borrador.redId
-                                                  )?.nombre
-                                                );
-                                                return aviso ? (
-                                                  <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
-                                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                                    {aviso}
-                                                  </p>
-                                                ) : null;
-                                              })()}
-                                            </>
-                                          )}
-                                        </td>
-                                        <td className="px-2 py-1 text-center">
-                                          <Checkbox
-                                            checked={borrador.esExtra}
-                                            onCheckedChange={(v) =>
-                                              setBorrador((b) => ({
-                                                ...b,
-                                                esExtra: v === true,
-                                              }))
-                                            }
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1">
-                                          <Input
-                                            placeholder="Descripción u observaciones"
-                                            value={borrador.notas}
-                                            onChange={(e) =>
-                                              setBorrador((b) => ({
-                                                ...b,
-                                                notas: e.target.value,
-                                              }))
-                                            }
-                                            maxLength={500}
-                                            className="h-7 min-w-40 text-xs"
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1">
-                                          <div className="flex items-center justify-end gap-1">
-                                            <button
-                                              type="button"
-                                              title="Guardar"
-                                              className="text-violet-700 hover:text-violet-900 disabled:opacity-40"
-                                              disabled={
-                                                ocupado === URL_OCUPADO(entrega.id) ||
-                                                !borrador.tipoId ||
-                                                (!tipoFila?.esEfimero &&
-                                                  !borrador.url.trim())
-                                              }
-                                              onClick={() =>
-                                                conError(
-                                                  URL_OCUPADO(entrega.id),
-                                                  async () => {
-                                                    const guardada =
-                                                      await actualizarEntrega(
-                                                        campaignId,
-                                                        entrega.id,
-                                                        {
-                                                          ...(tipoFila?.esEfimero
-                                                            ? {}
-                                                            : {
-                                                                url: borrador.url.trim(),
-                                                              }),
-                                                          notas:
-                                                            borrador.notas.trim() || null,
-                                                          serviceTypeId: borrador.tipoId,
-                                                          esExtra: borrador.esExtra,
-                                                        }
-                                                      );
-                                                    setUrlsGuardadas((u) => ({
-                                                      ...u,
-                                                      [entrega.id]: guardada.url,
-                                                    }));
-                                                    setExtrasGuardados((x) => ({
-                                                      ...x,
-                                                      [entrega.id]: borrador.esExtra,
-                                                    }));
-                                                    setRedesGuardadas((r) => ({
-                                                      ...r,
-                                                      [entrega.id]:
-                                                        perfil.redesDelPerfil.find(
-                                                          (x) =>
-                                                            x.platformId ===
-                                                            borrador.redId
-                                                        )?.nombre ?? entrega.red,
-                                                    }));
-                                                    setNotasGuardadas((n) => ({
-                                                      ...n,
-                                                      [entrega.id]: borrador.notas.trim(),
-                                                    }));
-                                                    setFormatosGuardados((f) => ({
-                                                      ...f,
-                                                      [entrega.id]: {
-                                                        nombre: tipoFila!.displayName,
-                                                        esEfimero: tipoFila!.esEfimero,
-                                                      },
-                                                    }));
-                                                    setEditandoFila(null);
-                                                  }
-                                                )
-                                              }
-                                            >
-                                              {ocupado === URL_OCUPADO(entrega.id) ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                              ) : (
-                                                <Check className="h-3.5 w-3.5" />
-                                              )}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              title="Cancelar"
-                                              className="text-gray-400 hover:text-gray-700"
-                                              onClick={() => setEditandoFila(null)}
-                                            >
-                                              <X className="h-3.5 w-3.5" />
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  }
-
-                                  return (
-                                    <tr
-                                      key={entrega.id}
-                                      className="border-t border-gray-200/70 text-gray-600 odd:bg-white/50"
-                                    >
-                                      <td className="px-2 py-1 whitespace-nowrap text-gray-500">
-                                        {redesGuardadas[entrega.id] ?? entrega.red}
-                                      </td>
-                                      <td className="px-2 py-1 whitespace-nowrap">
-                                        <span className="rounded bg-white px-1.5 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
-                                          {nombreFormato}
-                                        </span>
-                                      </td>
-                                      <td className="px-2 py-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          {enlace ? (
-                                            <a
-                                              href={enlace}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex min-w-0 max-w-[18rem] items-center gap-1 truncate text-violet-700 hover:underline"
-                                            >
-                                              <ExternalLink className="h-3 w-3 shrink-0" />
-                                              <span className="truncate">{enlace}</span>
-                                            </a>
-                                          ) : (
-                                            // Sin enlace, lo que respalda la
-                                            // entrega es quien la confirmó.
-                                            <span className="flex items-center gap-1 text-gray-700">
-                                              <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" />
-                                              Emitido
-                                              {entrega.publicadoEn
-                                                ? ` el ${fechaCorta(entrega.publicadoEn)}`
-                                                : ""}
-                                              {entrega.registradoPor
-                                                ? ` · confirmado por ${entrega.registradoPor.name}`
-                                                : ""}
-                                            </span>
-                                          )}
-
-                                          {/* Vistas que reportó el creador.
-                                              Solo en los efímeros: en el resto
-                                              las lee Apify y escribirlas a mano
-                                              crearía dos verdades. */}
-                                          {piezaEfimera && (
-                                            <span className="flex items-center gap-1 text-gray-500">
-                                              <Eye className="h-3 w-3 text-gray-400" />
-                                              {(vistasAnotadas[entrega.id] ??
-                                                entrega.metricas[0]?.vistas) != null ? (
-                                                <span className="text-gray-700">
-                                                  {formatNumber(
-                                                    vistasAnotadas[entrega.id] ??
-                                                      entrega.metricas[0]!.vistas!
-                                                  )}
-                                                </span>
-                                              ) : (
-                                                <span className="text-gray-400">
-                                                  sin vistas
-                                                </span>
-                                              )}
-                                              <Heart className="ml-1 h-3 w-3 text-gray-400" />
-                                              {(interAnotadas[entrega.id] ??
-                                                entrega.metricas[0]?.interacciones) !=
-                                              null ? (
-                                                <span className="text-gray-700">
-                                                  {formatNumber(
-                                                    interAnotadas[entrega.id] ??
-                                                      entrega.metricas[0]!.interacciones!
-                                                  )}
-                                                </span>
-                                              ) : (
-                                                <span className="text-gray-400">
-                                                  sin interacciones
-                                                </span>
-                                              )}
-                                            </span>
-                                          )}
-
-                                          {piezaEfimera && puedeEditar && (
-                                            <span className="flex items-center gap-1">
-                                              <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="vistas"
-                                                value={vistasEntrega[entrega.id] ?? ""}
-                                                onChange={(e) =>
-                                                  setVistasEntrega((v) => ({
-                                                    ...v,
-                                                    [entrega.id]: e.target.value,
-                                                  }))
-                                                }
-                                                className="h-6 w-20 text-xs"
-                                              />
-                                              <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="interacc."
-                                                value={interEntrega[entrega.id] ?? ""}
-                                                onChange={(e) =>
-                                                  setInterEntrega((v) => ({
-                                                    ...v,
-                                                    [entrega.id]: e.target.value,
-                                                  }))
-                                                }
-                                                className="h-6 w-24 text-xs"
-                                              />
-                                              <button
-                                                type="button"
-                                                className="text-violet-700 hover:underline disabled:opacity-40"
-                                                disabled={
-                                                  ocupado === `cifras-${entrega.id}` ||
-                                                  (!(
-                                                    vistasEntrega[entrega.id] ?? ""
-                                                  ).trim() &&
-                                                    !(
-                                                      interEntrega[entrega.id] ?? ""
-                                                    ).trim())
-                                                }
-                                                onClick={() =>
-                                                  conError(
-                                                    `cifras-${entrega.id}`,
-                                                    async () => {
-                                                      const v = (
-                                                        vistasEntrega[entrega.id] ?? ""
-                                                      ).trim();
-                                                      const i = (
-                                                        interEntrega[entrega.id] ?? ""
-                                                      ).trim();
-                                                      await registrarCifras(
-                                                        campaignId,
-                                                        entrega.id,
-                                                        {
-                                                          vistas: v ? Number(v) : null,
-                                                          interacciones: i
-                                                            ? Number(i)
-                                                            : null,
-                                                        }
-                                                      );
-                                                      // Solo se pinta lo que se
-                                                      // acaba de anotar: lo otro
-                                                      // conserva su valor.
-                                                      if (v)
-                                                        setVistasAnotadas((a) => ({
-                                                          ...a,
-                                                          [entrega.id]: Number(v),
-                                                        }));
-                                                      if (i)
-                                                        setInterAnotadas((a) => ({
-                                                          ...a,
-                                                          [entrega.id]: Number(i),
-                                                        }));
-                                                      setVistasEntrega((x) => ({
-                                                        ...x,
-                                                        [entrega.id]: "",
-                                                      }));
-                                                      setInterEntrega((x) => ({
-                                                        ...x,
-                                                        [entrega.id]: "",
-                                                      }));
-                                                    }
-                                                  )
-                                                }
-                                              >
-                                                Guardar
-                                              </button>
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="px-2 py-1 text-center">
-                                        <Checkbox
-                                          checked={
-                                            extrasGuardados[entrega.id] ??
-                                            entrega.esExtra
-                                          }
-                                          disabled
-                                          aria-label="Entrega extra"
-                                        />
-                                      </td>
-                                      <td className="max-w-[16rem] px-2 py-1">
-                                        {nota ? (
-                                          <span className="line-clamp-2 text-gray-600">
-                                            {nota}
-                                          </span>
-                                        ) : (
-                                          <span className="text-gray-400">
-                                            Sin descripción
-                                          </span>
-                                        )}
-                                      </td>
-                                      {puedeEditar && (
-                                        <td className="px-2 py-1">
-                                          <div className="flex items-center justify-end gap-1">
-                                            {/* El lápiz edita la fila entera:
-                                                red, formato, enlace y
-                                                descripción. Antes la
-                                                descripción tenía su propio
-                                                editor y la red no se podía
-                                                tocar en absoluto. */}
-                                            <button
-                                              type="button"
-                                              title="Editar la entrega"
-                                              className="text-gray-400 hover:text-violet-700"
-                                              onClick={() => {
-                                                const platformId =
-                                                  entrega.platformId;
-                                                const cat =
-                                                  perfil.redesDelPerfil.find(
-                                                    (r) => r.platformId === platformId
-                                                  )?.formatos ??
-                                                  plataforma.formatosDisponibles;
-                                                setBorrador({
-                                                  redId: platformId,
-                                                  tipoId:
-                                                    cat.find(
-                                                      (f) =>
-                                                        f.displayName === nombreFormato
-                                                    )?.id ??
-                                                    formato.formatoContratadoId ??
-                                                    "",
-                                                  url: enlace ?? "",
-                                                  notas: nota,
-                                                  esExtra:
-                                                    extrasGuardados[entrega.id] ??
-                                                    entrega.esExtra,
-                                                });
-                                                setEditandoFila(entrega.id);
-                                              }}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              title="Eliminar la entrega"
-                                              className="text-gray-400 hover:text-red-600"
-                                              disabled={ocupado === entrega.id}
-                                              onClick={() =>
-                                                conError(entrega.id, async () => {
-                                                  await eliminarEntrega(
-                                                    campaignId,
-                                                    entrega.id
-                                                  );
-                                                  setQuitadas((q) => [...q, entrega.id]);
-                                                })
-                                              }
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                            {!anadiendo[formato.id] && (
-                                              <button
-                                                type="button"
-                                                title="Añadir otra entrega a este formato"
-                                                className="text-gray-400 hover:text-violet-700"
-                                                onClick={() =>
-                                                  setAnadiendo((a) => ({
-                                                    ...a,
-                                                    [formato.id]: true,
-                                                  }))
-                                                }
-                                              >
-                                                <Plus className="h-3.5 w-3.5" />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      )}
-                                    </tr>
-                                  );
-                                })}
-
-                                {mostrarAlta && (
-                                  <tr className="border-t border-gray-200/70 bg-white/70">
-                                    <td className="px-2 py-1">
-                                      <SelectorRed
-                                        perfil={perfil}
-                                        valor={redId}
-                                        onCambio={(v) => {
-                                          setRedElegida((r) => ({
-                                            ...r,
-                                            [formato.id]: v,
-                                          }));
-                                          // Los formatos son de la red: el
-                                          // que estuviera elegido ya no vale.
-                                          setTipoElegido((t) => ({
-                                            ...t,
-                                            [formato.id]: "",
-                                          }));
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="px-2 py-1">
-                                      <SelectorFormato
-                                        formatos={catalogo}
-                                        valor={tipoId}
-                                        onCambio={(v) =>
-                                          setTipoElegido((t) => ({
-                                            ...t,
-                                            [formato.id]: v,
-                                          }))
-                                        }
-                                      />
-                                    </td>
-                                    <td className="px-2 py-1">
-                                      {!tipoNuevo ? (
-                                        <span className="text-[11px] text-gray-500">
-                                          Elige el formato para registrar la entrega.
-                                        </span>
-                                      ) : nuevaEsEfimera ? (
-                                        // Stories y directos no dejan enlace:
-                                        // la entrega la sostienen la fecha de
-                                        // emisión y quien la confirma.
-                                        <div className="flex flex-wrap items-center gap-1">
-                                          <Input
-                                            type="date"
-                                            value={fechaEmision[formato.id] ?? ""}
-                                            onChange={(e) =>
-                                              setFechaEmision((v) => ({
-                                                ...v,
-                                                [formato.id]: e.target.value,
-                                              }))
-                                            }
-                                            className="h-7 w-36 text-xs"
-                                          />
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="Vistas"
-                                            value={vistasNuevas[formato.id] ?? ""}
-                                            onChange={(e) =>
-                                              setVistasNuevas((v) => ({
-                                                ...v,
-                                                [formato.id]: e.target.value,
-                                              }))
-                                            }
-                                            className="h-7 w-24 text-xs"
-                                          />
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="Interacc."
-                                            value={interNuevas[formato.id] ?? ""}
-                                            onChange={(e) =>
-                                              setInterNuevas((v) => ({
-                                                ...v,
-                                                [formato.id]: e.target.value,
-                                              }))
-                                            }
-                                            className="h-7 w-28 text-xs"
-                                          />
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <Input
-                                            placeholder="https://… link de la publicación"
-                                            value={nuevoLink[formato.id] ?? ""}
-                                            onChange={(e) =>
-                                              setNuevoLink((v) => ({
-                                                ...v,
-                                                [formato.id]: e.target.value,
-                                              }))
-                                            }
-                                            className="h-7 min-w-56 text-xs"
-                                          />
-                                          {(() => {
-                                            const aviso = avisoDeRed(
-                                              nuevoLink[formato.id] ?? "",
-                                              nombreRed
-                                            );
-                                            return aviso ? (
-                                              <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
-                                                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                                {aviso}
-                                              </p>
-                                            ) : null;
-                                          })()}
-                                        </>
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-1 text-center">
-                                      <Checkbox
-                                        checked={extraNueva[formato.id] ?? false}
-                                        onCheckedChange={(v) =>
-                                          setExtraNueva((x) => ({
-                                            ...x,
-                                            [formato.id]: v === true,
-                                          }))
-                                        }
-                                      />
-                                    </td>
-                                    <td className="px-2 py-1">
-                                      <Input
-                                        placeholder="Descripción u observaciones (opcional)"
-                                        value={notaNueva[formato.id] ?? ""}
-                                        onChange={(e) =>
-                                          setNotaNueva((v) => ({
-                                            ...v,
-                                            [formato.id]: e.target.value,
-                                          }))
-                                        }
-                                        maxLength={500}
-                                        className="h-7 min-w-40 text-xs"
-                                      />
-                                    </td>
-                                    <td className="px-2 py-1">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 shrink-0 text-xs"
-                                          disabled={
-                                            ocupado === formato.id ||
-                                            !tipoNuevo ||
-                                            (nuevaEsEfimera
-                                              ? !(fechaEmision[formato.id] ?? "")
-                                              : !(nuevoLink[formato.id] ?? "").trim())
-                                          }
-                                          onClick={() =>
-                                            conError(formato.id, async () => {
-                                              const nota =
-                                                (notaNueva[formato.id] ?? "").trim() ||
-                                                null;
-                                              const vistas = (
-                                                vistasNuevas[formato.id] ?? ""
-                                              ).trim();
-                                              const inter = (
-                                                interNuevas[formato.id] ?? ""
-                                              ).trim();
-                                              const publicadoEn = nuevaEsEfimera
-                                                ? new Date(
-                                                    fechaEmision[formato.id]
-                                                  ).toISOString()
-                                                : null;
-                                              const creada = await registrarEntrega(
-                                                campaignId,
-                                                {
-                                                  // Cuenta contra el formato
-                                                  // contratado de este
-                                                  // recuadro; la red la dice
-                                                  // el formato senalado.
-                                                  campaignServiceId: formato.id,
-                                                  serviceTypeId: tipoId,
-                                                  esExtra: extraNueva[formato.id] ?? false,
-                                                  ...(nuevaEsEfimera
-                                                    ? {
-                                                        publicadoEn,
-                                                        vistasReportadas: vistas
-                                                          ? Number(vistas)
-                                                          : null,
-                                                        interaccionesReportadas: inter
-                                                          ? Number(inter)
-                                                          : null,
-                                                      }
-                                                    : { url: nuevoLink[formato.id] }),
-                                                  notas: nota,
-                                                }
-                                              );
-                                              // Limpiar el formulario pase lo
-                                              // que pase con el repintado.
-                                              for (const limpiar of [
-                                                setNuevoLink,
-                                                setFechaEmision,
-                                                setVistasNuevas,
-                                                setInterNuevas,
-                                                setNotaNueva,
-                                              ]) {
-                                                limpiar((v) => ({
-                                                  ...v,
-                                                  [formato.id]: "",
-                                                }));
-                                              }
-                                              setAnadiendo((a) => ({
-                                                ...a,
-                                                [formato.id]: false,
-                                              }));
-                                              setExtraNueva((v) => ({
-                                                ...v,
-                                                [formato.id]: false,
-                                              }));
-                                              pintarYa(formato.id, {
-                                                id: creada.id,
-                                                url: creada.url,
-                                                formato: {
-                                                  nombre: tipoNuevo!.displayName,
-                                                  esEfimero: nuevaEsEfimera,
-                                                },
-                                                red: red?.nombre ?? plataforma.plataforma,
-                                                platformId: redId,
-                                                esExtra: extraNueva[formato.id] ?? false,
-                                                entregadoEn: creada.entregadoEn,
-                                                publicadoEn,
-                                                notas: nota,
-                                                registradoPor: null,
-                                                metricas:
-                                                  nuevaEsEfimera && (vistas || inter)
-                                                    ? [
-                                                        {
-                                                          capturadoEn:
-                                                            creada.entregadoEn,
-                                                          origen: "REPORTADA",
-                                                          vistas: vistas
-                                                            ? Number(vistas)
-                                                            : null,
-                                                          interacciones: inter
-                                                            ? Number(inter)
-                                                            : null,
-                                                          meGusta: null,
-                                                          comentarios: null,
-                                                          compartidos: null,
-                                                          guardados: null,
-                                                        },
-                                                      ]
-                                                    : [],
-                                              });
-                                            })
-                                          }
-                                        >
-                                          {ocupado === formato.id ? (
-                                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                          ) : (
-                                            <Save className="mr-1 h-3.5 w-3.5" />
-                                          )}
-                                          Guardar
-                                        </Button>
-                                        {entregasDe(formato).length > 0 && (
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-7 shrink-0 text-xs text-gray-500"
-                                            disabled={ocupado === formato.id}
-                                            onClick={() =>
-                                              setAnadiendo((a) => ({
-                                                ...a,
-                                                [formato.id]: false,
-                                              }))
-                                            }
-                                          >
-                                            Cancelar
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
+                                {formato.esEfimero && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-sky-100 text-sky-800"
+                                  >
+                                    Sin enlace
+                                  </Badge>
                                 )}
-                              </tbody>
-                            </table>
-                          </div>
+                                <span className="text-xs text-gray-500">
+                                  {estado.entregados} de {estado.esperados}
+                                </span>
+                                {formato.esCombo && formato.comboDescripcion && (
+                                  <span className="text-xs italic text-gray-500">
+                                    Incluye: {formato.comboDescripcion}
+                                  </span>
+                                )}
+                              </div>
 
-                          {mostrarAlta && nuevaEsEfimera && (
-                            <p className="mt-1 text-[11px] text-gray-500">
-                              Este formato no deja enlace: confirma la fecha en que
-                              se emitió y, si el creador te las pasa, sus vistas.
-                              Puedes anotarlas o corregirlas después.
-                            </p>
+                              {puedeEditar && (
+                                <div className="flex items-center gap-1">
+                                  <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
+                                  <Label
+                                    htmlFor={`fecha-${formato.id}`}
+                                    className="text-xs font-normal text-gray-500"
+                                  >
+                                    Fecha límite
+                                  </Label>
+                                  <Input
+                                    id={`fecha-${formato.id}`}
+                                    type="date"
+                                    defaultValue={soloFecha(formato.fechaLimite)}
+                                    className="h-7 w-36 text-xs"
+                                    onChange={(e) =>
+                                      conError(`fecha-${formato.id}`, () =>
+                                        fijarFechaLimite(campaignId, formato.id, {
+                                          fechaLimite: e.target.value
+                                            ? new Date(e.target.value).toISOString()
+                                            : null,
+                                        })
+                                      )
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* El contenido, todo en una tabla. Cada pieza se
+                      describe sola —su red y su formato van en la fila—,
+                      asi que repartirlas en un recuadro por formato
+                      contratado solo obligaba a adivinar bajo cual
+                      escribir. */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[52rem] text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500">
+                          <th className="px-2 py-1 font-medium">Red</th>
+                          <th className="px-2 py-1 font-medium">Formato</th>
+                          <th className="px-2 py-1 font-medium">Publicación</th>
+                          <th className="px-2 py-1 text-center font-medium">Extra</th>
+                          <th className="px-2 py-1 font-medium">Descripción</th>
+                          {puedeEditar && (
+                            <th className="w-24 px-2 py-1 text-right font-medium">
+                              Acciones
+                            </th>
                           )}
-                        </div>
-                      );
-                    })
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {piezas.length === 0 && !mostrarAlta && (
+                          <tr>
+                            <td
+                              colSpan={puedeEditar ? 6 : 5}
+                              className="px-2 py-3 text-center text-gray-400"
+                            >
+                              Todavía no hay contenido registrado.
+                            </td>
+                          </tr>
+                        )}
+
+                        {piezas.map(({ entrega, formato, plataforma }) => {
+                          // Lo efímero se decide por PIEZA, no por el
+                          // formato contratado: un combo puede llevar un
+                          // Reel con enlace y una Story sin él.
+                          const nombreFormato =
+                            formatosGuardados[entrega.id]?.nombre ??
+                            entrega.formato?.nombre ??
+                            formato.nombre;
+                          const piezaEfimera =
+                            formatosGuardados[entrega.id]?.esEfimero ??
+                            entrega.formato?.esEfimero ??
+                            formato.esEfimero;
+                          const enlace = urlsGuardadas[entrega.id] ?? entrega.url;
+                          const nota =
+                            notasGuardadas[entrega.id] ?? entrega.notas ?? "";
+
+                          if (editandoFila === entrega.id) {
+                            const catalogoFila =
+                              perfil.redesDelPerfil.find(
+                                (r) => r.platformId === borrador.redId
+                              )?.formatos ?? plataforma.formatosDisponibles;
+                            const tipoFila = catalogoFila.find(
+                              (f) => f.id === borrador.tipoId
+                            );
+                            return (
+                              <tr
+                                key={entrega.id}
+                                className="border-t border-gray-200/70 bg-white/70"
+                              >
+                                <td className="px-2 py-1">
+                                  <SelectorRed
+                                    perfil={perfil}
+                                    valor={borrador.redId}
+                                    onCambio={(v) =>
+                                      setBorrador((b) => ({
+                                        ...b,
+                                        redId: v,
+                                        tipoId: "",
+                                      }))
+                                    }
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <SelectorFormato
+                                    formatos={catalogoFila}
+                                    valor={borrador.tipoId}
+                                    onCambio={(v) =>
+                                      setBorrador((b) => ({ ...b, tipoId: v }))
+                                    }
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  {tipoFila?.esEfimero ? (
+                                    <span className="text-[11px] text-gray-500">
+                                      Sin enlace: la sostienen su fecha de emisión y
+                                      quien la confirmó.
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Input
+                                        autoFocus
+                                        placeholder="https://… link de la publicación"
+                                        value={borrador.url}
+                                        onChange={(e) =>
+                                          setBorrador((b) => ({
+                                            ...b,
+                                            url: e.target.value,
+                                          }))
+                                        }
+                                        className="h-7 min-w-56 text-xs"
+                                      />
+                                      {(() => {
+                                        const aviso = avisoDeRed(
+                                          borrador.url,
+                                          perfil.redesDelPerfil.find(
+                                            (r) => r.platformId === borrador.redId
+                                          )?.nombre
+                                        );
+                                        return aviso ? (
+                                          <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
+                                            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                            {aviso}
+                                          </p>
+                                        ) : null;
+                                      })()}
+                                    </>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  <Checkbox
+                                    checked={borrador.esExtra}
+                                    onCheckedChange={(v) =>
+                                      setBorrador((b) => ({
+                                        ...b,
+                                        esExtra: v === true,
+                                      }))
+                                    }
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <Input
+                                    placeholder="Descripción u observaciones"
+                                    value={borrador.notas}
+                                    onChange={(e) =>
+                                      setBorrador((b) => ({
+                                        ...b,
+                                        notas: e.target.value,
+                                      }))
+                                    }
+                                    maxLength={500}
+                                    className="h-7 min-w-40 text-xs"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      title="Guardar"
+                                      className="text-violet-700 hover:text-violet-900 disabled:opacity-40"
+                                      disabled={
+                                        ocupado === URL_OCUPADO(entrega.id) ||
+                                        !borrador.tipoId ||
+                                        (!tipoFila?.esEfimero && !borrador.url.trim())
+                                      }
+                                      onClick={() =>
+                                        conError(URL_OCUPADO(entrega.id), async () => {
+                                          const guardada = await actualizarEntrega(
+                                            campaignId,
+                                            entrega.id,
+                                            {
+                                              ...(tipoFila?.esEfimero
+                                                ? {}
+                                                : { url: borrador.url.trim() }),
+                                              notas: borrador.notas.trim() || null,
+                                              serviceTypeId: borrador.tipoId,
+                                              esExtra: borrador.esExtra,
+                                            }
+                                          );
+                                          setUrlsGuardadas((u) => ({
+                                            ...u,
+                                            [entrega.id]: guardada.url,
+                                          }));
+                                          setExtrasGuardados((x) => ({
+                                            ...x,
+                                            [entrega.id]: borrador.esExtra,
+                                          }));
+                                          setRedesGuardadas((r) => ({
+                                            ...r,
+                                            [entrega.id]:
+                                              perfil.redesDelPerfil.find(
+                                                (x) => x.platformId === borrador.redId
+                                              )?.nombre ?? entrega.red,
+                                          }));
+                                          setNotasGuardadas((n) => ({
+                                            ...n,
+                                            [entrega.id]: borrador.notas.trim(),
+                                          }));
+                                          setFormatosGuardados((f) => ({
+                                            ...f,
+                                            [entrega.id]: {
+                                              nombre: tipoFila!.displayName,
+                                              esEfimero: tipoFila!.esEfimero,
+                                            },
+                                          }));
+                                          setEditandoFila(null);
+                                        })
+                                      }
+                                    >
+                                      {ocupado === URL_OCUPADO(entrega.id) ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Cancelar"
+                                      className="text-gray-400 hover:text-gray-700"
+                                      onClick={() => setEditandoFila(null)}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <tr
+                              key={entrega.id}
+                              className="border-t border-gray-200/70 text-gray-600 odd:bg-white/50"
+                            >
+                              <td className="px-2 py-1 whitespace-nowrap text-gray-500">
+                                {redesGuardadas[entrega.id] ?? entrega.red}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap">
+                                <span className="rounded bg-white px-1.5 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
+                                  {nombreFormato}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {enlace ? (
+                                    <a
+                                      href={enlace}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex min-w-0 max-w-[18rem] items-center gap-1 truncate text-violet-700 hover:underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{enlace}</span>
+                                    </a>
+                                  ) : (
+                                    // Sin enlace, lo que respalda la entrega
+                                    // es quien la confirmó.
+                                    <span className="flex items-center gap-1 text-gray-700">
+                                      <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" />
+                                      Emitido
+                                      {entrega.publicadoEn
+                                        ? ` el ${fechaCorta(entrega.publicadoEn)}`
+                                        : ""}
+                                      {entrega.registradoPor
+                                        ? ` · confirmado por ${entrega.registradoPor.name}`
+                                        : ""}
+                                    </span>
+                                  )}
+
+                                  {/* Vistas que reportó el creador. Solo en
+                                      los efímeros: en el resto las lee Apify
+                                      y escribirlas a mano crearía dos
+                                      verdades. */}
+                                  {piezaEfimera && (
+                                    <span className="flex items-center gap-1 text-gray-500">
+                                      <Eye className="h-3 w-3 text-gray-400" />
+                                      {(vistasAnotadas[entrega.id] ??
+                                        entrega.metricas[0]?.vistas) != null ? (
+                                        <span className="text-gray-700">
+                                          {formatNumber(
+                                            vistasAnotadas[entrega.id] ??
+                                              entrega.metricas[0]!.vistas!
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">sin vistas</span>
+                                      )}
+                                      <Heart className="ml-1 h-3 w-3 text-gray-400" />
+                                      {(interAnotadas[entrega.id] ??
+                                        entrega.metricas[0]?.interacciones) != null ? (
+                                        <span className="text-gray-700">
+                                          {formatNumber(
+                                            interAnotadas[entrega.id] ??
+                                              entrega.metricas[0]!.interacciones!
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">
+                                          sin interacciones
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+
+                                  {piezaEfimera && puedeEditar && (
+                                    <span className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="vistas"
+                                        value={vistasEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setVistasEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        className="h-6 w-20 text-xs"
+                                      />
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="interacc."
+                                        value={interEntrega[entrega.id] ?? ""}
+                                        onChange={(e) =>
+                                          setInterEntrega((v) => ({
+                                            ...v,
+                                            [entrega.id]: e.target.value,
+                                          }))
+                                        }
+                                        className="h-6 w-24 text-xs"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="text-violet-700 hover:underline disabled:opacity-40"
+                                        disabled={
+                                          ocupado === `cifras-${entrega.id}` ||
+                                          (!(vistasEntrega[entrega.id] ?? "").trim() &&
+                                            !(interEntrega[entrega.id] ?? "").trim())
+                                        }
+                                        onClick={() =>
+                                          conError(`cifras-${entrega.id}`, async () => {
+                                            const v = (
+                                              vistasEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            const i = (
+                                              interEntrega[entrega.id] ?? ""
+                                            ).trim();
+                                            await registrarCifras(
+                                              campaignId,
+                                              entrega.id,
+                                              {
+                                                vistas: v ? Number(v) : null,
+                                                interacciones: i ? Number(i) : null,
+                                              }
+                                            );
+                                            // Solo se pinta lo que se acaba
+                                            // de anotar: lo otro conserva su
+                                            // valor.
+                                            if (v)
+                                              setVistasAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: Number(v),
+                                              }));
+                                            if (i)
+                                              setInterAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: Number(i),
+                                              }));
+                                            setVistasEntrega((x) => ({
+                                              ...x,
+                                              [entrega.id]: "",
+                                            }));
+                                            setInterEntrega((x) => ({
+                                              ...x,
+                                              [entrega.id]: "",
+                                            }));
+                                          })
+                                        }
+                                      >
+                                        Guardar
+                                      </button>
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                <Checkbox
+                                  checked={extrasGuardados[entrega.id] ?? entrega.esExtra}
+                                  disabled
+                                  aria-label="Entrega extra"
+                                />
+                              </td>
+                              <td className="max-w-[16rem] px-2 py-1">
+                                {nota ? (
+                                  <span className="line-clamp-2 text-gray-600">
+                                    {nota}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">Sin descripción</span>
+                                )}
+                              </td>
+                              {puedeEditar && (
+                                <td className="px-2 py-1">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {/* El lápiz edita la fila entera: red,
+                                        formato, enlace y descripción. */}
+                                    <button
+                                      type="button"
+                                      title="Editar la entrega"
+                                      className="text-gray-400 hover:text-violet-700"
+                                      onClick={() => {
+                                        const platformId = entrega.platformId;
+                                        const cat =
+                                          perfil.redesDelPerfil.find(
+                                            (r) => r.platformId === platformId
+                                          )?.formatos ?? plataforma.formatosDisponibles;
+                                        setBorrador({
+                                          redId: platformId,
+                                          tipoId:
+                                            cat.find(
+                                              (f) => f.displayName === nombreFormato
+                                            )?.id ??
+                                            formato.formatoContratadoId ??
+                                            "",
+                                          url: enlace ?? "",
+                                          notas: nota,
+                                          esExtra:
+                                            extrasGuardados[entrega.id] ??
+                                            entrega.esExtra,
+                                        });
+                                        setEditandoFila(entrega.id);
+                                      }}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Eliminar la entrega"
+                                      className="text-gray-400 hover:text-red-600"
+                                      disabled={ocupado === entrega.id}
+                                      onClick={() =>
+                                        conError(entrega.id, async () => {
+                                          await eliminarEntrega(campaignId, entrega.id);
+                                          setQuitadas((q) => [...q, entrega.id]);
+                                        })
+                                      }
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+
+                        {mostrarAlta && (
+                          <tr className="border-t border-gray-200/70 bg-white/70">
+                            <td className="px-2 py-1">
+                              <SelectorRed
+                                perfil={perfil}
+                                valor={redId}
+                                onCambio={(v) => {
+                                  setRedElegida((r) => ({ ...r, [perfil.id]: v }));
+                                  // Los formatos son de la red: el que
+                                  // estuviera elegido ya no vale.
+                                  setTipoElegido((t) => ({ ...t, [perfil.id]: "" }));
+                                }}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <SelectorFormato
+                                formatos={catalogo}
+                                valor={tipoId}
+                                onCambio={(v) =>
+                                  setTipoElegido((t) => ({ ...t, [perfil.id]: v }))
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              {!tipoNuevo ? (
+                                <span className="text-[11px] text-gray-500">
+                                  Elige la red y el formato para registrar el
+                                  contenido.
+                                </span>
+                              ) : nuevaEsEfimera ? (
+                                // Stories y directos no dejan enlace: la
+                                // entrega la sostienen la fecha de emisión y
+                                // quien la confirma.
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <Input
+                                    type="date"
+                                    value={fechaEmision[perfil.id] ?? ""}
+                                    onChange={(e) =>
+                                      setFechaEmision((v) => ({
+                                        ...v,
+                                        [perfil.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-7 w-36 text-xs"
+                                  />
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Vistas"
+                                    value={vistasNuevas[perfil.id] ?? ""}
+                                    onChange={(e) =>
+                                      setVistasNuevas((v) => ({
+                                        ...v,
+                                        [perfil.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-7 w-24 text-xs"
+                                  />
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Interacc."
+                                    value={interNuevas[perfil.id] ?? ""}
+                                    onChange={(e) =>
+                                      setInterNuevas((v) => ({
+                                        ...v,
+                                        [perfil.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-7 w-28 text-xs"
+                                  />
+                                </div>
+                              ) : (
+                                <>
+                                  <Input
+                                    placeholder="https://… link de la publicación"
+                                    value={nuevoLink[perfil.id] ?? ""}
+                                    onChange={(e) =>
+                                      setNuevoLink((v) => ({
+                                        ...v,
+                                        [perfil.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="h-7 min-w-56 text-xs"
+                                  />
+                                  {(() => {
+                                    const aviso = avisoDeRed(
+                                      nuevoLink[perfil.id] ?? "",
+                                      nombreRed
+                                    );
+                                    return aviso ? (
+                                      <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
+                                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                        {aviso}
+                                      </p>
+                                    ) : null;
+                                  })()}
+                                </>
+                              )}
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <Checkbox
+                                checked={
+                                  destino?.forzarExtra || (extraNueva[perfil.id] ?? false)
+                                }
+                                disabled={destino?.forzarExtra}
+                                onCheckedChange={(v) =>
+                                  setExtraNueva((x) => ({
+                                    ...x,
+                                    [perfil.id]: v === true,
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <Input
+                                placeholder="Descripción u observaciones (opcional)"
+                                value={notaNueva[perfil.id] ?? ""}
+                                onChange={(e) =>
+                                  setNotaNueva((v) => ({
+                                    ...v,
+                                    [perfil.id]: e.target.value,
+                                  }))
+                                }
+                                maxLength={500}
+                                className="h-7 min-w-40 text-xs"
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 text-xs"
+                                  disabled={
+                                    ocupado === perfil.id ||
+                                    !tipoNuevo ||
+                                    !destino ||
+                                    (nuevaEsEfimera
+                                      ? !(fechaEmision[perfil.id] ?? "")
+                                      : !(nuevoLink[perfil.id] ?? "").trim())
+                                  }
+                                  onClick={() =>
+                                    conError(perfil.id, async () => {
+                                      if (!destino) return;
+                                      const nota =
+                                        (notaNueva[perfil.id] ?? "").trim() || null;
+                                      const vistas = (
+                                        vistasNuevas[perfil.id] ?? ""
+                                      ).trim();
+                                      const inter = (
+                                        interNuevas[perfil.id] ?? ""
+                                      ).trim();
+                                      const publicadoEn = nuevaEsEfimera
+                                        ? new Date(fechaEmision[perfil.id]).toISOString()
+                                        : null;
+                                      const esExtra =
+                                        destino.forzarExtra ||
+                                        (extraNueva[perfil.id] ?? false);
+                                      const creada = await registrarEntrega(
+                                        campaignId,
+                                        {
+                                          // El formato contratado al que se
+                                          // engancha lo decide formatoDestino,
+                                          // a partir de la red y el formato
+                                          // señalados.
+                                          campaignServiceId: destino.formato.id,
+                                          serviceTypeId: tipoId,
+                                          esExtra,
+                                          ...(nuevaEsEfimera
+                                            ? {
+                                                publicadoEn,
+                                                vistasReportadas: vistas
+                                                  ? Number(vistas)
+                                                  : null,
+                                                interaccionesReportadas: inter
+                                                  ? Number(inter)
+                                                  : null,
+                                              }
+                                            : { url: nuevoLink[perfil.id] }),
+                                          notas: nota,
+                                        }
+                                      );
+                                      // Limpiar el formulario pase lo que
+                                      // pase con el repintado.
+                                      for (const limpiar of [
+                                        setNuevoLink,
+                                        setFechaEmision,
+                                        setVistasNuevas,
+                                        setInterNuevas,
+                                        setNotaNueva,
+                                      ]) {
+                                        limpiar((v) => ({ ...v, [perfil.id]: "" }));
+                                      }
+                                      setAnadiendo((a) => ({
+                                        ...a,
+                                        [perfil.id]: false,
+                                      }));
+                                      setExtraNueva((v) => ({
+                                        ...v,
+                                        [perfil.id]: false,
+                                      }));
+                                      setTipoElegido((t) => ({
+                                        ...t,
+                                        [perfil.id]: "",
+                                      }));
+                                      pintarYa(destino.formato.id, {
+                                        id: creada.id,
+                                        url: creada.url,
+                                        formato: {
+                                          nombre: tipoNuevo!.displayName,
+                                          esEfimero: nuevaEsEfimera,
+                                        },
+                                        red: nombreRed,
+                                        platformId: redId,
+                                        esExtra,
+                                        entregadoEn: creada.entregadoEn,
+                                        publicadoEn,
+                                        notas: nota,
+                                        registradoPor: null,
+                                        metricas:
+                                          nuevaEsEfimera && (vistas || inter)
+                                            ? [
+                                                {
+                                                  capturadoEn: creada.entregadoEn,
+                                                  origen: "REPORTADA",
+                                                  vistas: vistas
+                                                    ? Number(vistas)
+                                                    : null,
+                                                  interacciones: inter
+                                                    ? Number(inter)
+                                                    : null,
+                                                  meGusta: null,
+                                                  comentarios: null,
+                                                  compartidos: null,
+                                                  guardados: null,
+                                                },
+                                              ]
+                                            : [],
+                                      });
+                                    })
+                                  }
+                                >
+                                  {ocupado === perfil.id ? (
+                                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Save className="mr-1 h-3.5 w-3.5" />
+                                  )}
+                                  Guardar
+                                </Button>
+                                {piezas.length > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 shrink-0 text-xs text-gray-500"
+                                    disabled={ocupado === perfil.id}
+                                    onClick={() =>
+                                      setAnadiendo((a) => ({
+                                        ...a,
+                                        [perfil.id]: false,
+                                      }))
+                                    }
+                                  >
+                                    Cancelar
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {mostrarAlta && nuevaEsEfimera && (
+                    <p className="text-[11px] text-gray-500">
+                      Este formato no deja enlace: confirma la fecha en que se
+                      emitió y, si el creador te las pasa, sus vistas. Puedes
+                      anotarlas o corregirlas después.
+                    </p>
+                  )}
+
+                  {mostrarAlta && destino?.forzarExtra && (
+                    <p className="flex items-start gap-1 text-[11px] text-amber-700">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      En {nombreRed} no hay nada contratado para {perfil.nombre}, así
+                      que esta pieza se guarda como contenido extra y no cuenta para
+                      cerrar la campaña.
+                    </p>
+                  )}
+
+                  {mostrarAlta && formatosDelPerfil.length === 0 && (
+                    <p className="flex items-start gap-1 text-[11px] text-amber-700">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      {perfil.nombre} no tiene formatos contratados en esta campaña,
+                      así que no hay dónde registrar su contenido.
+                    </p>
                   )}
                 </div>
               )}
@@ -1352,11 +1430,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
           );
         })}
 
-        {perfiles.length === 0 && (
-          <p className="py-6 text-center text-sm text-gray-500">
-            Esta campaña todavía no tiene influencers.
-          </p>
-        )}
       </CardContent>
 
     </Card>

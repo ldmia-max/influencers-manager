@@ -789,7 +789,12 @@ export async function entregasPendientesDeCampana(campaignId: string): Promise<
             select: {
               quantity: true,
               esCombo: true,
-              _count: { select: { entregas: true } },
+              // Lo extra no cuenta para cerrar. Es contenido de mas,
+              // fuera de lo contratado, y darlo por entregado dejaria
+              // cerrar una campana con el trabajo encargado sin hacer:
+              // basta con que el creador publique algo por su cuenta en
+              // una red donde no se le contrato nada.
+              _count: { select: { entregas: { where: { esExtra: false } } } },
             },
           },
         },
