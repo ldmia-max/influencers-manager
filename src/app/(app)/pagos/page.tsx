@@ -5,8 +5,8 @@ import { auth } from "@/lib/auth";
 import { puede, type Rol } from "@/lib/permissions";
 import {
   agruparPorCampana,
-  economiaDeCampanas,
   listarPagos,
+  presupuestosDeCampanas,
 } from "@/data-access/pagos";
 import { formatNumber } from "@/lib/format";
 import type { EstadoPago } from "@/lib/pagos";
@@ -69,12 +69,14 @@ async function Listado({
   });
 
   const grupos = agruparPorCampana(pagos);
-  const economia = await economiaDeCampanas(grupos.map((g) => g.campanaId));
+  // El presupuesto se mide contra lo que ve el cliente —base + 40%—, no
+  // contra el coste: ese 40% es parte de lo contratado. Y lo que haya
+  // que girar a los influencers tiene que caber dentro, siempre.
+  const presupuestos = await presupuestosDeCampanas(grupos.map((g) => g.campanaId));
   for (const g of grupos) {
-    const e = economia.get(g.campanaId);
-    g.presupuesto = e?.presupuesto ?? 0;
-    g.cobradoAlCliente = e?.cobradoAlCliente ?? 0;
-    g.utilidad = g.cobradoAlCliente - g.coste;
+    g.presupuesto = presupuestos.get(g.campanaId) ?? 0;
+    g.disponible = g.presupuesto - g.consumido;
+    g.excedido = g.presupuesto > 0 && g.aPagar >= g.presupuesto;
   }
 
   // Las opciones de los desplegables salen de lo que hay, no de un
@@ -116,10 +118,10 @@ async function Listado({
       <TablaContabilidad grupos={grupos} puedeRegistrar={puedeRegistrar} />
 
       <p className="text-[11px] text-gray-500">
-        El precio sale de lo contratado en la campaña, sin el margen del cliente.
-        Los impuestos se calculan según cómo factura cada influencer: natural sin
-        IVA y 10% de retención, jurídica con IVA del 19% y 11% de retención, los
-        dos sobre la base. El reteiva no aplica.
+        El precio es lo pactado con el influencer, sin el 40% que se le carga
+        al cliente. Los impuestos se calculan según cómo factura cada uno:
+        natural sin IVA y 10% de retención, jurídica con IVA del 19% y 11% de
+        retención, los dos sobre la base. El reteiva no aplica.
       </p>
     </div>
   );

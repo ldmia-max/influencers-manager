@@ -8,8 +8,12 @@ const adjunto = z.object({
 const tipoPersona = z.enum(["NATURAL", "JURIDICA"]);
 
 /**
- * Lo que aporta mercadeo: los tres documentos, la fecha desde la que
- * corre el plazo y el tipo de persona que se pactó al negociar.
+ * Lo que aporta mercadeo: los documentos, la fecha desde la que corre el
+ * plazo y el tipo de persona que se pactó al negociar.
+ *
+ * Imprescindibles son dos, la cuenta de cobro y el certificado bancario.
+ * El RUT y la ARL son opcionales —la ARL además solo se le pide a quien
+ * factura como jurídica—, así que su ausencia no frena el registro.
  *
  * `null` retira un adjunto o deja el tipo en "todavía no se sabe";
  * ausente lo deja como estaba.
@@ -19,6 +23,7 @@ export const documentacionPagoSchema = z
     cuentaCobro: adjunto.nullish(),
     certificado: adjunto.nullish(),
     rut: adjunto.nullish(),
+    arl: adjunto.nullish(),
     fechaCuentaCobro: z.coerce.date().nullish(),
     tipoPersona: tipoPersona.nullish(),
     observaciones: z.string().max(1000).nullish(),

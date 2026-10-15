@@ -101,19 +101,24 @@ export function TablaContabilidad({
               )}
             </div>
 
-            {/* El control que hacen hoy: el total de saldos contra el
-                presupuesto de la campana. La utilidad es interna. */}
+            {/* El control que hacen hoy: lo que hay que girar contra el
+                presupuesto de la campana. Lo consumido va con el 40%
+                —es lo que ve el cliente—; el pago, sin el. La utilidad
+                es interna y no sale de la agencia. */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500">
               <span>
                 Presupuesto <Dinero valor={g.presupuesto} destacado />
               </span>
-              <span>
-                Coste influencers <Dinero valor={g.coste} destacado />
+              <span title="Lo contratado al precio que ve el cliente, con el margen incluido">
+                Consumido <Dinero valor={g.consumido} destacado />
               </span>
-              <span title="Lo que se le cobra al cliente. No sale de la agencia.">
-                Cobrado <Dinero valor={g.cobradoAlCliente} destacado />
+              <span title="Lo que queda libre del presupuesto">
+                Disponible <Dinero valor={g.disponible} destacado />
               </span>
-              <span title="Cobrado menos coste. No sale de la agencia.">
+              <span title="Lo que de verdad hay que girarles, con sus impuestos y ajustes">
+                A pagar a influencers <Dinero valor={g.aPagar} destacado />
+              </span>
+              <span title="Lo que se queda la agencia. No sale de la agencia.">
                 Utilidad{" "}
                 <span
                   className={
@@ -122,7 +127,8 @@ export function TablaContabilidad({
                       : "font-semibold text-red-600"
                   }
                 >
-                  ${formatNumber(Math.round(Math.abs(g.utilidad)))}
+                  {g.utilidad < 0 ? "−" : ""}$
+                  {formatNumber(Math.round(Math.abs(g.utilidad)))}
                 </span>
               </span>
               <span title="Lo que esta campaña todavía pide para terminar de pagar">
@@ -138,6 +144,19 @@ export function TablaContabilidad({
                 </span>
               </span>
             </div>
+
+            {/* No deberia pasar nunca: el presupuesto cubre base + 40% y
+                el pago es como mucho base + 19%. Si pasa, algo se
+                contrato fuera de cuenta y hay que verlo. */}
+            {g.excedido && (
+              <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
+                {`Lo que hay que pagar a los influencers ($${formatNumber(
+                  Math.round(g.aPagar)
+                )}) no es menor que el presupuesto de la campaña ($${formatNumber(
+                  Math.round(g.presupuesto)
+                )}). Revísalo con mercadeo antes de girar.`}
+              </p>
+            )}
           </CardHeader>
 
           <CardContent>
@@ -184,9 +203,10 @@ function Totales({
   puedeRegistrar: boolean;
 }) {
   const sumar = (f: (p: PagoVista) => number) => pagos.reduce((s, p) => s + f(p), 0);
+  // El signo va a mano: formatNumber borra todo lo que no sea digito.
   const celda = (v: number) => (
     <td className="px-2 py-2 text-right tabular-nums">
-      ${formatNumber(Math.round(v))}
+      {Math.round(v) < 0 ? "−" : ""}${formatNumber(Math.abs(Math.round(v)))}
     </td>
   );
 
@@ -294,7 +314,12 @@ function Fila({
                 {p.tipoPersona === "NATURAL" ? "Natural" : "Jurídica"}
               </p>
               {!p.tipoVerificado && (
-                <p className="text-[11px] text-amber-700">sin RUT</p>
+                <p
+                  className="text-[11px] text-gray-400"
+                  title="Pactado al negociar; nadie lo ha confirmado contra el RUT"
+                >
+                  sin confirmar con el RUT
+                </p>
               )}
             </>
           ) : (
@@ -403,6 +428,10 @@ function Fila({
             etiqueta="certificado"
           />
           <Adjunto url={p.rutUrl} nombre={p.rutNombre} etiqueta="RUT" />
+          {/* La ARL solo la aporta quien factura como juridica. */}
+          {p.tipoPersona === "JURIDICA" && (
+            <Adjunto url={p.arlUrl} nombre={p.arlNombre} etiqueta="ARL" />
+          )}
         </td>
         <td className="px-2 py-2">
           <EstadoBadge estado={p.estado} loPagaElCliente={p.loPagaElCliente} />

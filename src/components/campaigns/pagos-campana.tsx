@@ -59,7 +59,11 @@ export function PagosCampana({
     }
   };
 
+  // Dos cifras distintas, y las dos hacen falta aqui: lo que se le paga
+  // al influencer es la base; lo que descuenta del presupuesto es esa
+  // base con el margen, que es el precio que vio el cliente.
   const coste = pagos.reduce((s, p) => s + p.base, 0);
+  const consumido = pagos.reduce((s, p) => s + p.precioCliente, 0);
   const reserva = pagos.reduce((s, p) => s + p.reserva, 0);
   const saldo = pagos.reduce((s, p) => s + p.saldo, 0);
   const sinDocumentos = pagos.filter(
@@ -72,8 +76,11 @@ export function PagosCampana({
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base">Pagos a influencers</CardTitle>
         <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500">
-          <span>
-            Contratado <Dinero valor={coste} destacado />
+          <span title="Lo pactado con los influencers, sin el margen del cliente">
+            Coste influencers <Dinero valor={coste} destacado />
+          </span>
+          <span title="Lo que descuenta del presupuesto: el precio que vio el cliente, con el margen">
+            Consumido del presupuesto <Dinero valor={consumido} destacado />
           </span>
           <span title="Lo que hay que tener reservado, con IVA donde aplica">
             A reservar <Dinero valor={reserva} destacado />
@@ -119,7 +126,9 @@ export function PagosCampana({
                     <th className="px-2 py-1 font-medium">Influencer</th>
                     <th className="px-2 py-1 font-medium">Nombre completo</th>
                     <th className="px-2 py-1 font-medium">Cómo factura</th>
-                    <th className="px-2 py-1 text-right font-medium">Contratado</th>
+                    <th className="px-2 py-1 text-right font-medium">
+                      Precio base
+                    </th>
                     <th className="px-2 py-1 text-right font-medium">A reservar</th>
                     <th className="px-2 py-1 font-medium">Documentos</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
@@ -229,6 +238,20 @@ export function PagosCampana({
                             puedeSubir={puedeEditar}
                             onSubido={(doc) =>
                               guardar(p.campaignProfileId, { rut: doc })
+                            }
+                          />
+                        )}
+                        {/* La ARL solo se le pide a quien factura como
+                            juridica. Mostrarsela a una persona natural
+                            seria pedirle un documento que no tiene. */}
+                        {p.tipoPersona === "JURIDICA" && (
+                          <Adjunto
+                            url={p.arlUrl}
+                            nombre={p.arlNombre}
+                            etiqueta="ARL"
+                            puedeSubir={puedeEditar}
+                            onSubido={(doc) =>
+                              guardar(p.campaignProfileId, { arl: doc })
                             }
                           />
                         )}

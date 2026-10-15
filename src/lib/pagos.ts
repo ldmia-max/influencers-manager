@@ -102,6 +102,23 @@ export function reservaMaxima(base: number): number {
   return calcularImpuestos(base, "JURIDICA").valorFactura;
 }
 
+/**
+ * Lo que la agencia se queda de ese influencer.
+ *
+ * Del 40% que se le carga al cliente, 10 puntos son utilidad; los otros
+ * 30 cubren el IVA y la retefuente. Si el influencer factura como
+ * natural no cobra IVA, asi que esos 19 puntos tampoco salen y se
+ * quedan tambien como utilidad.
+ *
+ * Mientras no se sabe como factura se devuelve el 10%, que es lo
+ * prudente: contar con los 19 puntos de alguien que puede resultar
+ * juridico seria prometer un margen que quiza no exista.
+ */
+export function utilidadDe(base: number, tipo: TipoPersona | null): number {
+  const utilidad = base * 0.1;
+  return tipo === "NATURAL" ? utilidad + base * TARIFAS.JURIDICA.iva : utilidad;
+}
+
 export type EstadoPago =
   /** Mercadeo todavia no aporto la documentacion. */
   | "PENDIENTE_DOCUMENTOS"
@@ -133,9 +150,6 @@ export const COLOR_PAGO: Record<EstadoPago, string> = {
 export interface DatosDePago {
   cuentaCobroUrl: string | null;
   certificadoUrl: string | null;
-  rutUrl: string | null;
-  /** True si el perfil ya tiene el tipo confirmado de otra campana. */
-  rutYaVerificado: boolean;
   documento: string | null;
   loPagaElCliente: boolean;
   /** Cuanto falta por pagar. */
@@ -160,10 +174,10 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
   // le pide cuenta de cobro a nadie, solo espera la confirmacion.
   if (pago.loPagaElCliente) return "REGISTRADO";
 
-  const faltaRut = !pago.rutUrl && !pago.rutYaVerificado;
-  if (pago.cuentaCobroUrl && pago.certificadoUrl && !faltaRut) {
-    return "DOCUMENTOS_RECIBIDOS";
-  }
+  // Solo la cuenta de cobro y el certificado son imprescindibles. El
+  // RUT y la ARL son opcionales: ayudan a confirmar como factura, pero
+  // su ausencia no impide registrar ni pagar.
+  if (pago.cuentaCobroUrl && pago.certificadoUrl) return "DOCUMENTOS_RECIBIDOS";
   return "PENDIENTE_DOCUMENTOS";
 }
 

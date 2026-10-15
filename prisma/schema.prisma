@@ -905,11 +905,16 @@ model PagoInfluencer {
 
   /// El RUT, que es lo que decide si factura como natural o juridica.
   ///
-  /// Llega con la cuenta de cobro. No se pide cuando el perfil ya lo
-  /// tiene verificado de una campana anterior: seria pedir lo que ya se
-  /// tiene.
+  /// Llega con la cuenta de cobro, y es opcional: contabilidad puede
+  /// registrar el pago sin el. No se pide cuando el perfil ya lo tiene
+  /// verificado de una campana anterior.
   rutUrl    String?
   rutNombre String?
+
+  /// La ARL, que solo se pide a quien factura como juridica. Opcional,
+  /// igual que el RUT.
+  arlUrl    String?
+  arlNombre String?
 
   /// Fecha de la cuenta de cobro.
   ///

@@ -11,7 +11,14 @@ import {
   type EstadoPago,
 } from "@/lib/pagos";
 
-/** Un importe. Cero se pinta en gris: no es lo mismo que una cifra. */
+/**
+ * Un importe. Cero se pinta en gris: no es lo mismo que una cifra.
+ *
+ * El signo se escribe aqui a mano porque formatNumber borra todo lo que
+ * no sea digito —el menos incluido—, y un negativo pintado en positivo
+ * no es un numero feo: es un numero que dice lo contrario. Un
+ * presupuesto pasado se veria como presupuesto de sobra.
+ */
 export function Dinero({
   valor,
   destacado,
@@ -19,17 +26,20 @@ export function Dinero({
   valor: number;
   destacado?: boolean;
 }) {
+  const redondeado = Math.round(valor);
   return (
     <span
       className={
-        valor === 0
+        redondeado === 0
           ? "text-gray-400"
-          : destacado
-            ? "font-semibold text-gray-900"
-            : "text-gray-700"
+          : redondeado < 0
+            ? "font-semibold text-red-600"
+            : destacado
+              ? "font-semibold text-gray-900"
+              : "text-gray-700"
       }
     >
-      ${formatNumber(Math.round(valor))}
+      {redondeado < 0 ? "−" : ""}${formatNumber(Math.abs(redondeado))}
     </span>
   );
 }

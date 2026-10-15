@@ -690,7 +690,28 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                 </p>
               ) : (
                 <div className="space-y-6">
-                  {campaign.profiles.map((cp) => (
+                  {campaign.profiles.map((cp) => {
+                    // Lo que cuesta este creador entero: todos sus formatos
+                    // de todas sus redes, al precio que ve el cliente. Con el
+                    // margen ya dentro y sin desglosarlo: para el cliente ese
+                    // numero es el precio, no una base mas un porcentaje.
+                    const totalPerfil = cp.platforms.reduce(
+                      (suma, cpp) =>
+                        suma +
+                        cpp.services.reduce(
+                          (t, cs) =>
+                            t +
+                            calculateMarkupPrice(
+                              Number(cs.basePrice),
+                              campaign.markupPercentage
+                            ) *
+                              cs.quantity,
+                          0
+                        ),
+                      0
+                    );
+
+                    return (
                     <div key={cp.id} className={`border rounded-lg p-4 ${
                       cp.status === "REJECTED" ? "border-red-300 bg-red-50" :
                       cp.status === "APPROVED" ? "border-green-300 bg-green-50" : ""
@@ -709,6 +730,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              Total del influencer
+                            </p>
+                            <p className="text-base font-semibold text-gray-900 tabular-nums">
+                              ${formatNumber(totalPerfil.toFixed(0))}
+                            </p>
+                          </div>
                           {/* Estado del perfil en la campaña */}
                           {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
                             <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
@@ -843,7 +872,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                         );
                       })}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

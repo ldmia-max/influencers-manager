@@ -8,6 +8,7 @@ import {
   mesDelPago,
   plazoDePago,
   reservaMaxima,
+  utilidadDe,
   type EstadoPago,
   type Impuestos,
   type TipoPersona,
@@ -71,6 +72,8 @@ const SELECCION = {
       certificadoNombre: true,
       rutUrl: true,
       rutNombre: true,
+      arlUrl: true,
+      arlNombre: true,
       fechaCuentaCobro: true,
       tipoPersona: true,
       documento: true,
@@ -117,8 +120,15 @@ export interface PagoVista {
   /** "YYYY-MM" del arranque de la campana, para filtrar por mes. */
   mesCampana: string | null;
 
-  /** Coste contratado, sin el margen del cliente. */
+  /** Coste contratado, sin el margen. Es lo que contabilidad paga. */
   base: number;
+  /**
+   * Lo que ve el cliente: base + 40%. Es lo que descuenta del
+   * presupuesto de la campana, no el coste.
+   */
+  precioCliente: number;
+  /** Lo que se queda la agencia de este influencer. */
+  utilidad: number;
   /** Con el que se calculo. Null mientras no se sepa. */
   tipoPersona: TipoPersona | null;
   /** True si se confirmo mirando el RUT del influencer. */
@@ -146,6 +156,8 @@ export interface PagoVista {
   certificadoNombre: string | null;
   rutUrl: string | null;
   rutNombre: string | null;
+  arlUrl: string | null;
+  arlNombre: string | null;
 
   fechaCuentaCobro: string | null;
   documento: string | null;
@@ -165,24 +177,48 @@ export interface GrupoDeCampana {
   cliente: string;
   mes: string | null;
   presupuesto: number;
+  /**
+   * Lo que se lleva consumido del presupuesto: la suma de los precios
+   * que ve el cliente, base + margen. No el coste: el presupuesto se
+   * mide contra lo que se le cobra.
+   */
+  consumido: number;
+  disponible: number;
   /** Coste de los influencers, sin margen. */
   coste: number;
-  /** Lo que se le cobra al cliente. Interno: nunca sale de la agencia. */
-  cobradoAlCliente: number;
+  /** Lo que de verdad hay que girarles, con sus impuestos. */
+  aPagar: number;
+  /** Lo que se queda la agencia. Interno: nunca sale de la agencia. */
   utilidad: number;
   /** Suma de saldos: lo que esta campana todavia pide. */
   saldo: number;
+  /**
+   * Lo que hay que pagar supera el presupuesto.
+   *
+   * No deberia ocurrir nunca —el presupuesto cubre base + 40% y el pago
+   * es como mucho base + 19%— asi que si pasa es que algo se contrato
+   * fuera de cuenta, y conviene que salte a la vista.
+   */
+  excedido: boolean;
   pagos: PagoVista[];
 }
 
 function aVista(cp: Fila): PagoVista {
+  // Dos cifras distintas y las dos hacen falta: la base es lo que se le
+  // paga al influencer; la base mas el margen es lo que ve el cliente y
+  // lo que descuenta del presupuesto de la campana.
+  const margen = cp.campaign.markupPercentage ?? MARKUP_PERCENTAGE;
   let base = 0;
+  let precioCliente = 0;
   for (const plataforma of cp.platforms) {
     for (const servicio of plataforma.services) {
-      base += calculateServiceTotal(
+      const totales = calculateServiceTotal(
         Number(servicio.basePrice),
-        servicio.quantity
-      ).baseTotal;
+        servicio.quantity,
+        margen
+      );
+      base += totales.baseTotal;
+      precioCliente += totales.markupTotal;
     }
   }
 
@@ -226,6 +262,8 @@ function aVista(cp: Fila): PagoVista {
     mesCampana: mesDelPago(cp.campaign.startDate),
 
     base,
+    precioCliente,
+    utilidad: utilidadDe(base, tipo),
     tipoPersona: tipo,
     tipoVerificado: cp.profile.tipoPersonaVerificado,
     impuestos,
@@ -243,8 +281,6 @@ function aVista(cp: Fila): PagoVista {
         ? {
             cuentaCobroUrl: pago.cuentaCobroUrl,
             certificadoUrl: pago.certificadoUrl,
-            rutUrl: pago.rutUrl,
-            rutYaVerificado: cp.profile.tipoPersonaVerificado,
             documento: pago.documento,
             loPagaElCliente: pago.loPagaElCliente,
             saldo,
@@ -260,6 +296,8 @@ function aVista(cp: Fila): PagoVista {
     certificadoNombre: pago?.certificadoNombre ?? null,
     rutUrl: pago?.rutUrl ?? null,
     rutNombre: pago?.rutNombre ?? null,
+    arlUrl: pago?.arlUrl ?? null,
+    arlNombre: pago?.arlNombre ?? null,
 
     fechaCuentaCobro: fecha ? fecha.toISOString() : null,
     documento: pago?.documento ?? null,
@@ -353,63 +391,38 @@ export function agruparPorCampana(pagos: PagoVista[]): GrupoDeCampana[] {
   return [...grupos.values()]
     .map((filas) => {
       const primera = filas[0];
-      const coste = filas.reduce((s, p) => s + p.base, 0);
       return {
         campanaId: primera.campanaId,
         campana: primera.campana,
         cliente: primera.cliente,
         mes: primera.mesCampana,
         presupuesto: 0,
-        coste,
-        cobradoAlCliente: 0,
-        utilidad: 0,
+        consumido: filas.reduce((s, p) => s + p.precioCliente, 0),
+        disponible: 0,
+        coste: filas.reduce((s, p) => s + p.base, 0),
+        aPagar: filas.reduce(
+          (s, p) => s + (p.impuestos?.valorAPagar ?? p.reserva) + p.ajuste,
+          0
+        ),
+        utilidad: filas.reduce((s, p) => s + p.utilidad, 0),
         saldo: filas.reduce((s, p) => s + p.saldo, 0),
+        excedido: false,
         pagos: filas.sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1)),
       };
     })
     .sort((a, b) => b.saldo - a.saldo);
 }
 
-/** El presupuesto y el margen de cada campana, para el encabezado. */
-export async function economiaDeCampanas(
+/** El presupuesto de cada campana, para el encabezado de su grupo. */
+export async function presupuestosDeCampanas(
   campaignIds: string[]
-): Promise<Map<string, { presupuesto: number; cobradoAlCliente: number }>> {
+): Promise<Map<string, number>> {
   if (campaignIds.length === 0) return new Map();
-
   const campanas = await prisma.campaign.findMany({
     where: { id: { in: campaignIds } },
-    select: {
-      id: true,
-      budget: true,
-      markupPercentage: true,
-      profiles: {
-        where: { status: "APPROVED", participacion: "ACTIVO" },
-        select: {
-          platforms: {
-            select: { services: { select: { basePrice: true, quantity: true } } },
-          },
-        },
-      },
-    },
+    select: { id: true, budget: true },
   });
-
-  const mapa = new Map<string, { presupuesto: number; cobradoAlCliente: number }>();
-  for (const c of campanas) {
-    let cobrado = 0;
-    for (const cp of c.profiles) {
-      for (const plataforma of cp.platforms) {
-        for (const servicio of plataforma.services) {
-          cobrado += calculateServiceTotal(
-            Number(servicio.basePrice),
-            servicio.quantity,
-            c.markupPercentage ?? MARKUP_PERCENTAGE
-          ).markupTotal;
-        }
-      }
-    }
-    mapa.set(c.id, { presupuesto: Number(c.budget), cobradoAlCliente: cobrado });
-  }
-  return mapa;
+  return new Map(campanas.map((c) => [c.id, Number(c.budget)]));
 }
 
 /** El pago de un influencer en una campana. */
@@ -463,6 +476,7 @@ export async function guardarDocumentacionDePago(
     cuentaCobro?: { url: string; nombre: string } | null;
     certificado?: { url: string; nombre: string } | null;
     rut?: { url: string; nombre: string } | null;
+    arl?: { url: string; nombre: string } | null;
     fechaCuentaCobro?: Date | null;
     tipoPersona?: TipoPersona | null;
     observaciones?: string | null;
@@ -482,6 +496,10 @@ export async function guardarDocumentacionDePago(
     ...(datos.rut !== undefined && {
       rutUrl: datos.rut?.url ?? null,
       rutNombre: datos.rut?.nombre ?? null,
+    }),
+    ...(datos.arl !== undefined && {
+      arlUrl: datos.arl?.url ?? null,
+      arlNombre: datos.arl?.nombre ?? null,
     }),
     ...(datos.fechaCuentaCobro !== undefined && {
       fechaCuentaCobro: datos.fechaCuentaCobro,

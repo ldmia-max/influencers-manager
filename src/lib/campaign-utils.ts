@@ -3,12 +3,21 @@ import { Decimal } from "@prisma/client/runtime/library";
 /**
  * Margen POR DEFECTO para las campanas nuevas.
  *
- * Ya no es el margen de todas: cada campana congela el suyo en
+ * El 40% no es un numero redondo elegido al azar: cubre el 19% de IVA
+ * que habra que pagarle al influencer si factura como juridica, el 11%
+ * de retefuente que se le retiene y se le gira a la DIAN, y un 10% de
+ * utilidad para la agencia. Se aplica igual sin saber como factura, y
+ * si resulta ser natural —que no cobra IVA— ese 19% se queda como
+ * utilidad.
+ *
+ * El cliente ve `base + 40%` y nada del desglose: para el es el precio.
+ *
+ * Ya no es el margen de todas las campanas: cada una congela el suyo en
  * Campaign.markupPercentage al crearse. Cambiar este valor solo afecta
  * a las que se creen a partir de entonces, que es lo que permite
  * actualizarlo cada ano sin repreciar lo ya negociado.
  */
-export const MARKUP_PERCENTAGE = 0.4; // 40%
+export const MARKUP_PERCENTAGE = 0.4; // 19% IVA + 11% retefuente + 10% utilidad
 
 /**
  * Las cinco etapas de una campana, como se llaman en pantalla.
