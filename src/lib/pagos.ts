@@ -112,19 +112,44 @@ export function reservaMaxima(base: number): number {
 }
 
 /**
+ * El 10% de utilidad, y sobre que se calcula.
+ *
+ * NO sale del precio base, sino de la base ya cargada con el IVA y la
+ * retefuente: `(base + 19% + 11%) × 10%`. Como los dos porcentajes son
+ * fijos —se aplican igual se sepa o no como factura el influencer—, eso
+ * equivale siempre a 13 puntos de la base, y es la razon de que el
+ * recargo al cliente sea del 43% y no del 40%: 19 + 11 + 13.
+ *
+ * Es tambien el "13%" que aparecia en el Total de la hoja de mercadeo
+ * sin que ninguna columna lo explicara: las dos visibles sumaban 1,30 y
+ * el total era 1,43, que es 1,30 × 1,10.
+ */
+export const PORCENTAJE_UTILIDAD = 0.1;
+
+/**
+ * La base sobre la que se calcula la utilidad: el precio ya cargado con
+ * los dos impuestos. Con las tarifas de juridica, que son las que
+ * componen el recargo pase lo que pase.
+ */
+export function baseDeUtilidad(base: number): number {
+  const { iva, retencion } = TARIFAS.JURIDICA;
+  return base * (1 + iva + retencion);
+}
+
+/**
  * Lo que la agencia se queda de ese influencer.
  *
- * Del 40% que se le carga al cliente, 10 puntos son utilidad; los otros
- * 30 cubren el IVA y la retefuente. Si el influencer factura como
- * natural no cobra IVA, asi que esos 19 puntos tampoco salen y se
- * quedan tambien como utilidad.
+ * Del 43% que se le carga al cliente, 13 puntos son utilidad —el 10%
+ * sobre base + IVA + retefuente—; los otros 30 cubren esos dos
+ * impuestos. Si el influencer factura como natural no cobra IVA, asi
+ * que esos 19 puntos tampoco salen y se quedan tambien como utilidad.
  *
- * Mientras no se sabe como factura se devuelve el 10%, que es lo
- * prudente: contar con los 19 puntos de alguien que puede resultar
+ * Mientras no se sabe como factura se devuelven solo los 13 puntos, que
+ * es lo prudente: contar con los 19 de alguien que puede resultar
  * juridico seria prometer un margen que quiza no exista.
  */
 export function utilidadDe(base: number, tipo: TipoPersona | null): number {
-  const utilidad = base * 0.1;
+  const utilidad = baseDeUtilidad(base) * PORCENTAJE_UTILIDAD;
   return tipo === "NATURAL" ? utilidad + base * TARIFAS.JURIDICA.iva : utilidad;
 }
 

@@ -1,0 +1,12 @@
+-- El recargo por defecto pasa del 40% al 43%.
+--
+-- El 10% de utilidad se calcula sobre el subtotal (base + 19% de IVA +
+-- 11% de retefuente), no sobre la base, asi que vale 13 puntos de la
+-- base y no 10: 19 + 11 + 13 = 43. Es lo que la hoja de mercadeo ya
+-- cobraba, multiplicando por 1,43.
+--
+-- SET DEFAULT solo afecta a las filas que se inserten a partir de
+-- ahora. Las campanas existentes conservan el 0.4 con el que se
+-- negociaron, que es justo lo que se quiere: nada de lo ya aprobado
+-- por un cliente se reprecia solo.
+ALTER TABLE "Campaign" ALTER COLUMN "markupPercentage" SET DEFAULT 0.43;

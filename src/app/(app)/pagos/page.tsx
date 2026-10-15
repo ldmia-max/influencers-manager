@@ -69,8 +69,8 @@ async function Listado({
   });
 
   const grupos = agruparPorCampana(pagos);
-  // El presupuesto se mide contra lo que ve el cliente —base + 40%—, no
-  // contra el coste: ese 40% es parte de lo contratado. Y lo que haya
+  // El presupuesto se mide contra lo que ve el cliente —base + 43%—, no
+  // contra el coste: ese recargo es parte de lo contratado. Y lo que haya
   // que girar a los influencers tiene que caber dentro, siempre.
   const presupuestos = await presupuestosDeCampanas(grupos.map((g) => g.campanaId));
   for (const g of grupos) {
@@ -118,7 +118,7 @@ async function Listado({
       <TablaContabilidad grupos={grupos} puedeRegistrar={puedeRegistrar} />
 
       <p className="text-[11px] text-gray-500">
-        El precio es lo pactado con el influencer, sin el 40% que se le carga
+        El precio es lo pactado con el influencer, sin el 43% que se le carga
         al cliente. Los impuestos se calculan según cómo factura cada uno:
         natural sin IVA y 10% de retención, jurídica con IVA del 19% y 11% de
         retención, los dos sobre la base. El reteiva no aplica.

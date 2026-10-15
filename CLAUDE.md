@@ -124,9 +124,16 @@ The five stages, and the fact that **the enum names and the on-screen labels del
 
 **Deliveries and impact only render once the campaign has started** (`ACTIVE`, `COMPLETED` or `CANCELLED`). While it waits on the client there is nothing published to record or to measure. Within a started campaign, **a `PENDING` profile stays out of Deliveries entirely** — it is a proposal the client has not seen, so there is no commissioned work to hand in. It lives in Sustituciones, where it gets resolved. Three places enforce that together, and they have to move as one: the detail page filters it out of the deliveries block, `registrarEntrega` refuses it so the rule survives an API call, and `entregasPendientesDeCampana` excludes it from the close gate — without that last one an unanswered proposal would claim formats nobody is allowed to deliver, and the campaign could never reach `COMPLETED`.
 
-**Prices shown to clients carry a 40% markup, and that 40% is three things.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything. Each campaign freezes its own rate in `Campaign.markupPercentage` at creation, so changing the constant only affects new ones.
+**Prices shown to clients carry a 43% markup, and it is built in two steps, not one.** `MARKUP_PERCENTAGE` / `calculateMarkupPrice()` in `src/lib/campaign-utils.ts` — `ProfileService.price` is the base cost, and the cart store applies the markup before displaying anything. Each campaign freezes its own rate in `Campaign.markupPercentage` at creation, so changing the constant only affects new ones (campaigns created before it went to 43% keep 0.4).
 
-The 40% is **19% IVA + 11% retefuente + 10% utilidad**. It is applied the same whether or not the influencer's `tipoPersona` is known, and a `NATURAL` charges no IVA, so those 19 points stay as margin (`utilidadDe()` in `src/lib/pagos.ts`). **The client sees `base + 40%` and never the breakdown** — for them that figure is the price. The budget is measured against that figure, not against the cost: `calcularTotalCampana` discounts `conMargen`. Accounting works with the **base**, because that is what gets paid to the creator, and the total to pay (base + IVA − retención ± ajustes) must always come out below the campaign budget — `/pagos` flags a group where it does not.
+```
+subtotal = base + 30%       19% IVA + 11% retefuente
+total    = subtotal + 10%   the agency's utilidad
+```
+
+**The 10% is taken on the subtotal, not on the base**, so it is worth 13 points of the base, not 10 — hence `base × 1.30 × 1.10 = base × 1.43`. That is also what mercadeo's spreadsheet already charged: its totals are `precio × 1.43` even though the visible columns only add to 1.30, which is where its unexplained "13%" came from.
+
+IVA and retefuente are applied whether or not the influencer's `tipoPersona` is known; a `NATURAL` charges no IVA, so those 19 points never leave and stay as margin too (`utilidadDe()` in `src/lib/pagos.ts`). **The client sees `base + 43%` and never the breakdown** — for them that figure is the price. The budget is measured against that figure, not against the cost: `calcularTotalCampana` discounts `conMargen`. Accounting works with the **base**, because that is what gets paid to the creator, and the total to pay (base + IVA − retención ± ajustes) must always come out below the campaign budget — `/pagos` flags a group where it does not.
 
 ### Content delivery, withdrawal and impact
 

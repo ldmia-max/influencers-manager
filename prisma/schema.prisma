@@ -454,7 +454,7 @@ model Campaign {
   /// Es Float y no Decimal a proposito: es una tasa, no un importe, y
   /// el calculo ya se hacia en coma flotante, asi que no anade
   /// imprecision y evita serializar un Decimal mas hacia el cliente.
-  markupPercentage Float     @default(0.4)
+  markupPercentage Float     @default(0.43)
   startDate        DateTime?
   endDate          DateTime?
   activationReason String? // Motivo opcional al activar la campaña

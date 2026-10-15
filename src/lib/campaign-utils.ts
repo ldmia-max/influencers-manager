@@ -3,21 +3,32 @@ import { Decimal } from "@prisma/client/runtime/library";
 /**
  * Margen POR DEFECTO para las campanas nuevas.
  *
- * El 40% no es un numero redondo elegido al azar: cubre el 19% de IVA
- * que habra que pagarle al influencer si factura como juridica, el 11%
- * de retefuente que se le retiene y se le gira a la DIAN, y un 10% de
- * utilidad para la agencia. Se aplica igual sin saber como factura, y
- * si resulta ser natural —que no cobra IVA— ese 19% se queda como
- * utilidad.
+ * Son dos pasos, no un porcentaje suelto:
  *
- * El cliente ve `base + 40%` y nada del desglose: para el es el precio.
+ *   subtotal = base + 30%        19% de IVA + 11% de retefuente
+ *   total    = subtotal + 10%    la utilidad de la agencia
+ *
+ * El 10% se calcula sobre el SUBTOTAL, no sobre la base, asi que
+ * equivale a 13 puntos de la base y no a 10. De ahi que el total sea
+ * `base x 1,30 x 1,10 = base x 1,43` y el recargo, 43%.
+ *
+ * Ese 43% es el que ya aplicaba la hoja de calculo de mercadeo —sus
+ * totales son el precio x 1,43 aunque las columnas visibles solo sumen
+ * 1,30—, y explica el 13% que aparecia en ella sin columna que lo
+ * justificara.
+ *
+ * El IVA y la retefuente entran siempre, se sepa o no como factura el
+ * influencer. Si resulta ser natural —que no cobra IVA— esos 19 puntos
+ * no salen de caja y se quedan tambien como utilidad.
+ *
+ * El cliente ve `base + 43%` y nada del desglose: para el es el precio,
+ * y es esa cifra la que se descuenta del presupuesto de la campana.
  *
  * Ya no es el margen de todas las campanas: cada una congela el suyo en
- * Campaign.markupPercentage al crearse. Cambiar este valor solo afecta
- * a las que se creen a partir de entonces, que es lo que permite
- * actualizarlo cada ano sin repreciar lo ya negociado.
+ * Campaign.markupPercentage al crearse. Subirlo aqui no reprecia nada
+ * de lo ya negociado, solo afecta a las que se creen a partir de ahora.
  */
-export const MARKUP_PERCENTAGE = 0.4; // 19% IVA + 11% retefuente + 10% utilidad
+export const MARKUP_PERCENTAGE = 0.43; // 1,30 x 1,10 - 1
 
 /**
  * Las cinco etapas de una campana, como se llaman en pantalla.
@@ -102,7 +113,7 @@ export const USER_VALID_TRANSITIONS: Record<string, string[]> = {
  * Aplica un margen al precio base.
  *
  * Es el UNICO sitio donde debe aplicarse. Hubo tres lugares que lo
- * multiplicaban por 1.2 a mano y quedaron desfasados al subirlo al 40%.
+ * multiplicaban por 1.2 a mano y quedaron desfasados al subir el margen.
  *
  * SIEMPRE que exista una campana hay que pasarle su
  * campaign.markupPercentage. Omitir el argumento usa el margen por

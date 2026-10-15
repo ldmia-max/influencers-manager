@@ -123,7 +123,7 @@ export interface PagoVista {
   /** Coste contratado, sin el margen. Es lo que contabilidad paga. */
   base: number;
   /**
-   * Lo que ve el cliente: base + 40%. Es lo que descuenta del
+   * Lo que ve el cliente: base + 43%. Es lo que descuenta del
    * presupuesto de la campana, no el coste.
    */
   precioCliente: number;
@@ -195,7 +195,7 @@ export interface GrupoDeCampana {
   /**
    * Lo que hay que pagar supera el presupuesto.
    *
-   * No deberia ocurrir nunca —el presupuesto cubre base + 40% y el pago
+   * No deberia ocurrir nunca —el presupuesto cubre base + 43% y el pago
    * es como mucho base + 19%— asi que si pasa es que algo se contrato
    * fuera de cuenta, y conviene que salte a la vista.
    */

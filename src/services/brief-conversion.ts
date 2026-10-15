@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
+import { MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
 
 /**
  * Convierte un brief diligenciado en una campana en estado DRAFT.
@@ -83,6 +84,10 @@ export async function convertirBriefACampana(
         clientId: client.id,
         clientContactId: contact.id,
         createdById,
+        // Explicito, como en el alta normal. Dejarlo al default de la
+        // base era tener dos tarifas segun por donde entrara la
+        // campana: el default se queda congelado y la constante no.
+        markupPercentage: MARKUP_PERCENTAGE,
       },
       select: { id: true, name: true },
     });

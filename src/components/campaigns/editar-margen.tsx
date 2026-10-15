@@ -18,7 +18,7 @@ import { apiPatch } from "@/services/api";
 
 interface Props {
   campaignId: string;
-  /** Margen actual en tanto por uno (0.4 = 40%). */
+  /** Margen actual en tanto por uno (0.43 = 43%). */
   markupActual: number;
   /** Si la campana ya fue enviada al cliente, se avisa al cambiarlo. */
   yaEnviadaAlCliente: boolean;

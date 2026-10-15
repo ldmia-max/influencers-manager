@@ -102,7 +102,7 @@ export function TablaContabilidad({
             </div>
 
             {/* El control que hacen hoy: lo que hay que girar contra el
-                presupuesto de la campana. Lo consumido va con el 40%
+                presupuesto de la campana. Lo consumido va con el 43%
                 —es lo que ve el cliente—; el pago, sin el. La utilidad
                 es interna y no sale de la agencia. */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500">
@@ -145,7 +145,7 @@ export function TablaContabilidad({
               </span>
             </div>
 
-            {/* No deberia pasar nunca: el presupuesto cubre base + 40% y
+            {/* No deberia pasar nunca: el presupuesto cubre base + 43% y
                 el pago es como mucho base + 19%. Si pasa, algo se
                 contrato fuera de cuenta y hay que verlo. */}
             {g.excedido && (
