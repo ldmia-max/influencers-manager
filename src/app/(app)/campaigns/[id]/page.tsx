@@ -971,15 +971,6 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       etiqueta: "Impacto del contenido",
       contenido: (
         <>
-          {/* La prevision abre la pestana: es la vara contra la que se
-              leen las cifras que vienen debajo. Sin seguidores
-              contratados la cadena entera sale en cero y no diria nada. */}
-          {totalSeguidores > 0 && (
-            <PrevisionCampana
-              seguidores={totalSeguidores}
-              filas={filasPrevision}
-            />
-          )}
           <MetricasCampana
             campaignId={id}
             capturas={capturas}
@@ -995,6 +986,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               campaign.status === "ACTIVE" || campaign.status === "COMPLETED"
             }
           />
+
+          {/* La prevision cierra la pestana, debajo del aporte por
+              influencer. Es una estimacion hecha con los seguidores
+              contratados, no una medicion, asi que se lee despues de lo
+              que de verdad paso y no antes. Sin seguidores la cadena
+              entera sale en cero y no diria nada. */}
+          {totalSeguidores > 0 && (
+            <PrevisionCampana
+              seguidores={totalSeguidores}
+              filas={filasPrevision}
+            />
+          )}
         </>
       ),
     });
