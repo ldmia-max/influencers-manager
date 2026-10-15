@@ -391,24 +391,30 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // El catalogo para sustituir. Solo se carga con la campana en marcha:
   // en el resto de estados el bloque no se pinta y seria traer para nada
   // todos los perfiles con sus cuentas y tarifas.
-  const catalogoParaSustituir =
-    campaign.status === "ACTIVE"
-      ? (await getAllProfilesForEditor()).filter((p) => !idsEnCampana.has(p.id))
-      : [];
+  // Se puede anadir mientras la campana no haya salido hacia el cliente
+  // o este ya en marcha. En Revision no: el cliente esta mirando
+  // justamente esa lista. En Cerrada o Cancelada tampoco, que son
+  // terminales.
+  const puedeAnadirInfluencers =
+    campaign.status === "ACTIVE" ||
+    campaign.status === "DRAFT" ||
+    campaign.status === "PENDING";
 
-  // Entregas e impacto solo tienen sentido una vez la campana arranco.
-  // Mientras espera al cliente no hay nada publicado que registrar ni
-  // que medir, y pedir links de un trabajo que aun no se ha encargado
-  // solo confunde a quien mira la ficha.
+  const catalogoParaSustituir = puedeAnadirInfluencers
+    ? (await getAllProfilesForEditor()).filter((p) => !idsEnCampana.has(p.id))
+    : [];
+
+  // Las pestanas de entregas e impacto se ven siempre, pero registrar
+  // contenido sigue siendo cosa de una campana en marcha: antes de
+  // arrancar no hay trabajo encargado del que pegar un enlace.
   const enMarcha = campaign.status === "ACTIVE";
-  const yaArranco =
-    enMarcha ||
-    campaign.status === "COMPLETED" ||
-    campaign.status === "CANCELLED";
 
   // A quien hay que pagar en esta campana. Solo con la campana en
   // marcha: antes no hay trabajo encargado que pagar.
-  const pagos = yaArranco ? await listarPagos({ campaignId: id }) : [];
+  // listarPagos ya filtra por ESTADOS_PAGABLES, asi que en una campana
+  // que no ha arrancado devuelve vacio sin que haya que preguntarlo
+  // aqui. La pestana se pinta igual y lo dice.
+  const pagos = await listarPagos({ campaignId: id });
 
   const activos = campaign.profiles.filter((p) => p.participacion === "ACTIVO");
   const profileCounts = {
@@ -691,6 +697,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               ) : (
                 <div className="space-y-6">
                   {campaign.profiles.map((cp) => {
+                    const retirado = cp.participacion === "RETIRADO";
+
                     // Lo que cuesta este creador entero: todos sus formatos
                     // de todas sus redes, al precio que ve el cliente. Con el
                     // margen ya dentro y sin desglosarlo: para el cliente ese
@@ -712,10 +720,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                     );
 
                     return (
-                    <div key={cp.id} className={`border rounded-lg p-4 ${
-                      cp.status === "REJECTED" ? "border-red-300 bg-red-50" :
-                      cp.status === "APPROVED" ? "border-green-300 bg-green-50" : ""
-                    }`}>
+                    <div
+                      key={cp.id}
+                      className={`border rounded-lg p-4 ${
+                        // Quien ya no esta contratado se ve apagado, aunque
+                        // en su dia lo aprobaran: el verde dice "cuenta en
+                        // esta campana", y un retirado ya no cuenta.
+                        retirado
+                          ? "border-gray-300 bg-gray-100 opacity-75"
+                          : cp.status === "REJECTED"
+                            ? "border-red-300 bg-red-50"
+                            : cp.status === "APPROVED"
+                              ? "border-green-300 bg-green-50"
+                              : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div>
@@ -738,11 +757,25 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                               ${formatNumber(totalPerfil.toFixed(0))}
                             </p>
                           </div>
-                          {/* Estado del perfil en la campaña */}
-                          {(campaign.status === "REVIEW" || campaign.status === "PENDING" || campaign.status === "ACTIVE") && (
-                            <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
-                              {PROFILE_STATUS_LABELS[cp.status]}
+                          {/* Estado del perfil en la campaña.
+                              Retirado manda sobre aprobado: son dos ejes
+                              distintos —si el cliente lo aprobo y si sigue
+                              contratado— pero en la insignia solo cabe uno,
+                              y el que importa al mirar la ficha es si sigue
+                              dentro. Por eso se pinta siempre que lo este,
+                              y no solo en las etapas donde hay revision. */}
+                          {retirado ? (
+                            <Badge className="bg-gray-200 text-gray-700">
+                              Retirado
                             </Badge>
+                          ) : (
+                            (campaign.status === "REVIEW" ||
+                              campaign.status === "PENDING" ||
+                              campaign.status === "ACTIVE") && (
+                              <Badge className={PROFILE_STATUS_COLORS[cp.status]}>
+                                {PROFILE_STATUS_LABELS[cp.status]}
+                              </Badge>
+                            )
                           )}
                           {/* Retirar solo con la campaña en marcha: antes de
                               activarla los cambios se hacen en el editor,
@@ -759,7 +792,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                       </div>
 
                       {/* Quien ya no sigue contratado, y por qué. */}
-                      {cp.participacion === "RETIRADO" && (
+                      {retirado && (
                         <div className="mb-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-600">
                           Retirado
                           {cp.retiradoEn &&
@@ -879,9 +912,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Sustituciones: solo con la campana en marcha. Antes de activarla
-              los cambios se hacen en el editor, que permite mucho mas. */}
-          {campaign.status === "ACTIVE" && (
+          {/* Anadir un influencer sin pasar por el editor.
+              Tambien con la campana Abierta: una campana recien convertida
+              desde un brief llega vacia, y obligar a entrar en "Editar"
+              para poner al primer creador era un rodeo. El editor sigue
+              siendo la herramienta completa —precios, quitar gente—; esto
+              solo anade. */}
+          {puedeAnadirInfluencers && (
             <ReemplazarInfluencer
               campaignId={id}
               profiles={catalogoParaSustituir}
@@ -897,7 +934,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     },
   ];
 
-  if (yaArranco) {
+  // Las pestanas se muestran siempre, tengan datos o no. Antes
+  // aparecian solo con la campana en marcha y una campana recien creada
+  // ensenaba dos: quien la abria no podia saber que mas iba a haber
+  // alli. Cada una dice por si misma que esta vacia y por que.
+  {
     pestanas.push({
       valor: "entregas",
       etiqueta: "Entregas de contenido",
@@ -946,20 +987,22 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             puedeRefrescar={
               campaign.status === "ACTIVE" || campaign.status === "COMPLETED"
             }
-            puedeEditarCifras={campaign.status === "ACTIVE"}
+            // Tambien con la campana cerrada: las cifras de una
+            // historia siguen subiendo despues de darla por entregada, y
+            // el informe al cliente suele escribirse justo entonces. Es
+            // la misma regla que ya tiene el refresco automatico.
+            puedeEditarCifras={
+              campaign.status === "ACTIVE" || campaign.status === "COMPLETED"
+            }
           />
         </>
       ),
     });
   }
 
-  // El enlace tambien en campanas ACTIVE: de ahi sale el enlace con el
-  // que el cliente aprueba un reemplazo.
-  if (
-    campaign.approvalTokens.length > 0 ||
-    campaign.status === "REVIEW" ||
-    campaign.status === "ACTIVE"
-  ) {
+  // El enlace tambien se pinta siempre. La tarjeta explica por si sola
+  // que todavia no hay ninguno y cuando se podra generar.
+  {
     pestanas.push({
       valor: "aprobacion",
       etiqueta: "Enlace de aprobación",

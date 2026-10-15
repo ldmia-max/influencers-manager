@@ -48,7 +48,12 @@ interface Props {
 }
 
 /**
- * Sustituir a un influencer que se retiro de una campana ya en marcha.
+ * Anadir un influencer a una campana sin pasar por el editor.
+ *
+ * Nacio para sustituir a quien se retiraba de una campana ya en marcha,
+ * y de ahi el nombre del archivo; hoy tambien es por donde se pone al
+ * primer creador de una campana Abierta, que es como llegan las que
+ * vienen de un brief: vacias.
  *
  * Solo anade. La edicion completa sigue cerrada en campanas activas a
  * proposito: ahi se podrian cambiar precios que el cliente aprobo o
@@ -257,7 +262,7 @@ export function ReemplazarInfluencer({
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <UserPlus className="h-4 w-4" />
-            Sustituciones
+            Nuevo influencer
           </CardTitle>
           {presupuestoLiberado > 0 && (
             <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">

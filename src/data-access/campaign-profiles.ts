@@ -257,9 +257,13 @@ export async function agregarInfluencerACampana(
   });
   if (!campana) throw new NotFoundError("Campaña no encontrada");
 
-  if (campana.status !== "ACTIVE" && campana.status !== "PENDING") {
+  // Abierta y En proceso. En Revision no, porque el cliente esta
+  // mirando esa misma lista y le apareceria gente a mitad de decidir;
+  // en Cerrada y Cancelada tampoco, que son terminales.
+  const ADMITEN_NUEVOS = ["ACTIVE", "DRAFT", "PENDING"];
+  if (!ADMITEN_NUEVOS.includes(campana.status)) {
     throw new ValidationError(
-      "Solo se pueden añadir influencers a una campaña activa. En borrador o revisión, usa el editor."
+      "No se pueden añadir influencers a esta campaña: solo mientras está abierta o en proceso."
     );
   }
 

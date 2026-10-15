@@ -386,9 +386,30 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
           </div>
         )}
 
-        {!resumen.todoEntregado && (
+        {perfiles.length > 0 && !resumen.todoEntregado && (
           <p className="text-xs text-gray-500">
             La campaña no se puede completar mientras falten links por registrar.
+          </p>
+        )}
+
+        {/* La pestana se pinta aunque no haya nadie todavia, asi que
+            tiene que decir por si sola por que esta vacia. */}
+        {perfiles.length === 0 && (
+          <div className="py-8 text-center">
+            <p className="text-sm text-gray-500">
+              Todavía no hay influencers en esta campaña.
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              Añádelos desde «Perfiles y formatos» y aquí aparecerá lo que
+              tengan que entregar.
+            </p>
+          </div>
+        )}
+
+        {perfiles.length > 0 && !puedeEditar && (
+          <p className="text-xs text-gray-500">
+            El contenido se registra con la campaña en proceso. Mientras tanto
+            esto solo muestra lo contratado.
           </p>
         )}
 

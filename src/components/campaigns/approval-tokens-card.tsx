@@ -135,8 +135,30 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
 
   const admiteEnlace = campaignStatus === "REVIEW" || campaignStatus === "ACTIVE";
 
+  // Antes devolvia null y la pestana quedaba en blanco, que no se
+  // distingue de algo roto. Si todavia no se puede generar un enlace,
+  // lo que hace falta es decir cuando se podra.
   if (tokens.length === 0 && !admiteEnlace) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            Enlace de Aprobación
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500">
+            Todavía no hay enlace de aprobación.
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            {campaignStatus === "COMPLETED" || campaignStatus === "CANCELLED"
+              ? "Esta campaña ya terminó, así que no se generarán más enlaces."
+              : "Se genera al enviar la campaña a revisión, que es cuando el cliente tiene algo que aprobar."}
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { apiPatch, apiPost } from "@/services/api";
+import { registrarCifras } from "@/services/entregas";
 
 export interface CapturaMetrica {
   capturadoEn: string;
@@ -133,6 +134,15 @@ type CifrasAMano = {
   alcance: number | null;
   compartidosReportados: number | null;
   reposteosReportados: number | null;
+  /**
+   * Solo en los efimeros, y solo si se acaban de anotar.
+   *
+   * `undefined` es "no se tocó" y deja mandar a la ultima captura;
+   * `null` seria "sin dato", que aqui no se usa porque una casilla
+   * vacia significa dejar la cifra como estaba.
+   */
+  vistas?: number | null;
+  interacciones?: number | null;
 };
 
 interface Props {
@@ -312,10 +322,16 @@ export function MetricasCampana({
         admiteReposteos: pub.admiteReposteos,
         esExtra: pub.esExtra,
         origen: c?.origen ?? "MEDIDA",
-        vistas: c?.vistas ?? null,
+        // Lo que se acaba de anotar manda sobre la ultima captura: la
+        // captura nueva ya esta en la base, pero el servidor no repinta
+        // de forma fiable en produccion.
+        vistas: local?.vistas !== undefined ? local.vistas : (c?.vistas ?? null),
         meGusta: c?.meGusta ?? null,
         comentarios: c?.comentarios ?? null,
-        interacciones: c?.interacciones ?? null,
+        interacciones:
+          local?.interacciones !== undefined
+            ? local.interacciones
+            : (c?.interacciones ?? null),
         guardados: c?.guardados ?? null,
         // Lo escrito a mano manda sobre lo medido: alguien miro el panel
         // del creador —la unica fuente donde Instagram publica estas dos
@@ -1007,7 +1023,11 @@ export function MetricasCampana({
                                           <button
                                             type="button"
                                             onClick={() => setEditando(pieza)}
-                                            title="Anotar alcance, compartidos y reposteos"
+                                            title={
+                                              pieza.esEfimero
+                                                ? "Anotar vistas e interacciones"
+                                                : "Anotar alcance, compartidos y reposteos"
+                                            }
                                             className="rounded p-1 text-gray-400 hover:bg-accent/10 hover:text-gray-700"
                                           >
                                             <Pencil className="h-3 w-3" />
@@ -1177,9 +1197,20 @@ function CeldaAlcance({
 /**
  * Anotar lo que ningun scraper lee.
  *
- * Las tres cifras juntas en un modal y no tres casillas sueltas en la
- * tabla: se consultan de una vez en el panel del creador, y escribirlas
- * de una vez es una sola visita y una sola peticion.
+ * Las cifras juntas en un modal y no sueltas en la tabla: se consultan
+ * de una vez en el panel del creador, y escribirlas de una vez es una
+ * sola visita.
+ *
+ * En una historia o un directo tambien se anotan las vistas y las
+ * interacciones. Ahi no hay nada que medir —su autor es el unico que ve
+ * esas cifras— y antes solo se podian escribir al registrar la pieza:
+ * si al dia siguiente habia mas vistas, el informe al cliente se
+ * quedaba con las primeras.
+ *
+ * Cada cambio anade una captura en vez de corregir la anterior, que es
+ * como funciona todo el historico: una historia se ve durante horas, y
+ * el dia uno y el dia tres son dos datos, no una rectificacion. Manda
+ * la ultima, que es la que se pinta.
  */
 function ModalCifras({
   campaignId,
@@ -1195,6 +1226,8 @@ function ModalCifras({
   const [alcance, setAlcance] = useState("");
   const [compartidos, setCompartidos] = useState("");
   const [reposteos, setReposteos] = useState("");
+  const [vistas, setVistas] = useState("");
+  const [interacciones, setInteracciones] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [abiertaPara, setAbiertaPara] = useState<string | null>(null);
@@ -1206,11 +1239,19 @@ function ModalCifras({
     setAlcance(pieza.alcance !== null ? String(pieza.alcance) : "");
     setCompartidos(pieza.compartidos !== null ? String(pieza.compartidos) : "");
     setReposteos(pieza.reposteos !== null ? String(pieza.reposteos) : "");
+    setVistas(pieza.vistas !== null ? String(pieza.vistas) : "");
+    setInteracciones(
+      pieza.interacciones !== null ? String(pieza.interacciones) : ""
+    );
     setError(null);
   }
 
   const admiteAlcance = !!pieza && pieza.esInstagram && !pieza.esEfimero;
   const admiteReposteos = !!pieza && pieza.admiteReposteos;
+  // Vistas e interacciones a mano solo donde no hay scraper que las lea.
+  // En una publicacion con enlace las mide Apify, y escribirlas aqui
+  // crearia dos verdades para el mismo contenido.
+  const admiteCifrasPropias = !!pieza && pieza.esEfimero;
 
   // Vacio significa "sin dato", que es distinto de cero: borrar la
   // casilla retira la cifra en vez de afirmar que nadie lo compartio.
@@ -1228,10 +1269,26 @@ function ModalCifras({
       compartidos: aNumero(compartidos),
       ...(admiteReposteos ? { reposteos: aNumero(reposteos) } : {}),
     };
-    if (Object.values(cuerpo).some((v) => Number.isNaN(v))) {
+
+    // Vistas e interacciones van por otro camino: no corrigen la
+    // captura anterior, anaden una. Vacio aqui no retira la cifra, la
+    // deja como estaba, porque una historia se mira varios dias y
+    // borrarla al anotar solo la otra seria perder lo que ya se sabia.
+    const vistasNuevas = admiteCifrasPropias ? aNumero(vistas) : null;
+    const interNuevas = admiteCifrasPropias ? aNumero(interacciones) : null;
+    const cambioVistas = admiteCifrasPropias && vistasNuevas !== pieza.vistas;
+    const cambioInter =
+      admiteCifrasPropias && interNuevas !== pieza.interacciones;
+
+    if (
+      Object.values(cuerpo).some((v) => Number.isNaN(v)) ||
+      Number.isNaN(vistasNuevas) ||
+      Number.isNaN(interNuevas)
+    ) {
       setError("Escribe números enteros, o deja la casilla vacía.");
       return;
     }
+
     setGuardando(true);
     setError(null);
     try {
@@ -1240,10 +1297,26 @@ function ModalCifras({
         compartidosReportados: number | null;
         reposteosReportados: number | null;
       }>(`/api/campaigns/${campaignId}/entregas/${pieza.entregaId}/cifras`, cuerpo);
+
+      let anotadas: Pick<CifrasAMano, "vistas" | "interacciones"> = {};
+      if (cambioVistas || cambioInter) {
+        const captura = await registrarCifras(campaignId, pieza.entregaId, {
+          ...(cambioVistas ? { vistas: vistasNuevas } : {}),
+          ...(cambioInter ? { interacciones: interNuevas } : {}),
+        });
+        // La captura responde con las dos cifras ya fundidas: la que no
+        // se tocó viene arrastrada de la anterior.
+        anotadas = {
+          vistas: captura.vistas,
+          interacciones: captura.interacciones,
+        };
+      }
+
       onGuardado(pieza.entregaId, {
         alcance: guardada.alcance,
         compartidosReportados: guardada.compartidosReportados,
         reposteosReportados: guardada.reposteosReportados,
+        ...anotadas,
       });
       onCerrar();
     } catch (e) {
@@ -1268,6 +1341,36 @@ function ModalCifras({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* En una historia o un directo, estas dos son LAS cifras: no
+              hay enlace que medir, solo lo que ve su autor en su panel. */}
+          {admiteCifrasPropias && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="vistas">Vistas</Label>
+                <Input
+                  id="vistas"
+                  inputMode="numeric"
+                  value={vistas}
+                  onChange={(e) => setVistas(e.target.value)}
+                  placeholder="Las que muestra el panel del creador"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="interacciones">Interacciones</Label>
+                <Input
+                  id="interacciones"
+                  inputMode="numeric"
+                  value={interacciones}
+                  onChange={(e) => setInteracciones(e.target.value)}
+                  placeholder="Respuestas y reacciones, en un solo número"
+                />
+                <p className="text-xs text-gray-500">
+                  Una historia no se desglosa: su autor ve respuestas y
+                  reacciones en una sola cifra.
+                </p>
+              </div>
+            </>
+          )}
           {admiteAlcance && (
             <div className="space-y-1.5">
               <Label htmlFor="alcance">Alcance</Label>
@@ -1305,9 +1408,17 @@ function ModalCifras({
             )}
           </div>
           <p className="text-xs text-gray-500">
-            Deja una casilla vacía para retirar su cifra. Lo que escribas aquí
-            manda sobre lo que mida el refresco automático.
+            Deja vacíos compartidos o reposteos para retirar su cifra. Lo que
+            escribas aquí manda sobre lo que mida el refresco automático.
           </p>
+          {admiteCifrasPropias && (
+            <p className="text-xs text-gray-500">
+              Las vistas y las interacciones se guardan como una medición nueva,
+              no corrigen la anterior: una historia se ve durante horas y cada
+              consulta es un dato más. Manda la última. Si dejas una vacía,
+              conserva el valor que ya tenía.
+            </p>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
