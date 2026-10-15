@@ -31,11 +31,19 @@ export type TipoPersona = "NATURAL" | "JURIDICA";
 /**
  * Lo que aplica a cada tipo.
  *
- * La retencion se calcula sobre la BASE, no sobre la factura con IVA.
+ * Los dos porcentajes salen de la BASE y ninguno del otro: el IVA no se
+ * calcula sobre base + retencion, ni la retencion sobre la factura con
+ * IVA. Van en paralelo, no en cadena.
+ *
+ * Se escribe aqui porque es el detalle que mas se presta a deriva —son
+ * dos cifras que aparecen juntas en la misma fila y parece natural
+ * encadenarlas—, y encadenarlas cambia el dinero: en una base de
+ * 5.000.000 el IVA pasaria de 950.000 a 1.054.500.
+ *
  * Comprobado contra las dos filas juridicas de la hoja: Fly Pasion sas
  * (5.000.000 → IVA 950.000, retencion 550.000, a pagar 5.400.000) y Oh
  * mai kat (10.730.337 → IVA 2.038.764, retencion 1.180.337, a pagar
- * 11.588.764).
+ * 11.588.764). Las dos cuadran al peso con base × 19% y base × 11%.
  *
  * El reteiva no figura: solo lo practica un gran contribuyente y la
  * agencia no lo es, asi que es cero siempre. La columna se pinta igual,
@@ -63,6 +71,7 @@ export interface Impuestos {
 
 export function calcularImpuestos(base: number, tipo: TipoPersona): Impuestos {
   const { iva: tarifaIva, retencion: tarifaRetencion } = TARIFAS[tipo];
+  // Los dos sobre `base`, nunca uno sobre el resultado del otro.
   const iva = Math.round(base * tarifaIva);
   const retencion = Math.round(base * tarifaRetencion);
   const valorFactura = base + iva;
