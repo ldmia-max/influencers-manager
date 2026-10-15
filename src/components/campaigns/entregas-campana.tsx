@@ -148,6 +148,22 @@ function soloFecha(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/**
+ * Un "YYYY-MM-DD" del formulario convertido a instante.
+ *
+ * A mediodia UTC, no a medianoche. `new Date("2026-10-12")` da las
+ * 00:00 UTC, que en Bogota —UTC-5— son las 19:00 del 11: la fecha se
+ * guardaba bien y se pintaba un dia antes. Y no es solo cosmetico, que
+ * los avisos de vencimiento reducen la fecha al dia de la agencia y
+ * reclamaban un dia antes de tiempo.
+ *
+ * Mediodia deja doce horas de margen a cada lado, asi que ninguna zona
+ * horaria del mundo cambia el dia.
+ */
+function instanteDelDia(dia: string): string {
+  return new Date(`${dia}T12:00:00.000Z`).toISOString();
+}
+
 function fechaCorta(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", {
     day: "2-digit",
@@ -264,6 +280,11 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
     url: "",
     notas: "",
     esExtra: false,
+    /** Solo en los efimeros: la fecha en que se emitio. */
+    publicadoEn: "",
+    /** Solo en los efimeros: lo que reporto el creador. */
+    vistas: "",
+    interacciones: "",
   });
   /** La casilla Extra de la proxima pieza de cada formato. */
   const [extraNueva, setExtraNueva] = useState<Record<string, boolean>>({});
@@ -284,8 +305,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   const [notasGuardadas, setNotasGuardadas] = useState<Record<string, string>>({});
   // Formato señalado para la próxima pieza de cada bloque.
   const [tipoElegido, setTipoElegido] = useState<Record<string, string>>({});
-  const [vistasEntrega, setVistasEntrega] = useState<Record<string, string>>({});
-  const [interEntrega, setInterEntrega] = useState<Record<string, string>>({});
 
   // El reloj se lee una vez y se pasa a todos los cálculos, para que dos
   // formatos que vencen al mismo tiempo no se pinten distinto por unos
@@ -312,6 +331,8 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
   /** Vistas recien anotadas, mientras el servidor no las devuelva. */
   const [vistasAnotadas, setVistasAnotadas] = useState<Record<string, number>>({});
   const [interAnotadas, setInterAnotadas] = useState<Record<string, number>>({});
+  /** Fechas de emision corregidas, por lo mismo. */
+  const [fechasGuardadas, setFechasGuardadas] = useState<Record<string, string>>({});
 
   /** Mete una entrega recien creada en la lista, sin esperar al servidor. */
   const pintarYa = (formatoId: string, entrega: EntregaVista) =>
@@ -662,7 +683,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       conError(`fecha-${formato.id}`, () =>
                                         fijarFechaLimite(campaignId, formato.id, {
                                           fechaLimite: e.target.value
-                                            ? new Date(e.target.value).toISOString()
+                                            ? instanteDelDia(e.target.value)
                                             : null,
                                         })
                                       )
@@ -763,10 +784,49 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                 </td>
                                 <td className="px-2 py-1">
                                   {tipoFila?.esEfimero ? (
-                                    <span className="text-[11px] text-gray-500">
-                                      Sin enlace: la sostienen su fecha de emisión y
-                                      quien la confirmó.
-                                    </span>
+                                    // Un efimero no deja enlace: lo que se
+                                    // edita es su fecha y las cifras que
+                                    // reporto el creador, que es todo lo que
+                                    // hay de el.
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <Input
+                                        type="date"
+                                        value={borrador.publicadoEn}
+                                        onChange={(e) =>
+                                          setBorrador((b) => ({
+                                            ...b,
+                                            publicadoEn: e.target.value,
+                                          }))
+                                        }
+                                        className="h-7 w-36 text-xs"
+                                      />
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="Vistas"
+                                        value={borrador.vistas}
+                                        onChange={(e) =>
+                                          setBorrador((b) => ({
+                                            ...b,
+                                            vistas: e.target.value,
+                                          }))
+                                        }
+                                        className="h-7 w-24 text-xs"
+                                      />
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="Interacc."
+                                        value={borrador.interacciones}
+                                        onChange={(e) =>
+                                          setBorrador((b) => ({
+                                            ...b,
+                                            interacciones: e.target.value,
+                                          }))
+                                        }
+                                        className="h-7 w-28 text-xs"
+                                      />
+                                    </div>
                                   ) : (
                                     <>
                                       <Input
@@ -836,18 +896,80 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                       }
                                       onClick={() =>
                                         conError(URL_OCUPADO(entrega.id), async () => {
+                                          const esEfimera = !!tipoFila?.esEfimero;
                                           const guardada = await actualizarEntrega(
                                             campaignId,
                                             entrega.id,
                                             {
-                                              ...(tipoFila?.esEfimero
-                                                ? {}
+                                              ...(esEfimera
+                                                ? {
+                                                    publicadoEn: borrador.publicadoEn
+                                                      ? instanteDelDia(
+                                                          borrador.publicadoEn
+                                                        )
+                                                      : null,
+                                                  }
                                                 : { url: borrador.url.trim() }),
                                               notas: borrador.notas.trim() || null,
                                               serviceTypeId: borrador.tipoId,
                                               esExtra: borrador.esExtra,
                                             }
                                           );
+
+                                          // Las cifras van por su propia ruta:
+                                          // no corrigen la captura anterior,
+                                          // anaden una. Solo si cambiaron,
+                                          // para no sembrar capturas iguales
+                                          // cada vez que se abre el lapiz.
+                                          const antesV =
+                                            vistasAnotadas[entrega.id] ??
+                                            entrega.metricas[0]?.vistas ??
+                                            null;
+                                          const antesI =
+                                            interAnotadas[entrega.id] ??
+                                            entrega.metricas[0]?.interacciones ??
+                                            null;
+                                          const aNum = (t: string) =>
+                                            t.trim() === "" ? null : Number(t);
+                                          const v = aNum(borrador.vistas);
+                                          const i = aNum(borrador.interacciones);
+
+                                          if (esEfimera && (v !== antesV || i !== antesI)) {
+                                            await registrarCifras(
+                                              campaignId,
+                                              entrega.id,
+                                              {
+                                                ...(v !== antesV ? { vistas: v } : {}),
+                                                ...(i !== antesI
+                                                  ? { interacciones: i }
+                                                  : {}),
+                                              }
+                                            );
+                                            if (v !== null)
+                                              setVistasAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: v,
+                                              }));
+                                            if (i !== null)
+                                              setInterAnotadas((a) => ({
+                                                ...a,
+                                                [entrega.id]: i,
+                                              }));
+                                          }
+                                          if (esEfimera) {
+                                            // El mismo instante que se
+                                            // mando, no la fecha cruda:
+                                            // fechaCorta leeria un
+                                            // "2026-10-12" suelto como
+                                            // medianoche UTC y lo pintaria
+                                            // un dia antes.
+                                            setFechasGuardadas((f) => ({
+                                              ...f,
+                                              [entrega.id]: borrador.publicadoEn
+                                                ? instanteDelDia(borrador.publicadoEn)
+                                                : "",
+                                            }));
+                                          }
                                           setUrlsGuardadas((u) => ({
                                             ...u,
                                             [entrega.id]: guardada.url,
@@ -929,8 +1051,12 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     <span className="flex items-center gap-1 text-gray-700">
                                       <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" />
                                       Emitido
-                                      {entrega.publicadoEn
-                                        ? ` el ${fechaCorta(entrega.publicadoEn)}`
+                                      {(fechasGuardadas[entrega.id] ||
+                                        entrega.publicadoEn)
+                                        ? ` el ${fechaCorta(
+                                            fechasGuardadas[entrega.id] ||
+                                              entrega.publicadoEn!
+                                          )}`
                                         : ""}
                                       {entrega.registradoPor
                                         ? ` · confirmado por ${entrega.registradoPor.name}`
@@ -973,86 +1099,6 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                     </span>
                                   )}
 
-                                  {piezaEfimera && puedeEditar && (
-                                    <span className="flex items-center gap-1">
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        placeholder="vistas"
-                                        value={vistasEntrega[entrega.id] ?? ""}
-                                        onChange={(e) =>
-                                          setVistasEntrega((v) => ({
-                                            ...v,
-                                            [entrega.id]: e.target.value,
-                                          }))
-                                        }
-                                        className="h-6 w-20 text-xs"
-                                      />
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        placeholder="interacc."
-                                        value={interEntrega[entrega.id] ?? ""}
-                                        onChange={(e) =>
-                                          setInterEntrega((v) => ({
-                                            ...v,
-                                            [entrega.id]: e.target.value,
-                                          }))
-                                        }
-                                        className="h-6 w-24 text-xs"
-                                      />
-                                      <button
-                                        type="button"
-                                        className="text-violet-700 hover:underline disabled:opacity-40"
-                                        disabled={
-                                          ocupado === `cifras-${entrega.id}` ||
-                                          (!(vistasEntrega[entrega.id] ?? "").trim() &&
-                                            !(interEntrega[entrega.id] ?? "").trim())
-                                        }
-                                        onClick={() =>
-                                          conError(`cifras-${entrega.id}`, async () => {
-                                            const v = (
-                                              vistasEntrega[entrega.id] ?? ""
-                                            ).trim();
-                                            const i = (
-                                              interEntrega[entrega.id] ?? ""
-                                            ).trim();
-                                            await registrarCifras(
-                                              campaignId,
-                                              entrega.id,
-                                              {
-                                                vistas: v ? Number(v) : null,
-                                                interacciones: i ? Number(i) : null,
-                                              }
-                                            );
-                                            // Solo se pinta lo que se acaba
-                                            // de anotar: lo otro conserva su
-                                            // valor.
-                                            if (v)
-                                              setVistasAnotadas((a) => ({
-                                                ...a,
-                                                [entrega.id]: Number(v),
-                                              }));
-                                            if (i)
-                                              setInterAnotadas((a) => ({
-                                                ...a,
-                                                [entrega.id]: Number(i),
-                                              }));
-                                            setVistasEntrega((x) => ({
-                                              ...x,
-                                              [entrega.id]: "",
-                                            }));
-                                            setInterEntrega((x) => ({
-                                              ...x,
-                                              [entrega.id]: "",
-                                            }));
-                                          })
-                                        }
-                                      >
-                                        Guardar
-                                      </button>
-                                    </span>
-                                  )}
                                 </div>
                               </td>
                               <td className="px-2 py-1 text-center">
@@ -1086,6 +1132,14 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           perfil.redesDelPerfil.find(
                                             (r) => r.platformId === platformId
                                           )?.formatos ?? plataforma.formatosDisponibles;
+                                        const vistasAhora =
+                                          vistasAnotadas[entrega.id] ??
+                                          entrega.metricas[0]?.vistas ??
+                                          null;
+                                        const interAhora =
+                                          interAnotadas[entrega.id] ??
+                                          entrega.metricas[0]?.interacciones ??
+                                          null;
                                         setBorrador({
                                           redId: platformId,
                                           tipoId:
@@ -1099,6 +1153,18 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                           esExtra:
                                             extrasGuardados[entrega.id] ??
                                             entrega.esExtra,
+                                          publicadoEn: soloFecha(
+                                            fechasGuardadas[entrega.id] ||
+                                              entrega.publicadoEn
+                                          ),
+                                          vistas:
+                                            vistasAhora !== null
+                                              ? String(vistasAhora)
+                                              : "",
+                                          interacciones:
+                                            interAhora !== null
+                                              ? String(interAhora)
+                                              : "",
                                         });
                                         setEditandoFila(entrega.id);
                                       }}
@@ -1280,7 +1346,7 @@ export function EntregasCampana({ campaignId, perfiles, puedeEditar }: Props) {
                                         interNuevas[perfil.id] ?? ""
                                       ).trim();
                                       const publicadoEn = nuevaEsEfimera
-                                        ? new Date(fechaEmision[perfil.id]).toISOString()
+                                        ? instanteDelDia(fechaEmision[perfil.id])
                                         : null;
                                       const esExtra =
                                         destino.forzarExtra ||
