@@ -1,7 +1,7 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { AprobarRechazar } from "./aprobar-rechazar";
 import { formatNumber } from "@/lib/format";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
@@ -48,15 +48,18 @@ export function ServiceItem({
         }`}
       >
         <div className="flex items-center gap-3">
-          <Checkbox
-            id={`service-${id}`}
-            checked={isApproved}
-            onCheckedChange={(checked) => onToggle(id, checked === true)}
+          <AprobarRechazar
+            aprobado={isApproved}
+            onCambio={(v) => onToggle(id, v)}
             disabled={disabled}
+            tamano="pequeno"
+            etiqueta={`Aprobar o rechazar ${serviceName}`}
           />
-          <label
-            htmlFor={`service-${id}`}
-            className={`text-sm cursor-pointer ${
+          {/* El nombre ya no alterna nada al pulsarlo: la decision esta
+              en los dos botones y tenerla tambien aqui haria que un
+              clic para leer el formato lo rechazara sin querer. */}
+          <span
+            className={`text-sm ${
               !isApproved ? "line-through text-muted-foreground" : ""
             }`}
           >
@@ -64,7 +67,7 @@ export function ServiceItem({
             {quantity > 1 && (
               <span className="text-muted-foreground"> x{quantity}</span>
             )}
-          </label>
+          </span>
         </div>
         <span
           className={`text-sm font-medium ${

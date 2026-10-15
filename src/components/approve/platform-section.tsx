@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { urlDelPerfil } from "@/lib/social-handles";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { AprobarRechazar } from "./aprobar-rechazar";
 import { ServiceItem } from "./service-item";
 import { calculateReach, formatNumber, getReachPercentage } from "@/lib/format";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
@@ -78,12 +78,11 @@ export function PlatformSection({
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Switch
-              checked={isApproved}
-              onCheckedChange={(checked) => onPlatformToggle(id, checked)}
-              onClick={(e) => e.stopPropagation()}
+            <AprobarRechazar
+              aprobado={isApproved}
+              onCambio={(v) => onPlatformToggle(id, v)}
               disabled={disabled}
-              className="data-[state=checked]:bg-green-500"
+              etiqueta={`Aprobar o rechazar ${platformName}`}
             />
             <span
               className={`font-medium ${

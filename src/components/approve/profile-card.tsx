@@ -5,7 +5,7 @@ import Image from "next/image";
 import { ChevronDown, ChevronUp, User } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { AprobarRechazar } from "./aprobar-rechazar";
 import { PlatformSection, ServiceData } from "./platform-section";
 import { formatNumber } from "@/lib/format";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
@@ -119,12 +119,11 @@ export function ProfileCard({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={isApproved}
-                  onCheckedChange={(checked) => onProfileToggle(id, checked)}
-                  onClick={(e) => e.stopPropagation()}
+                <AprobarRechazar
+                  aprobado={isApproved}
+                  onCambio={(v) => onProfileToggle(id, v)}
                   disabled={disabled}
-                  className="data-[state=checked]:bg-green-500"
+                  etiqueta={`Aprobar o rechazar a ${profileName}`}
                 />
                 <h3
                   className={`font-semibold ${
