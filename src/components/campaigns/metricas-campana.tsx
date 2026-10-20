@@ -40,7 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { apiPatch, apiPost } from "@/services/api";
-import { Barra } from "./prevision-campana";
+import { Barra, LeyendaDeBarras } from "./prevision-campana";
 import { VISUALIZACIONES_POR_SEGUIDOR } from "@/lib/campaign-utils";
 import { registrarCifras } from "@/services/entregas";
 
@@ -877,6 +877,13 @@ export function MetricasCampana({
                       seguidores sumados de los creadores
                     </p>
                   </div>
+
+                  {/* La misma leyenda del modelo hipotetico: son las
+                      mismas dos barras y tienen que nombrarse igual. */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <LeyendaDeBarras />
+                  </div>
+
                   <span
                     className={`text-2xl font-bold tabular-nums ${
                       estimado.veces === null

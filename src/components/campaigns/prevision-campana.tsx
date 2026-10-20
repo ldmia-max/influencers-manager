@@ -46,14 +46,7 @@ export function PrevisionCampana({
                 {formatNumber(seguidores)}
               </span>
             </span>
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-marca" />
-              Resultado
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
-              Previsión
-            </span>
+            <LeyendaDeBarras />
           </div>
         </div>
 
@@ -118,6 +111,28 @@ export function PrevisionCampana({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Que significa cada color de las barras.
+ *
+ * Se comparte con Impacto del contenido por el mismo motivo que la
+ * barra: son los mismos dos colores diciendo lo mismo, y dos copias
+ * acabarian nombrandolos distinto.
+ */
+export function LeyendaDeBarras() {
+  return (
+    <>
+      <span className="flex items-center gap-1.5 text-gray-500">
+        <span className="h-2.5 w-2.5 rounded-full bg-marca" />
+        Resultado
+      </span>
+      <span className="flex items-center gap-1.5 text-gray-500">
+        <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
+        Previsión
+      </span>
+    </>
   );
 }
 
