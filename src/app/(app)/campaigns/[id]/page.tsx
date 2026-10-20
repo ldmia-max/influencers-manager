@@ -32,6 +32,7 @@ import {
   PROFILE_STATUS_COLORS,
   calculateMarkupPrice,
   calcularTotalCampana,
+  VISUALIZACIONES_POR_SEGUIDOR,
 } from "@/lib/campaign-utils";
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
@@ -254,7 +255,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // La prevision: una cadena de factores fijos sobre los seguidores
   // contratados. El alcance solo lo reporta Instagram, pero el factor
   // se aplica sobre el total de visualizaciones, no sobre su parte.
-  const previsionVisualizaciones = totalSeguidores * 0.25;
+  const previsionVisualizaciones =
+    totalSeguidores * VISUALIZACIONES_POR_SEGUIDOR;
   const previsionAlcance = previsionVisualizaciones * 0.4;
   const previsionLikes = previsionAlcance * 0.03;
   const previsionComentarios = previsionLikes * 0.1;
@@ -1032,6 +1034,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             puedeEditarCifras={
               campaign.status === "ACTIVE" || campaign.status === "COMPLETED"
             }
+            seguidores={totalSeguidores}
           />
 
           {/* La prevision cierra la pestana, debajo del aporte por

@@ -121,7 +121,14 @@ export function PrevisionCampana({
   );
 }
 
-function Barra({
+/**
+ * Una barra con su cifra al final.
+ *
+ * Se exporta porque Impacto del contenido pinta la misma para las
+ * visualizaciones, y dos barras con el mismo trabajo acaban con dos
+ * aspectos distintos.
+ */
+export function Barra({
   valor,
   escala,
   className,

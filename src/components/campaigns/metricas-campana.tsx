@@ -40,6 +40,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { apiPatch, apiPost } from "@/services/api";
+import { Barra } from "./prevision-campana";
+import { VISUALIZACIONES_POR_SEGUIDOR } from "@/lib/campaign-utils";
 import { registrarCifras } from "@/services/entregas";
 
 export interface CapturaMetrica {
@@ -157,6 +159,14 @@ interface Props {
    * entrego al cliente, y no se reescribe.
    */
   puedeEditarCifras?: boolean;
+  /**
+   * Seguidores sumados de los creadores contratados. De aqui sale el
+   * estimado de visualizaciones, que es el 25%.
+   *
+   * Opcional: sin el, la barra no se pinta. Una campana sin seguidores
+   * daria un estimado de cero y una barra que no diria nada.
+   */
+  seguidores?: number;
 }
 
 /**
@@ -271,6 +281,7 @@ export function MetricasCampana({
   publicaciones = [],
   puedeRefrescar = false,
   puedeEditarCifras = false,
+  seguidores = 0,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -684,6 +695,28 @@ export function MetricasCampana({
     };
   }, [capturas, publicaciones, cifrasLocales, vista]);
 
+  /**
+   * El estimado de visualizaciones y lo que se lleva conseguido.
+   *
+   * El 0,25 es el mismo factor que usa el modelo hipotetico al final de
+   * la pestana: se saca de aqui para que las dos barras digan lo mismo
+   * y no se puedan desincronizar al tocar una.
+   */
+  const estimado = (() => {
+    if (seguidores <= 0) return null;
+    const previsto = seguidores * VISUALIZACIONES_POR_SEGUIDOR;
+    const vistas = datos.totales.find((t) => t.clave === "vistas");
+    // `disponible` en falso no es un cero medido: es que ninguna de las
+    // publicaciones de esta campana da numero de vistas.
+    const logrado = vistas?.disponible ? vistas.valor : null;
+    return {
+      previsto,
+      logrado,
+      escala: Math.max(previsto, logrado ?? 0, 1),
+      veces: logrado === null || previsto <= 0 ? null : logrado / previsto,
+    };
+  })();
+
   const refrescar = async () => {
     setRefrescando(true);
     setError(null);
@@ -824,6 +857,68 @@ export function MetricasCampana({
                   </div>
                 ))}
             </div>
+
+            {/* El progreso contra lo estimado.
+                De las cuatro cifras del modelo hipotetico esta es la
+                que de verdad se mide en todas las redes, asi que vive
+                tambien aqui, pegada a los totales que la componen, y no
+                solo al final de la pestana.
+
+                Solo en General: el estimado sale de los seguidores
+                contratados, que no se reparten entre lo de campana y lo
+                extra. */}
+            {vista === "general" && estimado !== null && (
+              <div className="rounded-lg border border-gray-200 p-4">
+                <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="text-sm font-semibold">Visualizaciones</p>
+                    <p className="text-xs text-gray-500">
+                      Estimado: el 25% de los {formatNumber(seguidores)}{" "}
+                      seguidores sumados de los creadores
+                    </p>
+                  </div>
+                  <span
+                    className={`text-2xl font-bold tabular-nums ${
+                      estimado.veces === null
+                        ? "text-gray-300"
+                        : estimado.veces >= 1
+                          ? "text-marca"
+                          : "text-gray-400"
+                    }`}
+                  >
+                    {estimado.veces === null
+                      ? "—"
+                      : `${estimado.veces.toLocaleString("es-CO", {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}x`}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-1.5">
+                  {/* Lo conseguido arriba y el estimado debajo, como en
+                      el modelo hipotetico: lo que se viene a mirar es lo
+                      primero que se lee. */}
+                  {estimado.logrado === null ? (
+                    <div className="flex h-4 items-center text-xs text-gray-400">
+                      Todavía no hay visualizaciones medidas
+                    </div>
+                  ) : (
+                    <Barra
+                      valor={estimado.logrado}
+                      escala={estimado.escala}
+                      className="bg-marca"
+                    />
+                  )}
+                  <Barra
+                    valor={estimado.previsto}
+                    escala={estimado.escala}
+                    className="bg-gray-300"
+                    tenue
+                  />
+                </div>
+              </div>
+            )}
 
             {datos.reportadas > 0 && (
               <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">

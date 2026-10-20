@@ -1,6 +1,20 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
 /**
+ * Visualizaciones que se estiman por cada seguidor contratado.
+ *
+ * La usan la barra de Impacto del contenido y el modelo hipotetico, que
+ * son la misma cifra pintada dos veces: verlas discrepar no tendria
+ * explicacion.
+ *
+ * Vive aqui y no en metricas-campana.tsx, que es donde se pinta, porque
+ * ese modulo lleva "use client": importar un valor suyo desde un Server
+ * Component devuelve una referencia de cliente y no el numero, y la
+ * multiplicacion sale NaN sin que nada falle.
+ */
+export const VISUALIZACIONES_POR_SEGUIDOR = 0.25;
+
+/**
  * Margen POR DEFECTO para las campanas nuevas.
  *
  * Son dos pasos, no un porcentaje suelto:

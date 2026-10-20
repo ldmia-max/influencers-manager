@@ -190,6 +190,7 @@ async function Contenido({ params }: PageProps) {
         campaignId={campana.id}
         capturas={capturas}
         publicaciones={publicaciones}
+        seguidores={totalSeguidores}
       />
 
       <Card>
