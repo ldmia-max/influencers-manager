@@ -871,7 +871,7 @@ export function MetricasCampana({
               <div className="rounded-lg border border-gray-200 p-4">
                 <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
                   <div>
-                    <p className="text-sm font-semibold">Visualizaciones</p>
+                    <p className="text-sm font-semibold">Previsión</p>
                     <p className="text-xs text-gray-500">
                       Estimado: el 25% de los {formatNumber(seguidores)}{" "}
                       seguidores sumados de los creadores
