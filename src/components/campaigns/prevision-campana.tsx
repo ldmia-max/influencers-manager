@@ -38,7 +38,7 @@ export function PrevisionCampana({
     <Card>
       <CardContent className="space-y-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <span className="font-semibold">Previsión</span>
+          <span className="font-semibold">Modelo hipotético</span>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
             <span className="flex items-center gap-2 text-gray-500">
               Total seguidores:
