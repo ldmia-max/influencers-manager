@@ -882,7 +882,23 @@ export async function getCampaignResultsForClient(
                       url: true,
                       publicadoEn: true,
                       entregadoEn: true,
-                      serviceType: { select: { displayName: true } },
+                      // Las cifras escritas a mano. Entran para que el
+                      // engagement del portal salga del mismo sitio que
+                      // el de la agencia: el alcance es el denominador y
+                      // compartidos y reposteos van en el numerador, asi
+                      // que sin ellos el cliente veria otro porcentaje
+                      // para lo mismo. `notas` sigue fuera a proposito.
+                      alcance: true,
+                      compartidosReportados: true,
+                      reposteosReportados: true,
+                      esExtra: true,
+                      serviceType: {
+                        select: {
+                          displayName: true,
+                          esEfimero: true,
+                          platform: { select: { name: true, displayName: true } },
+                        },
+                      },
                       metricas: {
                         orderBy: { capturadoEn: "asc" },
                         select: {

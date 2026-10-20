@@ -15,7 +15,10 @@ import {
 import { formatCompactNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MetricasCampana } from "@/components/campaigns/metricas-campana";
+import {
+  MetricasCampana,
+  type Publicacion,
+} from "@/components/campaigns/metricas-campana";
 
 function formatearFecha(fecha: Date | string): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -92,6 +95,49 @@ async function Contenido({ params }: PageProps) {
     )
   );
 
+  /**
+   * Una entrada por entrega, con lo que ningun scraper lee.
+   *
+   * El portal recibe las mismas que la ficha de la agencia para que el
+   * engagement salga igual en los dos sitios: sin el alcance, el
+   * denominador caeria a las vistas y el cliente veria otro porcentaje
+   * para la misma campana.
+   */
+  const publicaciones: Publicacion[] = campana.profiles.flatMap((cp) =>
+    cp.platforms.flatMap((cpp) =>
+      cpp.services.flatMap((cs) =>
+        cs.entregas.map((e) => {
+          const red =
+            e.serviceType?.platform.name ?? cpp.socialAccount.platform.name;
+          return {
+            entregaId: e.id,
+            influencer: cp.profile.name,
+            plataforma:
+              e.serviceType?.platform.displayName ??
+              cpp.socialAccount.platform.displayName,
+            username: cpp.socialAccount.username,
+            url: e.url,
+            formato:
+              e.serviceType?.displayName ??
+              (cs.esCombo
+                ? "Combo"
+                : (cs.profileService?.serviceType.displayName ?? null)),
+            esInstagram: red.toLowerCase() === "instagram",
+            admiteReposteos: red.toLowerCase() === "instagram",
+            esEfimero: e.serviceType
+              ? e.serviceType.esEfimero
+              : !cs.esCombo &&
+                (cs.profileService?.serviceType.esEfimero ?? false),
+            alcance: e.alcance,
+            compartidosReportados: e.compartidosReportados,
+            reposteosReportados: e.reposteosReportados,
+            esExtra: e.esExtra,
+          };
+        })
+      )
+    )
+  );
+
   const totalSeguidores = campana.profiles.reduce(
     (suma, cp) =>
       suma +
@@ -140,7 +186,11 @@ async function Contenido({ params }: PageProps) {
       </div>
 
       {/* El cliente mira, no refresca: cada lectura consume crédito. */}
-      <MetricasCampana campaignId={campana.id} capturas={capturas} />
+      <MetricasCampana
+        campaignId={campana.id}
+        capturas={capturas}
+        publicaciones={publicaciones}
+      />
 
       <Card>
         <CardHeader>

@@ -182,6 +182,48 @@ const VISTAS = [
   },
 ];
 
+/**
+ * Las interacciones de una publicacion.
+ *
+ * Una historia trae un unico numero porque su autor no ve mas: no se
+ * puede sumar un desglose que la plataforma no da. Cuando existe manda
+ * sobre la suma, que ahi valdria cero.
+ *
+ * Vive aqui y no dentro de un bucle porque ahora la usan dos calculos
+ * —el aporte por influencer y el engagement— y dos copias de esta regla
+ * acabarian dando dos numeros distintos para lo mismo.
+ */
+/**
+ * El engagement, escrito como se lee en voz alta.
+ *
+ * Un decimal solo cuando aporta: "5 %" y no "5,0 %", pero "0,8 %" y no
+ * "1 %", que redondeando a entero perderia justo donde la cifra es
+ * pequena y la diferencia importa.
+ */
+function porcentajeLegible(valor: number): string {
+  const uno = Math.round(valor * 10) / 10;
+  const texto = Number.isInteger(uno)
+    ? String(uno)
+    : uno.toFixed(1).replace(".", ",");
+  return `${texto} %`;
+}
+
+function interaccionesDe(c: {
+  interacciones: number | null;
+  meGusta: number | null;
+  comentarios: number | null;
+  compartidos: number | null;
+  reposteos: number | null;
+}): number {
+  return (
+    c.interacciones ??
+    (c.meGusta ?? 0) +
+      (c.comentarios ?? 0) +
+      (c.compartidos ?? 0) +
+      (c.reposteos ?? 0)
+  );
+}
+
 const SERIES = [
   { clave: "vistas" as const, nombre: "Vistas", color: "#7c3aed", icono: Eye },
   { clave: "meGusta" as const, nombre: "Me gusta", color: "#ec4899", icono: Heart },
@@ -389,6 +431,32 @@ export function MetricasCampana({
       };
     });
 
+    /**
+     * Engagement sobre el alcance: de cuanta gente que vio la
+     * publicacion salio una interaccion.
+     *
+     * El denominador es el alcance cuando la red lo da —solo Instagram,
+     * y solo si alguien lo anoto— y las vistas cuando no: son las dos
+     * maneras que tiene cada red de decir cuanta gente lo vio.
+     *
+     * Una pieza que no da ninguna de las dos queda fuera ENTERA, tambien
+     * sus interacciones. Sumar los likes de un carrusel —que no publica
+     * vistas— sobre el alcance de las demas inflaria el porcentaje con
+     * un numerador que el denominador no cubre.
+     */
+    let alcanceTotal = 0;
+    let interaccionesDelAlcance = 0;
+    let piezasConAlcance = 0;
+    for (const c of actuales) {
+      const vieron = c.alcance ?? c.vistas;
+      if (vieron === null || vieron <= 0) continue;
+      alcanceTotal += vieron;
+      interaccionesDelAlcance += interaccionesDe(c);
+      piezasConAlcance += 1;
+    }
+    const engagement =
+      alcanceTotal > 0 ? (interaccionesDelAlcance / alcanceTotal) * 100 : null;
+
     // Evolucion: total de la campana por dia, con la ultima captura de
     // cada entrega hasta ese dia.
     const dias = [...new Set(capturasDeLaVista.map((c) => dia(c.capturadoEn)))].sort();
@@ -489,12 +557,7 @@ export function MetricasCampana({
       // Una story trae un unico numero de interacciones porque su autor
       // no ve mas: no se puede sumar un desglose que la plataforma no da.
       // Cuando existe manda sobre la suma, que ahi valdria cero.
-      const interacciones =
-        c.interacciones ??
-        (c.meGusta ?? 0) +
-          (c.comentarios ?? 0) +
-          (c.compartidos ?? 0) +
-          (c.reposteos ?? 0);
+      const interacciones = interaccionesDe(c);
       const esReportada = c.origen === "REPORTADA" ? 1 : 0;
       // Cuantas publicaciones aportan cada cifra. Sin esto no se puede
       // distinguir "no tuvo vistas" de "esta red no las publica": un
@@ -593,6 +656,8 @@ export function MetricasCampana({
 
     return {
       totales,
+      engagement,
+      piezasConAlcance,
       evolucion,
       porInfluencer: [...porInfluencer.values()]
         .map((f) => ({ ...f, nombre: f.reportadas > 0 ? `${f.nombre} *` : f.nombre }))
@@ -712,6 +777,29 @@ export function MetricasCampana({
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {/* El engagement abre la fila y ocupa dos altos: no es una
+                  cifra mas, es la que relaciona a las otras dos —cuanta
+                  gente lo vio y cuanta reacciono—, y en blanco se
+                  distingue de los totales en bruto.
+
+                  Solo en General. En Campaña o Extra compararia las
+                  interacciones de un subconjunto con un alcance que no
+                  es el suyo. */}
+              {vista === "general" && datos.engagement !== null && (
+                <div className="col-span-2 flex flex-col items-center justify-center rounded-2xl border-2 border-marca bg-white p-4 lg:col-span-1 lg:row-span-2">
+                  <p className="text-5xl font-light tracking-tight text-marca">
+                    {porcentajeLegible(datos.engagement)}
+                  </p>
+                  <p className="mt-2 text-sm text-marca">Engagement Alcance</p>
+                  {datos.piezasConAlcance < datos.publicaciones && (
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      de {datos.piezasConAlcance} de {datos.publicaciones}{" "}
+                      publicaciones
+                    </p>
+                  )}
+                </div>
+              )}
+
               {datos.totales
                 .filter((t) => t.disponible)
                 .map((t) => (
