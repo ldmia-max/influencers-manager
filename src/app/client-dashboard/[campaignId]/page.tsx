@@ -177,19 +177,22 @@ async function Contenido({ params }: PageProps) {
       valor: "impacto",
       etiqueta: "Impacto del contenido",
       contenido: (
-        // El cliente puede refrescar, por su propia ruta: la de la
-        // agencia exige sesión de empleado, y además relee todas las
-        // publicaciones en cada pulsación. La del portal solo lee lo
-        // que lleva más de 20 h sin leerse, de modo que el crédito de
-        // Apify que puede gastar un cliente pulsando sin parar es el
-        // mismo que la tarea nocturna iba a gastar igualmente.
+        // El cliente mira, no refresca.
+        //
+        // Las cifras las renueva la tarea diaria, así que lo que ve es
+        // la lectura de esta madrugada y un botón diría «ya están al
+        // día» casi siempre. Lo que sí necesita es saber DE CUÁNDO son
+        // los números, y eso lo dice la fecha de última actualización
+        // bajo el título.
+        //
+        // Darle el botón significaría además poner en manos de
+        // cualquiera que entre al portal un gasto de Apify que hoy
+        // decide la agencia.
         <MetricasCampana
           campaignId={campana.id}
           capturas={capturas}
           publicaciones={publicaciones}
           seguidores={totalSeguidores}
-          puedeRefrescar
-          rutaRefresco={`/api/client-portal/metricas/${campana.id}`}
         />
       ),
     },
