@@ -18,6 +18,26 @@ interface RouteParams {
 }
 
 /**
+ * Redirige a una ruta **relativa**, sin componer una URL absoluta.
+ *
+ * `new URL(ruta, req.url)` parecia lo natural y en produccion mandaba al
+ * cliente a `0.0.0.0:3000`: detras del proxy de Dokploy el servidor
+ * escucha en la direccion interna, asi que `req.url` lleva esa y no la
+ * publica. La redireccion salia con el host del contenedor y el
+ * navegador no podia abrirla.
+ *
+ * Tampoco se arma desde `NEXTAUTH_URL` ni desde `x-forwarded-host`: la
+ * primera es una variable mas que puede estar mal puesta, y la segunda
+ * la manda quien llama. Una ruta relativa no necesita saber el host —la
+ * resuelve el navegador contra la pagina en la que ya esta, que es por
+ * definicion la direccion publica correcta—, y por eso no puede
+ * equivocarse de dominio ni dejar que se lo dicten.
+ */
+function redirigirA(ruta: string) {
+  return new NextResponse(null, { status: 303, headers: { Location: ruta } });
+}
+
+/**
  * GET /api/client-portal/revisar/[campaignId]
  *
  * Lleva a un cliente ya identificado en el portal a la revision de una
@@ -40,7 +60,7 @@ interface RouteParams {
  * modo que volver a pulsar continua la misma revision en vez de abrir
  * otra.
  */
-export async function GET(req: Request, { params }: RouteParams) {
+export async function GET(_req: Request, { params }: RouteParams) {
   try {
     const { campaignId } = await params;
 
@@ -50,7 +70,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     );
 
     if (!sesion) {
-      return NextResponse.redirect(new URL("/client-login", req.url));
+      return redirigirA("/client-login");
     }
 
     const token = await tokenDeRevisionParaCliente(
@@ -59,7 +79,7 @@ export async function GET(req: Request, { params }: RouteParams) {
       sesion.email
     );
 
-    const respuesta = NextResponse.redirect(new URL(`/approve/${token}`, req.url));
+    const respuesta = redirigirA(`/approve/${token}`);
     respuesta.cookies.set(
       COOKIE_APROBACION,
       await firmarSesionAprobacion({ token, email: sesion.email }),
@@ -72,13 +92,9 @@ export async function GET(req: Request, { params }: RouteParams) {
     // dejar una pagina de error. El cliente llego aqui pulsando un boton
     // que el portal le ofrecio, asi que el fallo es del portal, no suyo.
     if (error instanceof NotFoundError || error instanceof ValidationError) {
-      return NextResponse.redirect(
-        new URL("/client-dashboard/revisiones?aviso=sin-pendientes", req.url)
-      );
+      return redirigirA("/client-dashboard/revisiones?aviso=sin-pendientes");
     }
     console.error("Error abriendo la revisión desde el portal:", error);
-    return NextResponse.redirect(
-      new URL("/client-dashboard/revisiones?aviso=error", req.url)
-    );
+    return redirigirA("/client-dashboard/revisiones?aviso=error");
   }
 }
