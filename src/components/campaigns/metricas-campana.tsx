@@ -41,6 +41,7 @@ import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { apiPatch, apiPost } from "@/services/api";
 import { Barra, LeyendaDeBarras } from "./prevision-campana";
 import { VISUALIZACIONES_POR_SEGUIDOR } from "@/lib/campaign-utils";
+import { ZONA_AGENCIA } from "@/lib/fechas-agencia";
 import { registrarCifras } from "@/services/entregas";
 
 export interface CapturaMetrica {
@@ -766,15 +767,35 @@ export function MetricasCampana({
             <TrendingUp className="h-4 w-4" />
             Impacto del contenido
           </CardTitle>
-          {datos.capturadoEn && (
+          {/* Cuando se leyeron estas cifras, dicho entero y no en
+              abreviado: quien mira un número necesita saber de cuándo
+              es antes de decidir nada con él, y hasta ahora eso iba en
+              gris claro al lado del título.
+
+              La hora se fija a la zona de la agencia. Sin `timeZone`
+              cada lado la escribía en la suya —el contenedor va en UTC
+              y el navegador en Bogotá—, así que el servidor mandaba una
+              hora, el navegador pintaba otra al hidratar y durante un
+              instante se veía la equivocada. */}
+          {datos.capturadoEn ? (
+            <p className="mt-1 text-xs text-gray-600">
+              {datos.publicaciones}{" "}
+              {datos.publicaciones === 1 ? "publicación" : "publicaciones"} ·
+              última actualización:{" "}
+              <span className="font-medium text-gray-700">
+                {new Date(datos.capturadoEn).toLocaleString("es-CO", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: ZONA_AGENCIA,
+                })}
+              </span>
+            </p>
+          ) : (
             <p className="mt-1 text-xs text-gray-500">
-              {datos.publicaciones} publicaciones · última lectura{" "}
-              {new Date(datos.capturadoEn).toLocaleString("es-CO", {
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              Todavía no se han leído cifras de estas publicaciones.
             </p>
           )}
         </div>
