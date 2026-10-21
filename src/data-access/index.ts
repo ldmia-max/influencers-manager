@@ -156,6 +156,7 @@ export {
   entregasParaRefrescar,
   refrescarMetricas,
   refrescarMetricasDeCampana,
+  refrescarMetricasPendientesDeCampana,
   historicoDeCampana,
   DIAS_DE_SEGUIMIENTO,
 } from "./metricas";

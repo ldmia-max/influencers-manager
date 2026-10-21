@@ -177,12 +177,19 @@ async function Contenido({ params }: PageProps) {
       valor: "impacto",
       etiqueta: "Impacto del contenido",
       contenido: (
-        // El cliente mira, no refresca: cada lectura consume crédito.
+        // El cliente puede refrescar, por su propia ruta: la de la
+        // agencia exige sesión de empleado, y además relee todas las
+        // publicaciones en cada pulsación. La del portal solo lee lo
+        // que lleva más de 20 h sin leerse, de modo que el crédito de
+        // Apify que puede gastar un cliente pulsando sin parar es el
+        // mismo que la tarea nocturna iba a gastar igualmente.
         <MetricasCampana
           campaignId={campana.id}
           capturas={capturas}
           publicaciones={publicaciones}
           seguidores={totalSeguidores}
+          puedeRefrescar
+          rutaRefresco={`/api/client-portal/metricas/${campana.id}`}
         />
       ),
     },

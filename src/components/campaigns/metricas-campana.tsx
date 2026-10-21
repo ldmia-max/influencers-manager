@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -152,8 +151,17 @@ interface Props {
   capturas: CapturaMetrica[];
   /** Una por entrega registrada, haya sido medida o no. */
   publicaciones?: Publicacion[];
-  /** El portal del cliente solo mira: no refresca ni gasta crédito. */
   puedeRefrescar?: boolean;
+  /**
+   * A dónde se pide el refresco.
+   *
+   * El portal del cliente tiene la suya, autorizada por su cookie y
+   * frenada a una lectura cada 20 h por publicación: allí el botón lo
+   * pulsa cualquiera que entre, no alguien que sabe lo que cuesta cada
+   * consulta a Apify. Sin esta prop se usa la de la agencia, que relee
+   * todo en cada pulsación.
+   */
+  rutaRefresco?: string;
   /**
    * Cerrada la campana sus cifras son historia comercial: lo que se le
    * entrego al cliente, y no se reescribe.
@@ -280,13 +288,13 @@ export function MetricasCampana({
   capturas,
   publicaciones = [],
   puedeRefrescar = false,
+  rutaRefresco,
   puedeEditarCifras = false,
   seguidores = 0,
 }: Props) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   /**
    * Lo que se acaba de anotar, dibujado por el propio componente.
    *
@@ -720,12 +728,32 @@ export function MetricasCampana({
   const refrescar = async () => {
     setRefrescando(true);
     setError(null);
+    setAviso(null);
     try {
-      await apiPost(`/api/campaigns/${campaignId}/metricas`, {});
-      startTransition(() => router.refresh());
+      const resultado = await apiPost<{ yaAlDia?: boolean }>(
+        rutaRefresco ?? `/api/campaigns/${campaignId}/metricas`,
+        {}
+      );
+
+      // Nada vencido: no se llamó a Apify y no hay nada nuevo que
+      // pintar. Se dice, en vez de recargar y dejar al usuario
+      // buscando qué cambió.
+      if (resultado?.yaAlDia) {
+        setAviso(
+          "Las cifras ya están al día. Cada publicación se vuelve a leer una vez al día."
+        );
+        setRefrescando(false);
+        return;
+      }
+
+      // Recarga entera y no `router.refresh()`: todo lo que hay debajo
+      // —las tarjetas, el ranking, la curva y la tabla— sale del
+      // servidor, y `router.refresh()` no repinta de forma fiable en la
+      // compilación de producción. Pulsar Actualizar y no ver cambiar
+      // nada es peor que esperar a que recargue.
+      window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron refrescar");
-    } finally {
       setRefrescando(false);
     }
   };
@@ -766,6 +794,12 @@ export function MetricasCampana({
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {aviso && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            {aviso}
           </div>
         )}
 

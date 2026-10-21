@@ -28,10 +28,39 @@ const HORAS_ENTRE_CAPTURAS = 20;
  * y entonces cuenta la fecha en que se registro el link. Es una
  * aproximacion, pero preferible a no seguir nunca esa publicacion.
  */
+function ventanaDeSeguimiento() {
+  const ahora = Date.now();
+  return {
+    /** Publicado dentro del mes que se persigue. */
+    desde: new Date(ahora - DIAS_DE_SEGUIMIENTO * 24 * 60 * 60 * 1000),
+    /** Capturado antes de esto: toca volver a leerlo. */
+    corte: new Date(ahora - HORAS_ENTRE_CAPTURAS * 60 * 60 * 1000),
+  };
+}
+
+const SELECCION_CANDIDATA = {
+  id: true,
+  url: true,
+  metricas: {
+    orderBy: { capturadoEn: "desc" as const },
+    take: 1,
+    select: { capturadoEn: true },
+  },
+} as const;
+
+/**
+ * La ultima captura se filtra en memoria y no en la consulta porque
+ * Prisma no sabe comparar contra el maximo de una relacion.
+ */
+function sinCapturaReciente(
+  candidatas: { id: string; url: string | null; metricas: { capturadoEn: Date }[] }[],
+  corte: Date
+) {
+  return candidatas.filter((e) => !e.metricas[0] || e.metricas[0].capturadoEn < corte);
+}
+
 export async function entregasParaRefrescar(limite = 200) {
-  const ahora = new Date();
-  const desde = new Date(ahora.getTime() - DIAS_DE_SEGUIMIENTO * 24 * 60 * 60 * 1000);
-  const corte = new Date(ahora.getTime() - HORAS_ENTRE_CAPTURAS * 60 * 60 * 1000);
+  const { desde, corte } = ventanaDeSeguimiento();
 
   const candidatas = await prisma.campaignEntrega.findMany({
     where: {
@@ -42,22 +71,10 @@ export async function entregasParaRefrescar(limite = 200) {
     },
     orderBy: { entregadoEn: "desc" },
     take: limite,
-    select: {
-      id: true,
-      url: true,
-      metricas: {
-        orderBy: { capturadoEn: "desc" },
-        take: 1,
-        select: { capturadoEn: true },
-      },
-    },
+    select: SELECCION_CANDIDATA,
   });
 
-  // La ultima captura se filtra aqui y no en la consulta porque Prisma no
-  // sabe comparar contra el maximo de una relacion.
-  return candidatas.filter(
-    (e) => !e.metricas[0] || e.metricas[0].capturadoEn < corte
-  );
+  return sinCapturaReciente(candidatas, corte);
 }
 
 /**
@@ -141,6 +158,59 @@ export async function refrescarMetricasDeCampana(campaignId: string) {
     return { consultadas: 0, guardadas: 0, porPlataforma: {} };
   }
   return refrescarMetricas(entregas);
+}
+
+/**
+ * Refresca una campana, pero solo lo que de verdad toca.
+ *
+ * Es la hermana frenada de `refrescarMetricasDeCampana`, que relee
+ * TODAS las publicaciones cada vez que se la llama. Eso vale para un
+ * boton de la agencia, donde quien lo pulsa sabe lo que cuesta y lo
+ * pulsa antes de preparar un informe. No vale para el portal del
+ * cliente: ahi el boton lo tiene cualquiera que entre, y diez clics
+ * seguidos serian diez consultas a Apify por publicacion para redibujar
+ * exactamente el mismo numero.
+ *
+ * Aplica la misma regla que la tarea diaria —un mes de seguimiento, una
+ * captura cada 20 h— de modo que el gasto maximo que puede provocar un
+ * cliente pulsando sin parar es el que la tarea nocturna iba a hacer de
+ * todas formas. Si no hay nada vencido devuelve `yaAlDia` y no llama a
+ * nadie, para que la interfaz pueda decirlo en vez de fingir un
+ * refresco.
+ */
+export async function refrescarMetricasPendientesDeCampana(campaignId: string) {
+  const { desde, corte } = ventanaDeSeguimiento();
+
+  const candidatas = await prisma.campaignEntrega.findMany({
+    where: {
+      url: { not: null },
+      campaignService: {
+        campaignProfilePlatform: {
+          campaignProfile: { campaignId, participacion: "ACTIVO" },
+        },
+      },
+      OR: [
+        { publicadoEn: { gte: desde } },
+        { publicadoEn: null, entregadoEn: { gte: desde } },
+      ],
+    },
+    select: SELECCION_CANDIDATA,
+  });
+
+  const entregas = sinCapturaReciente(candidatas, corte);
+
+  if (entregas.length === 0) {
+    return {
+      consultadas: 0,
+      guardadas: 0,
+      porPlataforma: {},
+      yaAlDia: true,
+      seguidas: candidatas.length,
+    };
+  }
+
+  const resultado = await refrescarMetricas(entregas);
+  return { ...resultado, yaAlDia: false, seguidas: candidatas.length };
 }
 
 /**
