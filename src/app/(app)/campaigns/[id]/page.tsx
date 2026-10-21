@@ -33,6 +33,7 @@ import {
   calculateMarkupPrice,
   calcularTotalCampana,
   VISUALIZACIONES_POR_SEGUIDOR,
+  redAdmiteAlcance,
 } from "@/lib/campaign-utils";
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
@@ -199,12 +200,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             (cs.esCombo
               ? "Combo"
               : (cs.profileService?.serviceType.displayName ?? null)),
-          esInstagram:
-            (
-              e.serviceType?.platform.name ?? cpp.socialAccount.platform.name
-            ).toLowerCase() === "instagram",
-          // Igual que el alcance: solo Instagram. Ver el comentario de
-          // actualizarCifrasDeEntrega.
+          // Instagram y TikTok. La red de la pieza manda sobre la de la
+          // cuenta contratada: lo publicado puede no estar en la red por
+          // la que se contrató.
+          admiteAlcance: redAdmiteAlcance(
+            e.serviceType?.platform.name ?? cpp.socialAccount.platform.name
+          ),
+          // Los reposteos sí siguen siendo solo de Instagram. Ver el
+          // comentario de actualizarCifrasDeEntrega.
           admiteReposteos:
             (
               e.serviceType?.platform.name ?? cpp.socialAccount.platform.name
@@ -222,7 +225,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     )
   );
 
-  // El alcance conseguido: solo Instagram lo mide, y solo lo que haya
+  // El alcance conseguido: solo lo reportan Instagram y TikTok, y solo
+  // lo que haya
   // anotado alguien. Null mientras no haya ni una cifra, para que la
   // barra diga "sin dato" en vez de un cero que se leeria como "no
   // llego a nadie".

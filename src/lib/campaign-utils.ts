@@ -313,3 +313,32 @@ export function calculateSelectionTotal(profiles: ProfileSelection[]): {
 
   return { baseTotal, markupTotal };
 }
+
+/**
+ * Redes en las que una publicacion reporta alcance.
+ *
+ * Instagram lo llama "alcance" y TikTok "Total espectadores": distinto
+ * nombre para lo mismo —cuantas personas distintas vieron la pieza— y
+ * las dos lo ensenan solo a su autor en su propio panel, asi que no hay
+ * scraper que lo lea y la cifra se teclea a mano.
+ *
+ * TikTok estuvo fuera por desconocimiento, no por decision: se dio por
+ * hecho que solo Instagram lo publicaba y sus filas pintaban una raya.
+ *
+ * Vive aqui y no en `metricas-campana.tsx` porque ese modulo es
+ * "use client": importar un valor suyo desde una pagina de servidor
+ * devuelve una referencia de cliente en lugar del dato. Ya paso una vez
+ * con VISUALIZACIONES_POR_SEGUIDOR y el calculo se volvio NaN en
+ * silencio.
+ *
+ * No incluye los reposteos, que siguen siendo cosa de Instagram: eso si
+ * es una decision de la agencia y no cambia.
+ */
+export const REDES_CON_ALCANCE = ["instagram", "tiktok"] as const;
+
+export function redAdmiteAlcance(plataforma: string | null | undefined): boolean {
+  if (!plataforma) return false;
+  return (REDES_CON_ALCANCE as readonly string[]).includes(
+    plataforma.trim().toLowerCase()
+  );
+}

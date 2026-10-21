@@ -11,6 +11,7 @@ import { getCampaignResultsForClient } from "@/data-access/campaigns";
 import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_COLORS,
+  redAdmiteAlcance,
 } from "@/lib/campaign-utils";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +130,7 @@ async function Contenido({ params }: PageProps) {
               (cs.esCombo
                 ? "Combo"
                 : (cs.profileService?.serviceType.displayName ?? null)),
-            esInstagram: red.toLowerCase() === "instagram",
+            admiteAlcance: redAdmiteAlcance(red),
             admiteReposteos: red.toLowerCase() === "instagram",
             esEfimero: e.serviceType
               ? e.serviceType.esEfimero

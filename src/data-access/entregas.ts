@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "./errors";
 import { unidadesEsperadas } from "@/lib/entregas";
 import { limpiarUrlPublicacion } from "@/lib/social-handles";
+import { redAdmiteAlcance } from "@/lib/campaign-utils";
 import type { OrigenRetiro } from "@prisma/client";
 
 /**
@@ -909,6 +910,11 @@ export async function actualizarCifrasDeEntrega(
   const esInstagram =
     cpp.socialAccount.platform.name.toLowerCase() === "instagram";
 
+  // El alcance ya no es solo de Instagram: TikTok lo da como "Total
+  // espectadores". Son dos nombres para lo mismo y los dos solo los ve
+  // el autor en su panel, que es justo por lo que esta cifra se teclea.
+  const admiteAlcance = redAdmiteAlcance(cpp.socialAccount.platform.name);
+
   // Los reposteos solo se anotan en Instagram.
   //
   // Decision de la agencia, no de las redes: TikTok si publica un
@@ -924,8 +930,10 @@ export async function actualizarCifrasDeEntrega(
   if (cifras.alcance != null) {
     // Una historia no tiene alcance que anotar: lo que su autor ve es un
     // recuento de vistas, que ya se registra por otro camino.
-    if (!esInstagram) {
-      throw new ValidationError("El alcance solo existe en Instagram.");
+    if (!admiteAlcance) {
+      throw new ValidationError(
+        `${cpp.socialAccount.platform.displayName} no reporta alcance.`
+      );
     }
     if (esEfimero) {
       throw new ValidationError(

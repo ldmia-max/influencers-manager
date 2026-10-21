@@ -98,7 +98,7 @@ export const participacionSchema = z.discriminatedUnion("accion", [
  */
 export const cifrasDePublicacionSchema = z
   .object({
-    /** Solo Instagram, y nunca en un formato efímero. */
+    /** Solo en las redes que lo reportan, y nunca en un formato efímero. */
     alcance: cifra.nullish(),
     compartidos: cifra.nullish(),
     reposteos: cifra.nullish(),

@@ -40,7 +40,10 @@ import { Label } from "@/components/ui/label";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { apiPatch, apiPost } from "@/services/api";
 import { Barra, LeyendaDeBarras } from "./prevision-campana";
-import { VISUALIZACIONES_POR_SEGUIDOR } from "@/lib/campaign-utils";
+import {
+  VISUALIZACIONES_POR_SEGUIDOR,
+  redAdmiteAlcance,
+} from "@/lib/campaign-utils";
 import { ZONA_AGENCIA } from "@/lib/fechas-agencia";
 import { registrarCifras } from "@/services/entregas";
 
@@ -83,9 +86,14 @@ export interface Publicacion {
   username: string;
   url: string | null;
   formato: string | null;
-  esInstagram: boolean;
+  /**
+   * Si esta red reporta alcance. Instagram lo llama así y TikTok
+   * «Total espectadores»: lo mismo con otro nombre, y las dos solo se
+   * lo enseñan a su autor en su panel, que es por lo que esta cifra se
+   * teclea en vez de leerse.
+   */
+  admiteAlcance: boolean;
   esEfimero: boolean;
-  /** Solo Instagram lo mide y solo lo ve su autor. */
   alcance: number | null;
   /**
    * Si en esta red se cuentan reposteos. Solo Instagram.
@@ -114,7 +122,7 @@ interface Pieza {
   username: string;
   url: string | null;
   formato: string | null;
-  esInstagram: boolean;
+  admiteAlcance: boolean;
   esEfimero: boolean;
   admiteReposteos: boolean;
   esExtra: boolean;
@@ -372,7 +380,7 @@ export function MetricasCampana({
         username: pub.username,
         url: pub.url,
         formato: pub.formato,
-        esInstagram: pub.esInstagram,
+        admiteAlcance: pub.admiteAlcance,
         esEfimero: pub.esEfimero,
         admiteReposteos: pub.admiteReposteos,
         esExtra: pub.esExtra,
@@ -413,7 +421,7 @@ export function MetricasCampana({
         username: c.username,
         url: c.url ?? null,
         formato: c.formato ?? null,
-        esInstagram: c.plataforma.toLowerCase() === "instagram",
+        admiteAlcance: redAdmiteAlcance(c.plataforma),
         esEfimero: false,
         admiteReposteos: c.plataforma.toLowerCase() === "instagram",
         esExtra: false,
@@ -448,7 +456,8 @@ export function MetricasCampana({
      * Engagement sobre el alcance: de cuanta gente que vio la
      * publicacion salio una interaccion.
      *
-     * El denominador es el alcance cuando la red lo da —solo Instagram,
+     * El denominador es el alcance cuando la red lo da —Instagram y
+     * TikTok,
      * y solo si alguien lo anoto— y las vistas cuando no: son las dos
      * maneras que tiene cada red de decir cuanta gente lo vio.
      *
@@ -1353,7 +1362,8 @@ function CeldaCifra({
 /**
  * La casilla del alcance.
  *
- * Solo Instagram lo mide, y una historia ni eso: lo que su autor ve ahi
+ * Lo reportan Instagram y TikTok —alli se llama "Total espectadores"—,
+ * y una historia ni eso: lo que su autor ve ahi
  * es un recuento de vistas, que se anota por otro camino. En el resto de
  * las filas se pinta una raya en vez de una casilla vacia, que invitaria
  * a escribir algo que no existe.
@@ -1367,14 +1377,14 @@ function CeldaAlcance({
   editable: boolean;
   onEditar: () => void;
 }) {
-  if (!pieza.esInstagram || pieza.esEfimero) {
+  if (!pieza.admiteAlcance || pieza.esEfimero) {
     return (
       <td
         className="px-2 py-1 text-right text-gray-300"
         title={
           pieza.esEfimero
             ? "Una historia no reporta alcance"
-            : "El alcance solo existe en Instagram"
+            : "Esta red no reporta alcance"
         }
       >
         —
@@ -1464,8 +1474,9 @@ function ModalCifras({
     setError(null);
   }
 
-  const admiteAlcance = !!pieza && pieza.esInstagram && !pieza.esEfimero;
+  const admiteAlcance = !!pieza && pieza.admiteAlcance && !pieza.esEfimero;
   const admiteReposteos = !!pieza && pieza.admiteReposteos;
+  const esTikTok = pieza?.plataforma.trim().toLowerCase() === "tiktok";
   // Vistas e interacciones a mano solo donde no hay scraper que las lea.
   // En una publicacion con enlace las mide Apify, y escribirlas aqui
   // crearia dos verdades para el mismo contenido.
@@ -1599,6 +1610,14 @@ function ModalCifras({
                 onChange={(e) => setAlcance(e.target.value)}
                 placeholder="Cuántas cuentas distintas lo vieron"
               />
+              {/* Cada red lo llama de otra manera, y quien copia la
+                  cifra la está buscando en el panel del creador: sin
+                  esto hay que adivinar qué fila es «alcance». */}
+              {esTikTok && (
+                <p className="text-xs text-gray-500">
+                  En TikTok aparece como <strong>Total espectadores</strong>.
+                </p>
+              )}
             </div>
           )}
           <div className="space-y-1.5">
