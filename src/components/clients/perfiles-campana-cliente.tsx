@@ -53,6 +53,66 @@ export interface PerfilCliente {
   }[];
 }
 
+/**
+ * Lo que cuesta este creador entero, con el margen ya dentro y sin
+ * desglosarlo: para el cliente ese numero es el precio.
+ */
+function totalDelPerfil(cp: PerfilCliente): number {
+  return cp.platforms.reduce(
+    (suma, cpp) =>
+      suma + cpp.services.reduce((t, cs) => t + Number(cs.subtotal), 0),
+    0
+  );
+}
+
+/**
+ * En que bloque va cada creador. Mas bajo, mas arriba en la lista.
+ *
+ * El cliente abre esta pestana para ver quien trabaja en su campana, y
+ * eso tiene que leerse de un vistazo. En el orden en que venian —el de
+ * la base de datos— un rechazado podia abrir la lista y empujar hacia
+ * abajo a los contratados.
+ *
+ * 0. Aprobados y dentro: la campana real, lo que se esta pagando.
+ * 1. Pendientes: todavia pueden entrar, y si el cliente no ha
+ *    contestado son justo los que le toca mirar.
+ * 2. Retirados sin rechazo: estuvieron contratados y ya no siguen.
+ * 3. Rechazados: no participan y ademas fue decision del propio
+ *    cliente, asi que no le dicen nada que no sepa. Van al final.
+ *
+ * El rechazo se mira ANTES que la retirada: llegar a "En proceso"
+ * retira automaticamente a quien el cliente rechazo, de modo que casi
+ * todo rechazado esta tambien retirado y si no, los dos grupos se
+ * confundirian en uno.
+ */
+function grupoDelPerfil(cp: PerfilCliente): number {
+  if (cp.status === "REJECTED") return 3;
+  if (cp.participacion === "RETIRADO") return 2;
+  if (cp.status === "APPROVED") return 0;
+  return 1;
+}
+
+/**
+ * Dentro de cada bloque, de mas caro a mas barato: es el orden en que
+ * el cliente quiere repasarlos, porque donde esta el dinero es donde
+ * importa fijarse.
+ *
+ * El nombre desempata. Sin el, dos creadores que cuestan lo mismo
+ * podrian intercambiarse entre una carga y otra y la lista parecia
+ * moverse sola.
+ */
+function ordenarPerfiles(perfiles: PerfilCliente[]): PerfilCliente[] {
+  return [...perfiles].sort((a, b) => {
+    const porGrupo = grupoDelPerfil(a) - grupoDelPerfil(b);
+    if (porGrupo !== 0) return porGrupo;
+
+    const porCoste = totalDelPerfil(b) - totalDelPerfil(a);
+    if (porCoste !== 0) return porCoste;
+
+    return a.profile.name.localeCompare(b.profile.name, "es");
+  });
+}
+
 function formatearFecha(fecha: Date | string): string {
   return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
@@ -70,6 +130,10 @@ function formatearFecha(fecha: Date | string): string {
  * que recordaba. Lo que no se dice es POR QUE se retiro alguien
  * —`motivoRetiro` ni siquiera sale de la base de datos—: esa es una
  * conversacion entre la agencia y el creador.
+ *
+ * El orden lo pone `ordenarPerfiles`: primero quien esta contratado,
+ * al final quien no participa, y dentro de cada bloque de mas caro a
+ * mas barato. Ver alli el porque de cada escalon.
  *
  * Un retirado se pinta apagado y su insignia manda sobre el estado de
  * aprobacion: son dos ejes distintos —si el cliente dijo que si, y si
@@ -97,16 +161,9 @@ export function PerfilesCampanaCliente({
 
   return (
     <div className="space-y-4">
-      {perfiles.map((cp) => {
+      {ordenarPerfiles(perfiles).map((cp) => {
         const retirado = cp.participacion === "RETIRADO";
-
-        // Lo que cuesta este creador entero, con el margen ya dentro y
-        // sin desglosarlo: para el cliente ese numero es el precio.
-        const totalPerfil = cp.platforms.reduce(
-          (suma, cpp) =>
-            suma + cpp.services.reduce((t, cs) => t + Number(cs.subtotal), 0),
-          0
-        );
+        const totalPerfil = totalDelPerfil(cp);
 
         return (
           <div
