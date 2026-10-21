@@ -393,6 +393,39 @@ model ClientUser {
   // Relaciones
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId String @unique
+
+  restablecimientos ClientPasswordReset[]
+}
+
+/// Un enlace para poner contrasena en el portal del cliente.
+///
+/// Sirve para las dos cosas y por eso no se llama "recuperacion": el
+/// cliente que la olvido y el que nunca tuvo una pasan por aqui igual.
+/// La agencia crea el acceso sin inventarse una contrasena y manda este
+/// enlace; el cliente elige la suya.
+model ClientPasswordReset {
+  id        String    @id @default(cuid())
+  /// SHA-256 del token, nunca el token. Leer la tabla no debe permitir
+  /// entrar en la cuenta de nadie, que es el mismo motivo por el que
+  /// CampaignApprovalToken guarda `codeHash` y no el codigo.
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  /// Quien pidio el enlace: el propio cliente desde el portal, o la
+  /// agencia al darle de alta. Solo para la auditoria.
+  origen OrigenRestablecimiento @default(PORTAL)
+
+  clientUser   ClientUser @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  clientUserId String
+
+  @@index([clientUserId])
+}
+
+enum OrigenRestablecimiento {
+  PORTAL
+  AGENCIA
 }
 
 // ============ CAMPAÑAS ============

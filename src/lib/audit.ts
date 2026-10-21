@@ -89,6 +89,14 @@ export const ACCIONES = {
   accesoPortalConcedido: "client.access_granted",
   accesoPortalRevocado: "client.access_revoked",
 
+  /// Se pidio un enlace para poner contrasena en el portal. Queda
+  /// constancia aunque el correo no exista: lo que importa auditar es el
+  /// intento, y la respuesta al navegador es la misma en los dos casos
+  /// para no revelar que correos tienen acceso.
+  contrasenaPortalSolicitada: "client.password_link_requested",
+  /// El cliente eligio contrasena con ese enlace.
+  contrasenaPortalCambiada: "client.password_changed",
+
   /// Retirar a un influencer cambia lo que cuesta la campana, asi que
   /// deja rastro igual que el margen.
   influencerRetirado: "campaign.influencer_withdrawn",

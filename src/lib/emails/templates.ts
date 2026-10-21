@@ -404,3 +404,58 @@ ${tablaVencimientos(resumen, "#b91c1c")}`;
 
   return { subject, html: baseLayout(cuerpo) };
 }
+
+// =============================================================================
+// Template 7: Enlace para poner contrasena en el portal del cliente
+// =============================================================================
+
+/**
+ * Sirve para las dos cosas: estrenar el acceso y recuperarlo.
+ *
+ * Por eso el texto no dice "has olvidado tu contrasena" —a quien acaba
+ * de darse de alta le sonaria a error— ni "te hemos creado una cuenta"
+ * —a quien la ha pedido le sonaria a que se la han duplicado—. Se habla
+ * de elegir contrasena, que es lo unico cierto en los dos casos.
+ */
+export function enlaceContrasenaPortalTemplate(params: {
+  companyName: string;
+  url: string;
+  expiresAt: Date;
+  /** La agencia lo esta dando de alta, no lo pidio el cliente. */
+  esAlta: boolean;
+}): { subject: string; html: string } {
+  const subject = params.esAlta
+    ? "Tu acceso al portal de Los de Marketing"
+    : "Elige una nueva contraseña";
+
+  const html = baseLayout(`
+    <h2 style="margin:0 0 16px;font-size:18px;color:#18181b;">Hola,</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      ${
+        params.esAlta
+          ? `Se ha habilitado el acceso de <strong>${params.companyName}</strong> al
+             portal, donde puedes seguir tus campañas y revisar las propuestas
+             que te enviemos.`
+          : `Se ha solicitado elegir una nueva contraseña para la cuenta de
+             <strong>${params.companyName}</strong> en el portal.`
+      }
+    </p>
+    <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Pulsa el botón para elegir tu contraseña:
+    </p>
+    ${ctaButton("Elegir contraseña", params.url)}
+    <p style="margin:0 0 12px;font-size:13px;color:#71717a;line-height:1.6;">
+      El enlace caduca el ${formatDate(params.expiresAt)} y solo puede usarse
+      una vez.
+    </p>
+    <p style="margin:0;font-size:13px;color:#71717a;line-height:1.6;">
+      ${
+        params.esAlta
+          ? "Si no esperabas este correo, puedes ignorarlo: sin abrir el enlace no se crea ninguna contraseña."
+          : "Si no has sido tú, ignora este mensaje: tu contraseña actual sigue funcionando y nadie puede cambiarla sin abrir este enlace."
+      }
+    </p>
+  `);
+
+  return { subject, html };
+}

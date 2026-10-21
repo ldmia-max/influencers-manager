@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
 import {
   TRAS_LOGIN_CORRECTO,
@@ -337,13 +338,21 @@ export async function createOrUpdateClientAccess(
       data: updateData,
     });
   } else {
-    if (!data.password) {
-      throw new ValidationError(
-        "La contraseña es requerida para crear un nuevo acceso"
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    // Sin contrasena tambien se crea: la eligira el cliente con el
+    // enlace que se le manda por correo.
+    //
+    // Antes era obligatoria, y eso dejaba al administrador inventandose
+    // una y haciendosela llegar al cliente por fuera de la aplicacion
+    // —por WhatsApp, de viva voz—, que es exactamente donde no debe
+    // viajar una contrasena. El acceso nace con una cadena aleatoria
+    // que nadie conoce ni puede adivinar: la cuenta existe y no se
+    // puede entrar en ella hasta que su dueno elija la suya.
+    const hashedPassword = await bcrypt.hash(
+      data.password && data.password.trim() !== ""
+        ? data.password
+        : randomBytes(32).toString("base64url"),
+      10
+    );
 
     return prisma.clientUser.create({
       data: {

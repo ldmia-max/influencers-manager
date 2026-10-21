@@ -5,6 +5,7 @@ import {
   updateClient,
   createClientAccess,
   revokeClientAccess,
+  enviarEnlaceDeAcceso,
 } from "@/services/client";
 import type {
   ClientPayload,
@@ -95,5 +96,19 @@ export function useRevokeClientAccess() {
         queryKey: queryKeys.clients.access(clientId),
       });
     },
+  });
+}
+
+// =============================================================================
+// Enlace para que el cliente elija su contrasena
+// =============================================================================
+
+/**
+ * No invalida nada: mandar el enlace no cambia el acceso guardado. La
+ * contrasena solo cambia cuando el cliente abre el enlace y la elige.
+ */
+export function useEnviarEnlaceDeAcceso() {
+  return useMutation({
+    mutationFn: (clientId: string) => enviarEnlaceDeAcceso(clientId),
   });
 }

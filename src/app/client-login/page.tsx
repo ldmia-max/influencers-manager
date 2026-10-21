@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { clientLogin } from "@/services/auth";
@@ -74,7 +75,19 @@ export default function ClientLoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Contraseña</Label>
+                {/* Tambien es por donde se estrena el acceso, no solo
+                    por donde se recupera: hasta ahora la unica forma de
+                    tener contrasena era que un administrador se
+                    inventara una y la hiciera llegar por fuera. */}
+                <Link
+                  href="/client-login/recuperar"
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -97,11 +110,14 @@ export default function ClientLoginPage() {
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
 
-            <div className="text-center text-sm text-gray-500 mt-4">
-              ¿Problemas para acceder?{" "}
-              <a href="mailto:soporte@empresa.com" className="text-blue-600 hover:underline">
-                Contactar soporte
-              </a>
+            <div className="mt-4 text-center text-sm text-gray-500">
+              ¿Es tu primera vez?{" "}
+              <Link
+                href="/client-login/recuperar"
+                className="text-blue-600 hover:underline"
+              >
+                Crea tu contraseña
+              </Link>
             </div>
           </form>
         </CardContent>

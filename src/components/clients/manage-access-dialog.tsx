@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Key, Trash2 } from "lucide-react";
+import { Key, Trash2, Mail } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useCreateClientAccess, useRevokeClientAccess } from "@/hooks/mutations/use-client-mutations";
+import {
+  useCreateClientAccess,
+  useRevokeClientAccess,
+  useEnviarEnlaceDeAcceso,
+} from "@/hooks/mutations/use-client-mutations";
 
 interface ManageAccessDialogProps {
   clientId: string;
@@ -52,23 +56,34 @@ export function ManageAccessDialog({
 
   const createAccess = useCreateClientAccess();
   const revokeAccess = useRevokeClientAccess();
+  const enlace = useEnviarEnlaceDeAcceso();
 
-  const error = createAccess.error?.message || revokeAccess.error?.message || "";
-  const loading = createAccess.isPending || revokeAccess.isPending;
+  const error =
+    createAccess.error?.message ||
+    revokeAccess.error?.message ||
+    enlace.error?.message ||
+    "";
+  const loading =
+    createAccess.isPending || revokeAccess.isPending || enlace.isPending;
 
   const [validationError, setValidationError] = useState("");
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(
+    null
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError("");
 
-    // Validate passwords
     if (formData.password !== formData.confirmPassword) {
       setValidationError("Las contraseñas no coinciden");
       return;
     }
 
-    if (!currentAccess && formData.password.length < 6) {
+    // La contrasena es opcional: dejandola vacia, el acceso se crea y la
+    // elige el cliente con el enlace que se le manda por correo. Solo se
+    // valida el minimo cuando se ha escrito algo.
+    if (formData.password && formData.password.length < 6) {
       setValidationError("La contraseña debe tener al menos 6 caracteres");
       return;
     }
@@ -77,16 +92,51 @@ export function ManageAccessDialog({
       {
         clientId,
         payload: {
-          password: formData.password,
+          // El correo FALTABA. Sin el, la ruta recibia una cadena vacia
+          // y la capa de datos cortaba con "El email es requerido", de
+          // modo que crear un acceso desde aqui no funcionaba nunca.
+          email: formData.email.trim(),
+          password: formData.password || undefined,
+          isActive: formData.isActive,
         },
       },
       {
         onSuccess: () => {
-          setOpen(false);
           setFormData({ ...formData, password: "", confirmPassword: "" });
+          if (currentAccess) {
+            setOpen(false);
+          } else {
+            // Recien creado: lo util ahora es mandarle el enlace, no
+            // cerrar y tener que volver a abrir para hacerlo.
+            setAviso({
+              ok: true,
+              texto:
+                "Acceso creado. Envíale el enlace para que elija su contraseña.",
+            });
+          }
         },
       },
     );
+  };
+
+  const mandarEnlace = () => {
+    setValidationError("");
+    setAviso(null);
+    enlace.mutate(clientId, {
+      onSuccess: (r) => {
+        setAviso(
+          r.email.sent
+            ? {
+                ok: true,
+                texto: `Enlace enviado a ${r.destino}. Caduca en 24 horas.`,
+              }
+            : {
+                ok: false,
+                texto: `El enlace se generó, pero el correo no salió (${r.email.reason ?? "error"}). Revisa la configuración de correo.`,
+              }
+        );
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -143,7 +193,7 @@ export function ManageAccessDialog({
             <div className="space-y-2">
               <Label htmlFor="password">
                 {currentAccess ? "Nueva Contraseña" : "Contraseña"}{" "}
-                {!currentAccess && <span className="text-red-500">*</span>}
+                <span className="font-normal text-gray-500">(opcional)</span>
               </Label>
               <Input
                 id="password"
@@ -152,20 +202,22 @@ export function ManageAccessDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                required={!currentAccess}
                 disabled={loading}
-                placeholder={currentAccess ? "Dejar vacío para no cambiar" : ""}
+                placeholder={
+                  currentAccess
+                    ? "Dejar vacío para no cambiar"
+                    : "Dejar vacío y enviar el enlace"
+                }
               />
-              {!currentAccess && (
-                <p className="text-xs text-gray-500">Mínimo 6 caracteres</p>
-              )}
+              <p className="text-xs text-gray-500">
+                {currentAccess
+                  ? "Mínimo 6 caracteres. Vacío la deja como está."
+                  : "Déjala vacía y envíale el enlace: así la elige el cliente y no la conoce nadie más."}
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">
-                Confirmar Contraseña{" "}
-                {!currentAccess && <span className="text-red-500">*</span>}
-              </Label>
+              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -173,7 +225,6 @@ export function ManageAccessDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, confirmPassword: e.target.value })
                 }
-                required={!currentAccess}
                 disabled={loading}
               />
             </div>
@@ -195,10 +246,45 @@ export function ManageAccessDialog({
               />
             </div>
 
+            {aviso && (
+              <div
+                className={`rounded-lg border p-3 ${
+                  aviso.ok
+                    ? "border-green-200 bg-green-50"
+                    : "border-amber-200 bg-amber-50"
+                }`}
+              >
+                <p
+                  className={`text-sm ${
+                    aviso.ok ? "text-green-800" : "text-amber-800"
+                  }`}
+                >
+                  {aviso.texto}
+                </p>
+              </div>
+            )}
+
             {displayError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{displayError}</p>
               </div>
+            )}
+
+            {/* Solo con el acceso ya creado: el enlace va al correo
+                guardado, así que antes de guardarlo no hay destino. */}
+            {currentAccess && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={mandarEnlace}
+                disabled={loading}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                {enlace.isPending
+                  ? "Enviando…"
+                  : "Enviar enlace para elegir contraseña"}
+              </Button>
             )}
 
             <div className="flex justify-between gap-2">

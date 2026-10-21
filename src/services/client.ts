@@ -54,6 +54,20 @@ export async function createClientAccess(
 }
 
 /**
+ * Manda al cliente el enlace para que elija su contrasena.
+ *
+ * Devuelve a quien se envio y como fue el correo, para que el boton
+ * pueda decir que el enlace no salio en vez de dar por hecho que si.
+ */
+export async function enviarEnlaceDeAcceso(clientId: string): Promise<{
+  destino: string;
+  expiresAt: string;
+  email: { sent: boolean; reason?: string; error?: string };
+}> {
+  return apiPost(`/api/clients/${clientId}/access/enlace`, {});
+}
+
+/**
  * Revoke client portal access
  */
 export async function revokeClientAccess(clientId: string): Promise<{ success: boolean }> {
