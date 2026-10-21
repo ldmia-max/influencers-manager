@@ -43,6 +43,7 @@ import { Barra, LeyendaDeBarras } from "./prevision-campana";
 import {
   VISUALIZACIONES_POR_SEGUIDOR,
   redAdmiteAlcance,
+  nombreDelAlcanceEn,
 } from "@/lib/campaign-utils";
 import { ZONA_AGENCIA } from "@/lib/fechas-agencia";
 import { registrarCifras } from "@/services/entregas";
@@ -1476,7 +1477,7 @@ function ModalCifras({
 
   const admiteAlcance = !!pieza && pieza.admiteAlcance && !pieza.esEfimero;
   const admiteReposteos = !!pieza && pieza.admiteReposteos;
-  const esTikTok = pieza?.plataforma.trim().toLowerCase() === "tiktok";
+  const nombreDelAlcance = nombreDelAlcanceEn(pieza?.plataforma);
   // Vistas e interacciones a mano solo donde no hay scraper que las lea.
   // En una publicacion con enlace las mide Apify, y escribirlas aqui
   // crearia dos verdades para el mismo contenido.
@@ -1613,9 +1614,10 @@ function ModalCifras({
               {/* Cada red lo llama de otra manera, y quien copia la
                   cifra la está buscando en el panel del creador: sin
                   esto hay que adivinar qué fila es «alcance». */}
-              {esTikTok && (
+              {nombreDelAlcance && (
                 <p className="text-xs text-gray-500">
-                  En TikTok aparece como <strong>Total espectadores</strong>.
+                  En {pieza?.plataforma} aparece como{" "}
+                  <strong>{nombreDelAlcance}</strong>.
                 </p>
               )}
             </div>

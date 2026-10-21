@@ -315,15 +315,25 @@ export function calculateSelectionTotal(profiles: ProfileSelection[]): {
 }
 
 /**
- * Redes en las que una publicacion reporta alcance.
+ * Redes en las que una publicacion reporta alcance, y como lo llama
+ * cada una.
  *
- * Instagram lo llama "alcance" y TikTok "Total espectadores": distinto
- * nombre para lo mismo —cuantas personas distintas vieron la pieza— y
- * las dos lo ensenan solo a su autor en su propio panel, asi que no hay
- * scraper que lo lea y la cifra se teclea a mano.
+ * Es siempre la misma cifra —cuantas personas distintas vieron la
+ * pieza— con tres nombres: "alcance" en Instagram, "Total
+ * espectadores" en TikTok y "Espectadores unicos" en YouTube. Las tres
+ * se la ensenan solo a su autor en su propio panel, asi que no hay
+ * scraper que la lea y se teclea a mano.
  *
- * TikTok estuvo fuera por desconocimiento, no por decision: se dio por
- * hecho que solo Instagram lo publicaba y sus filas pintaban una raya.
+ * TikTok y YouTube estuvieron fuera por desconocimiento, no por
+ * decision: se dio por hecho que solo Instagram la publicaba y sus
+ * filas pintaban una raya. Kick sigue fuera; si resulta que tambien la
+ * da, se anade aqui y no hay nada mas que tocar.
+ *
+ * El nombre importa tanto como la lista. Quien copia la cifra la esta
+ * buscando en el panel del creador, donde "alcance" no aparece por
+ * ninguna parte, y en YouTube hay ademas una fila vecina —
+ * "Impresiones", cuantas veces se mostro la miniatura— que es otra cosa
+ * y se parece lo suficiente como para teclearla por error.
  *
  * Vive aqui y no en `metricas-campana.tsx` porque ese modulo es
  * "use client": importar un valor suyo desde una pagina de servidor
@@ -334,11 +344,29 @@ export function calculateSelectionTotal(profiles: ProfileSelection[]): {
  * No incluye los reposteos, que siguen siendo cosa de Instagram: eso si
  * es una decision de la agencia y no cambia.
  */
-export const REDES_CON_ALCANCE = ["instagram", "tiktok"] as const;
+const ALCANCE_POR_RED: Record<string, string | null> = {
+  // Instagram no necesita traduccion: alli se llama igual.
+  instagram: null,
+  tiktok: "Total espectadores",
+  youtube: "Espectadores únicos",
+};
+
+export const REDES_CON_ALCANCE = Object.keys(ALCANCE_POR_RED);
 
 export function redAdmiteAlcance(plataforma: string | null | undefined): boolean {
   if (!plataforma) return false;
-  return (REDES_CON_ALCANCE as readonly string[]).includes(
-    plataforma.trim().toLowerCase()
-  );
+  return plataforma.trim().toLowerCase() in ALCANCE_POR_RED;
+}
+
+/**
+ * Como se llama el alcance en esta red, si alli tiene otro nombre.
+ *
+ * Null cuando se llama igual o cuando la red no lo reporta: en los dos
+ * casos no hay nada util que anadir bajo la casilla.
+ */
+export function nombreDelAlcanceEn(
+  plataforma: string | null | undefined
+): string | null {
+  if (!plataforma) return null;
+  return ALCANCE_POR_RED[plataforma.trim().toLowerCase()] ?? null;
 }
