@@ -1,4 +1,4 @@
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,11 +61,19 @@ export function RevisionesCampanaCliente({
             <ClipboardCheck className="h-4 w-4" />
             Revisiones
           </span>
+          {/* En otra pestana, por el mismo motivo que en el listado de
+              Revisiones: la revision acaba en su propia pantalla, fuera
+              del portal, y desde ahi no hay vuelta atras. */}
           {pendientes > 0 && (
             <Button asChild size="sm">
-              <a href={`/api/client-portal/revisar/${campaignId}`}>
+              <a
+                href={`/api/client-portal/revisar/${campaignId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Revisar {pendientes}{" "}
                 {pendientes === 1 ? "creador" : "creadores"}
+                <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </Button>
           )}

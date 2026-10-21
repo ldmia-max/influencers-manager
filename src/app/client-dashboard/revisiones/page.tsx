@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { CalendarDays, ClipboardCheck, AlertCircle } from "lucide-react";
+import {
+  CalendarDays,
+  ClipboardCheck,
+  AlertCircle,
+  ExternalLink,
+} from "lucide-react";
 import {
   COOKIE_SESION_CLIENTE,
   verificarSesionCliente,
@@ -122,10 +127,22 @@ async function Contenido({
                       </span>
                       {/* Enlace normal y no un boton con fetch: la ruta
                           resuelve el token, deja puesta la cookie de
-                          aprobacion y redirige. Es navegacion. */}
+                          aprobacion y redirige. Es navegacion.
+
+                          En otra pestana: la revision termina en su
+                          propia pantalla de "gracias", fuera del portal
+                          y sin menu, asi que al aprobar o rechazar el
+                          cliente se quedaba sin camino de vuelta. Con
+                          una pestana aparte cierra la revision y
+                          encuentra su sesion donde la dejo. */}
                       <Button asChild size="sm">
-                        <a href={`/api/client-portal/revisar/${c.id}`}>
+                        <a
+                          href={`/api/client-portal/revisar/${c.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           Revisar
+                          <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       </Button>
                     </div>
