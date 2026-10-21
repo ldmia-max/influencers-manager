@@ -12,7 +12,6 @@ import { ProfileCard, PlatformData } from "@/components/approve/profile-card";
 import { ApprovalSummary } from "@/components/approve/approval-summary";
 import { ApprovalCharts } from "@/components/approve/approval-charts";
 import { RejectionDialog } from "@/components/approve/rejection-dialog";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
 import { calculateReach } from "@/lib/format";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,8 +32,6 @@ interface CampaignData {
     description?: string;
     budget: string;
     currency: string;
-    /** Margen congelado de esta campana; no usar la constante global. */
-    markupPercentage: number;
     client: {
       companyName: string;
     };
@@ -73,7 +70,14 @@ interface CampaignData {
         services: Array<{
           id: string;
           quantity: number;
-          basePrice: string;
+          /**
+           * Importe unitario con el margen de la campana ya aplicado.
+           *
+           * El servidor manda el precio hecho. Antes bajaban la base y
+           * el margen y se multiplicaba aqui, con lo que el navegador
+           * del cliente tenia delante el recargo exacto de la agencia.
+           */
+          precio: string;
           currency: string;
           isApproved: boolean;
           clientNotes?: string;
@@ -216,11 +220,7 @@ export default function ApprovePage() {
     data.campaign.profiles.forEach((profile) => {
       profile.platforms.forEach((platform) => {
         platform.services.forEach((service) => {
-          const markupPrice = calculateMarkupPrice(
-            Number(service.basePrice),
-            data.campaign.markupPercentage
-          );
-          const total = markupPrice * service.quantity;
+          const total = Number(service.precio) * service.quantity;
           original += total;
 
           const profileApproved =
@@ -497,7 +497,7 @@ export default function ApprovePage() {
             : "Combo"
           : service.profileService!.serviceType.displayName,
         quantity: service.quantity,
-        basePrice: Number(service.basePrice),
+        precio: Number(service.precio),
         currency: service.currency,
         isApproved: approvalState.services[service.id]?.isApproved ?? true,
         clientNotes: approvalState.services[service.id]?.clientNotes,
@@ -823,7 +823,6 @@ export default function ApprovePage() {
               return (
                 <ProfileCard
                   key={profile.id}
-                  markup={data.campaign.markupPercentage}
                   id={profile.id}
                   profileName={profile.profile.name}
                   profileType={profile.profile.type}

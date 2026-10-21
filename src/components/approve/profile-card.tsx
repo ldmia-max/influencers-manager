@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { AprobarRechazar } from "./aprobar-rechazar";
 import { PlatformSection, ServiceData } from "./platform-section";
 import { formatNumber } from "@/lib/format";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 export interface PlatformData {
   id: string;
@@ -21,12 +20,6 @@ export interface PlatformData {
 }
 
 interface ProfileCardProps {
-  /**
-   * Margen congelado de la campana. Se propaga desde el portal en vez
-   * de leer la constante global: una campana antigua debe seguir
-   * mostrando el margen con el que se aprobo.
-   */
-  markup: number;
   id: string;
   profileName: string;
   profileType: string;
@@ -50,7 +43,6 @@ const profileTypeLabels: Record<string, string> = {
 };
 
 export function ProfileCard({
-  markup,
   id,
   profileName,
   profileType,
@@ -75,7 +67,7 @@ export function ProfileCard({
       profileSum +
       platform.services.reduce((serviceSum, service) => {
         if (!service.isApproved) return serviceSum;
-        return serviceSum + calculateMarkupPrice(service.basePrice, markup) * service.quantity;
+        return serviceSum + service.precio * service.quantity;
       }, 0)
     );
   }, 0);
@@ -175,7 +167,6 @@ export function ProfileCard({
           <div className="space-y-3">
             {platforms.map((platform) => (
               <PlatformSection
-                markup={markup}
                 key={platform.id}
                 id={platform.id}
                 platformName={platform.platformName}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { CampaignProfileStatus } from "@prisma/client";
 import { ValidationError, NotFoundError } from "./errors";
+import { calculateMarkupPrice } from "@/lib/campaign-utils";
 import {
   CODIGO_MINUTOS,
   MAX_INTENTOS,
@@ -43,18 +44,46 @@ function validateToken(approvalToken: {
  */
 const ESTADOS_QUE_ADMITEN_APROBACION = ["REVIEW", "ACTIVE"];
 
+/**
+ * La campana que el cliente va a aprobar.
+ *
+ * Todo campo se nombra con `select`, nunca `include`. Con `include`,
+ * Prisma devuelve todos los escalares del modelo, y por ahi bajaban al
+ * navegador del cliente dos cosas que no le incumben: `basePrice` —lo
+ * que cobra el influencer— y `motivoRetiro`. El precio con margen se
+ * calculaba ademas EN EL NAVEGADOR, asi que `markupPercentage` tambien
+ * viajaba: con los dos numeros delante, cualquiera que abriese las
+ * herramientas de desarrollo veia el recargo exacto de la agencia.
+ *
+ * Ahora la multiplicacion se hace aqui y lo que viaja es `precio`, el
+ * importe unitario final. Si alguien vuelve a necesitar el margen en el
+ * cliente, lo que hay que mover al servidor es el calculo, no el dato.
+ */
 export async function getApprovalData(token: string) {
   const approvalToken = await prisma.campaignApprovalToken.findUnique({
     where: { token },
-    include: {
+    select: {
+      token: true,
+      expiresAt: true,
+      usedAt: true,
       campaign: {
-        include: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          status: true,
+          budget: true,
+          currency: true,
+          // Se lee para multiplicar aqui dentro; no se devuelve.
+          markupPercentage: true,
           client: { select: { companyName: true } },
           clientContact: {
             select: { firstName: true, lastName: true, email: true },
           },
           profiles: {
-            include: {
+            select: {
+              id: true,
+              status: true,
               profile: {
                 select: {
                   id: true,
@@ -65,12 +94,14 @@ export async function getApprovalData(token: string) {
                   gender: { select: { displayName: true } },
                   department: { select: { name: true } },
                   categories: {
-                    include: { category: { select: { name: true } } },
+                    select: { category: { select: { name: true } } },
                   },
                 },
               },
               platforms: {
-                include: {
+                select: {
+                  id: true,
+                  status: true,
                   socialAccount: {
                     select: {
                       id: true,
@@ -83,9 +114,17 @@ export async function getApprovalData(token: string) {
                     },
                   },
                   services: {
-                    include: {
+                    select: {
+                      id: true,
+                      quantity: true,
+                      basePrice: true,
+                      currency: true,
+                      isApproved: true,
+                      clientNotes: true,
+                      esCombo: true,
+                      comboDescripcion: true,
                       profileService: {
-                        include: {
+                        select: {
                           serviceType: {
                             select: { id: true, name: true, displayName: true },
                           },
@@ -118,12 +157,36 @@ export async function getApprovalData(token: string) {
     throw new ValidationError("INVALID_STATUS");
   }
 
+  const { markupPercentage, ...campana } = approvalToken.campaign;
+
   return {
     token: approvalToken.token,
     expiresAt: approvalToken.expiresAt,
-    campaign: approvalToken.campaign,
+    campaign: {
+      ...campana,
+      budget: campana.budget.toString(),
+      profiles: campana.profiles.map((cp) => ({
+        ...cp,
+        platforms: cp.platforms.map((cpp) => ({
+          ...cpp,
+          services: cpp.services.map((cs) => {
+            const { basePrice, ...servicio } = cs;
+            return {
+              ...servicio,
+              // Importe unitario con el margen ya dentro, redondeado
+              // aqui para que el cliente y la agencia nombren el mismo
+              // numero y no dos que difieren en los decimales.
+              precio: Math.round(
+                calculateMarkupPrice(Number(basePrice), markupPercentage)
+              ).toString(),
+            };
+          }),
+        })),
+      })),
+    },
   };
 }
+
 
 export async function saveApprovalDecisions(
   token: string,

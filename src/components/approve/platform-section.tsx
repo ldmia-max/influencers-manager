@@ -8,25 +8,19 @@ import { AprobarRechazar } from "./aprobar-rechazar";
 import { ServiceItem } from "./service-item";
 import { calculateReach, formatNumber, getReachPercentage } from "@/lib/format";
 import { useReachRanges } from "@/hooks/queries/use-reach-ranges";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 export interface ServiceData {
   id: string;
   serviceName: string;
   quantity: number;
-  basePrice: number;
+  /** Importe unitario con el margen ya aplicado en el servidor. */
+  precio: number;
   currency: string;
   isApproved: boolean;
   clientNotes?: string;
 }
 
 interface PlatformSectionProps {
-  /**
-   * Margen congelado de la campana. Se propaga desde el portal en vez
-   * de leer la constante global: una campana antigua debe seguir
-   * mostrando el margen con el que se aprobo.
-   */
-  markup: number;
   id: string;
   platformName: string;
   platformIcon?: string;
@@ -41,7 +35,6 @@ interface PlatformSectionProps {
 }
 
 export function PlatformSection({
-  markup,
   id,
   platformName,
   username,
@@ -58,7 +51,7 @@ export function PlatformSection({
 
   const approvedServices = services.filter((s) => s.isApproved);
   const totalApproved = approvedServices.reduce((sum, s) => {
-    return sum + calculateMarkupPrice(s.basePrice, markup) * s.quantity;
+    return sum + s.precio * s.quantity;
   }, 0);
   const reach = calculateReach(followers ?? 0, reachRanges);
   const reachPercent = getReachPercentage(followers ?? 0, reachRanges);
@@ -143,12 +136,11 @@ export function PlatformSection({
         <div className="p-4 pt-2 space-y-1">
           {services.map((service) => (
             <ServiceItem
-              markup={markup}
               key={service.id}
               id={service.id}
               serviceName={service.serviceName}
               quantity={service.quantity}
-              basePrice={service.basePrice}
+              precio={service.precio}
               currency={service.currency}
               isApproved={isApproved && service.isApproved}
               clientNotes={service.clientNotes}

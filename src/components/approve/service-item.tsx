@@ -3,20 +3,21 @@
 import { Input } from "@/components/ui/input";
 import { AprobarRechazar } from "./aprobar-rechazar";
 import { formatNumber } from "@/lib/format";
-import { calculateMarkupPrice } from "@/lib/campaign-utils";
 
 interface ServiceItemProps {
   id: string;
   serviceName: string;
   quantity: number;
-  basePrice: number;
-  currency: string;
   /**
-   * Margen congelado de la campana. Se propaga desde el portal en vez
-   * de leer la constante global: una campana antigua debe seguir
-   * mostrando el margen con el que se aprobo.
+   * Importe unitario que paga el cliente, con el margen ya aplicado.
+   *
+   * Llega hecho desde el servidor. Antes bajaban el precio base y el
+   * margen de la campana y la multiplicacion se hacia aqui, de modo que
+   * el navegador del cliente tenia delante los dos numeros que revelan
+   * cuanto carga la agencia encima.
    */
-  markup: number;
+  precio: number;
+  currency: string;
   isApproved: boolean;
   clientNotes?: string;
   onToggle: (id: string, isApproved: boolean) => void;
@@ -25,11 +26,10 @@ interface ServiceItemProps {
 }
 
 export function ServiceItem({
-  markup,
   id,
   serviceName,
   quantity,
-  basePrice,
+  precio,
   currency,
   isApproved,
   clientNotes,
@@ -37,8 +37,7 @@ export function ServiceItem({
   onNotesChange,
   disabled = false,
 }: ServiceItemProps) {
-  const markupPrice = calculateMarkupPrice(basePrice, markup);
-  const total = markupPrice * quantity;
+  const total = precio * quantity;
 
   return (
     <div className="space-y-1">
