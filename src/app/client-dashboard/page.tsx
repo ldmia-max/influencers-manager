@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Building2, CalendarDays, Users } from "lucide-react";
+import { CalendarDays, Users } from "lucide-react";
 import {
   COOKIE_SESION_CLIENTE,
   verificarSesionCliente,
@@ -14,7 +14,6 @@ import {
 } from "@/lib/campaign-utils";
 import { formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CerrarSesionCliente } from "@/components/clients/cerrar-sesion-cliente";
 
 function formatearFecha(fecha: Date | null) {
   return fecha
@@ -53,21 +52,6 @@ async function ContenidoPortal() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-blue-100 p-2">
-            <Building2 className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {sesion.companyName}
-            </h1>
-            <p className="text-sm text-gray-500">{sesion.email}</p>
-          </div>
-        </div>
-        <CerrarSesionCliente />
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Tus campañas</CardTitle>
@@ -161,12 +145,10 @@ function PortalCargando() {
  */
 export default function ClientDashboardPage() {
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <Suspense fallback={<PortalCargando />}>
-          <ContenidoPortal />
-        </Suspense>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Suspense fallback={<PortalCargando />}>
+        <ContenidoPortal />
+      </Suspense>
     </div>
   );
 }

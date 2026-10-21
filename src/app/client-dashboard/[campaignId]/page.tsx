@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ExternalLink, Users } from "lucide-react";
+import { ArrowLeft, Calendar, DollarSign, User } from "lucide-react";
 import {
   COOKIE_SESION_CLIENTE,
   verificarSesionCliente,
@@ -12,15 +12,22 @@ import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_COLORS,
 } from "@/lib/campaign-utils";
-import { formatCompactNumber } from "@/lib/format";
+import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  CampaignTabs,
+  type PestanaCampana,
+} from "@/components/campaigns/campaign-tabs";
 import {
   MetricasCampana,
   type Publicacion,
 } from "@/components/campaigns/metricas-campana";
+import { PerfilesCampanaCliente } from "@/components/clients/perfiles-campana-cliente";
+import { RevisionesCampanaCliente } from "@/components/clients/revisiones-campana-cliente";
 
-function formatearFecha(fecha: Date | string): string {
+function formatearFecha(fecha: Date | string | null): string {
+  if (!fecha) return "—";
   return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
     month: "short",
@@ -33,7 +40,7 @@ interface PageProps {
 }
 
 /**
- * Resultados de una campana en el portal del cliente.
+ * Una campana en el portal del cliente.
  *
  * Va dentro de <Suspense> por la misma razon que el listado: con
  * cacheComponents, leer cookies() y consultar la base fuera de un limite
@@ -138,12 +145,165 @@ async function Contenido({ params }: PageProps) {
     )
   );
 
-  const totalSeguidores = campana.profiles.reduce(
+  // Los seguidores y el dinero cuentan solo a quien sigue contratado: un
+  // retirado se ve en Perfiles con su insignia, pero ya no suma ni a la
+  // audiencia ni al total. Es la misma regla que aplica
+  // calcularTotalCampana en la ficha de la agencia.
+  const activos = campana.profiles.filter((cp) => cp.participacion === "ACTIVO");
+
+  const totalSeguidores = activos.reduce(
     (suma, cp) =>
       suma +
       cp.platforms.reduce((s, p) => s + (p.socialAccount.followers ?? 0), 0),
     0
   );
+
+  const totalContratado = activos.reduce(
+    (suma, cp) =>
+      suma +
+      cp.platforms.reduce(
+        (s, cpp) =>
+          s + cpp.services.reduce((t, cs) => t + Number(cs.subtotal), 0),
+        0
+      ),
+    0
+  );
+
+  const presupuesto = Number(campana.budget);
+  const pendientes = activos.filter((cp) => cp.status === "PENDING").length;
+
+  const pestanas: PestanaCampana[] = [
+    {
+      valor: "impacto",
+      etiqueta: "Impacto del contenido",
+      contenido: (
+        // El cliente mira, no refresca: cada lectura consume crédito.
+        <MetricasCampana
+          campaignId={campana.id}
+          capturas={capturas}
+          publicaciones={publicaciones}
+          seguidores={totalSeguidores}
+        />
+      ),
+    },
+    {
+      valor: "perfiles",
+      etiqueta: "Perfiles y formatos",
+      contenido: <PerfilesCampanaCliente perfiles={campana.profiles} />,
+    },
+    {
+      valor: "general",
+      etiqueta: "General",
+      contenido: (
+        <>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardContent className="space-y-3 py-4">
+                <span className="flex items-center gap-2 font-semibold">
+                  <User className="h-5 w-5" />
+                  Contacto
+                </span>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <span className="font-medium">
+                    {campana.clientContact.firstName}{" "}
+                    {campana.clientContact.lastName}
+                  </span>
+                  {campana.clientContact.position && (
+                    <span className="text-sm text-gray-500">
+                      {campana.clientContact.position}
+                    </span>
+                  )}
+                  <span className="text-sm text-gray-500">
+                    {campana.clientContact.email}
+                  </span>
+                  {campana.clientContact.phone && (
+                    <span className="text-sm text-gray-500">
+                      {campana.clientContact.phone}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="space-y-3 py-4">
+                <span className="flex items-center gap-2 font-semibold">
+                  <Calendar className="h-5 w-5" />
+                  Fechas
+                </span>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <span className="text-sm">
+                    <span className="text-gray-500">Inicio: </span>
+                    {formatearFecha(campana.startDate)}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-gray-500">Fin: </span>
+                    {formatearFecha(campana.endDate)}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-gray-500">Creada: </span>
+                    {formatearFecha(campana.createdAt)}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* El resumen economico del cliente: su presupuesto y lo que
+              lleva contratado, con el margen ya dentro de cada importe.
+              El margen en si NO se nombra, ni como porcentaje ni como
+              precio base: para el cliente el numero contratado es el
+              precio, no una base mas un recargo. */}
+          <Card>
+            <CardContent className="space-y-3 py-4">
+              <span className="flex items-center gap-2 font-semibold">
+                <DollarSign className="h-5 w-5" />
+                Resumen
+              </span>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Presupuesto:</span>
+                  <span className="font-bold">
+                    ${formatNumber(String(Math.round(presupuesto)))}{" "}
+                    {campana.currency}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Contratado:</span>
+                  <span className="font-medium tabular-nums">
+                    ${formatNumber(String(Math.round(totalContratado)))}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Creadores:</span>
+                  <span className="font-medium">{activos.length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    Audiencia sumada:
+                  </span>
+                  <span className="font-medium">
+                    {formatCompactNumber(totalSeguidores)}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ),
+    },
+    {
+      valor: "revisiones",
+      etiqueta: "Revisiones",
+      contenido: (
+        <RevisionesCampanaCliente
+          campaignId={campana.id}
+          revisiones={campana.approvalTokens}
+          pendientes={pendientes}
+        />
+      ),
+    },
+  ];
 
   return (
     <>
@@ -166,146 +326,23 @@ async function Contenido({ params }: PageProps) {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-gray-500">Creadores</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900">
-              {campana.profiles.length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-gray-500">Audiencia sumada</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900">
-              {formatCompactNumber(totalSeguidores)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* El cliente mira, no refresca: cada lectura consume crédito. */}
-      <MetricasCampana
-        campaignId={campana.id}
-        capturas={capturas}
-        publicaciones={publicaciones}
-        seguidores={totalSeguidores}
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="h-4 w-4" />
-            Contenido publicado
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {campana.profiles.map((cp) => (
-            <div key={cp.id} className="rounded-xl border border-gray-200 p-4">
-              <p className="font-medium text-gray-900">{cp.profile.name}</p>
-
-              {cp.platforms.map((cpp, i) => (
-                <div key={i} className="mt-2 space-y-2">
-                  <p className="text-xs text-gray-500">
-                    @{cpp.socialAccount.username} ·{" "}
-                    {cpp.socialAccount.platform.displayName}
-                    {cpp.socialAccount.followers != null &&
-                      ` · ${formatCompactNumber(cpp.socialAccount.followers)} seguidores`}
-                  </p>
-
-                  {cpp.services.map((cs) => (
-                    <div key={cs.id} className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-sm font-medium text-gray-800">
-                        {cs.esCombo
-                          ? cs.comboDescripcion || "Combo"
-                          : cs.profileService?.serviceType.displayName}
-                      </p>
-
-                      {cs.entregas.length === 0 ? (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Pendiente de publicación
-                        </p>
-                      ) : (
-                        <ul className="mt-1 space-y-1">
-                          {cs.entregas.map((e) =>
-                            e.url ? (
-                              <li key={e.id} className="flex items-center gap-1">
-                                {/* Que pieza es. En un combo es lo unico que
-                                    lo dice: la cabecera solo lleva el texto
-                                    del acuerdo. */}
-                                {e.serviceType && (
-                                  <span className="text-xs text-gray-500">
-                                    {e.serviceType.displayName} ·
-                                  </span>
-                                )}
-                                <a
-                                  href={e.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  Ver publicación
-                                </a>
-                              </li>
-                            ) : (
-                              // Stories y directos no dejan enlace. Se dice
-                              // cuando se emitió en vez de ofrecer un link
-                              // roto, que es lo que veria el cliente al
-                              // entrar dias despues.
-                              <li
-                                key={e.id}
-                                className="inline-flex items-center gap-1 text-xs text-gray-600"
-                              >
-                                <CheckCircle2 className="h-3 w-3 text-green-600" />
-                                {e.serviceType && (
-                                  <span className="text-gray-500">
-                                    {e.serviceType.displayName} ·
-                                  </span>
-                                )}
-                                Emitido el{" "}
-                                {formatearFecha(e.publicadoEn ?? e.entregadoEn)}
-                                <span className="text-gray-400">
-                                  · sin enlace permanente
-                                </span>
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {campana.profiles.length === 0 && (
-            <p className="py-6 text-center text-sm text-gray-500">
-              Todavía no hay creadores confirmados en esta campaña.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <CampaignTabs pestanas={pestanas} />
     </>
   );
 }
 
 export default function ResultadosCampanaCliente({ params }: PageProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
-        <Suspense
-          fallback={
-            <div className="py-20 text-center text-sm text-gray-500">
-              Cargando resultados…
-            </div>
-          }
-        >
-          <Contenido params={params} />
-        </Suspense>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Suspense
+        fallback={
+          <div className="py-20 text-center text-sm text-gray-500">
+            Cargando campaña…
+          </div>
+        }
+      >
+        <Contenido params={params} />
+      </Suspense>
     </div>
   );
 }

@@ -1058,7 +1058,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   {
     pestanas.push({
       valor: "aprobacion",
-      etiqueta: "Enlace de aprobación",
+      etiqueta: "Revisiones",
       contenido: (
         <ApprovalTokensCard
           campaignId={id}

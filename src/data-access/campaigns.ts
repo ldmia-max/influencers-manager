@@ -3,7 +3,11 @@ import { CampaignStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { ValidationError, NotFoundError } from "./errors";
 import { entregasPendientesDeCampana } from "./entregas";
-import { calcularTotalCampana, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import {
+  calcularTotalCampana,
+  calculateMarkupPrice,
+  MARKUP_PERCENTAGE,
+} from "@/lib/campaign-utils";
 
 function generateApprovalToken(): string {
   return randomBytes(24).toString("base64url");
@@ -811,9 +815,8 @@ export async function setCampaignMarkup(id: string, markup: number) {
   });
 }
 
-
 /**
- * Resultados de UNA campana para el portal del cliente.
+ * La campana completa para el portal del cliente.
  *
  * `clientId` va en el where ademas del id de campana: ese filtro es lo
  * unico que impide que un cliente lea la campana de otro poniendo un id
@@ -825,10 +828,24 @@ export async function setCampaignMarkup(id: string, markup: number) {
  * un mensaje distinto en cada caso confirmaria a un curioso que la
  * campana existe.
  *
- * Se deja fuera lo interno: los retirados no aparecen —el cliente no ve
- * ni quien decidio el retiro ni por que, y sus importes ya no cuentan—,
- * y de las entregas solo viaja el link y sus metricas, sin notas ni
- * quien las registro.
+ * Dos propiedades que hay que conservar al tocar esto:
+ *
+ * 1. **Todo campo se nombra con `select`, nunca `include`.** Asi una
+ *    columna nueva se queda dentro por omision en vez de salir por
+ *    omision. Es lo que mantiene fuera `nombreCompleto`, `tipoDocumento`
+ *    y `numeroDocumento` del influencer, que no salen nunca de la
+ *    agencia.
+ *
+ * 2. **El margen se aplica AQUI, no en el navegador.** Lo que viaja es
+ *    `precio`, el importe final. `basePrice` —lo que cobra el
+ *    influencer— y `markupPercentage` se quedan en el servidor: juntos
+ *    revelan cuanto carga la agencia encima, que es cosa de la agencia.
+ *    El portal de aprobacion hacia la multiplicacion en el cliente y por
+ *    eso ambos numeros bajaban al navegador.
+ *
+ * Siguen fuera `motivoRetiro` y `origenRetiro` —por que se fue alguien
+ * es una conversacion interna—, las `notas` de cada entrega y quien la
+ * registro.
  */
 export async function getCampaignResultsForClient(
   clientId: string,
@@ -847,18 +864,60 @@ export async function getCampaignResultsForClient(
       status: true,
       startDate: true,
       endDate: true,
+      createdAt: true,
+      budget: true,
+      currency: true,
+      // Se lee para multiplicar aqui dentro; no se devuelve.
+      markupPercentage: true,
+      client: { select: { companyName: true } },
+      clientContact: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          position: true,
+          phone: true,
+        },
+      },
+      // El historial de revisiones. El `token` NO se selecciona: es la
+      // credencial que abre la aprobacion, y el cliente no lo necesita
+      // —para entrar tiene el boton, que resuelve el enlace contra su
+      // sesion—. Lo que sirve aqui es cuando se le pidio cada revision
+      // y cuando la contesto.
+      approvalTokens: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          expiresAt: true,
+          usedAt: true,
+          verifiedAt: true,
+          verifiedEmail: true,
+          sentToEmail: true,
+        },
+      },
       profiles: {
-        where: { participacion: "ACTIVO" },
+        // Sin filtro de participacion: el cliente ve a todo el que paso
+        // por la campana con su estado, incluidos los retirados. Lo que
+        // no ve es el motivo del retiro.
         orderBy: { createdAt: "asc" },
         select: {
           id: true,
+          status: true,
+          participacion: true,
+          // El motivo del rechazo lo escribio el propio cliente:
+          // devolverselo es recordarle lo que dijo, no filtrar nada.
+          rejectionReason: true,
           profile: { select: { id: true, name: true } },
           platforms: {
             select: {
+              id: true,
+              status: true,
               socialAccount: {
                 select: {
                   username: true,
                   followers: true,
+                  profilePicUrl: true,
                   platform: { select: { name: true, displayName: true } },
                 },
               },
@@ -868,6 +927,11 @@ export async function getCampaignResultsForClient(
                   quantity: true,
                   esCombo: true,
                   comboDescripcion: true,
+                  isApproved: true,
+                  clientNotes: true,
+                  rejectionReason: true,
+                  fechaLimite: true,
+                  basePrice: true,
                   profileService: {
                     select: {
                       serviceType: {
@@ -924,5 +988,173 @@ export async function getCampaignResultsForClient(
     },
   });
 
-  return campaign;
+  if (!campaign) return null;
+
+  // A partir de aqui se reconstruye el arbol cambiando `basePrice` por
+  // `precio`. Es deliberadamente explicito: mientras la transformacion
+  // sea un mapeo campo a campo, anadir una columna a la consulta no la
+  // cuela en la respuesta sin que alguien la escriba aqui tambien.
+  const { markupPercentage, ...resto } = campaign;
+
+  const conPrecio = (base: unknown, cantidad: number) => {
+    const precio = calculateMarkupPrice(Number(base), markupPercentage);
+    return {
+      precio: Math.round(precio).toString(),
+      subtotal: Math.round(precio * cantidad).toString(),
+    };
+  };
+
+  return {
+    ...resto,
+    budget: campaign.budget.toString(),
+    profiles: campaign.profiles.map((cp) => ({
+      id: cp.id,
+      status: cp.status,
+      participacion: cp.participacion,
+      rejectionReason: cp.rejectionReason,
+      profile: cp.profile,
+      platforms: cp.platforms.map((cpp) => ({
+        id: cpp.id,
+        status: cpp.status,
+        socialAccount: cpp.socialAccount,
+        services: cpp.services.map((cs) => {
+          const { basePrice, ...servicio } = cs;
+          return { ...servicio, ...conPrecio(basePrice, cs.quantity) };
+        }),
+      })),
+    })),
+  };
+}
+
+/**
+ * Las campanas de este cliente que esperan una respuesta suya.
+ *
+ * Es la misma condicion que deja generar un enlace de aprobacion: la
+ * campana admite revision (REVIEW o ACTIVE) y queda al menos un
+ * influencer sin contestar. ACTIVE entra porque a una campana en marcha
+ * se le suma gente cuando alguien se retira, y ese reemplazo necesita
+ * el si del cliente sin reabrir el resto.
+ *
+ * `clientId` viene de la cookie firmada, como en todo el portal.
+ */
+export async function revisionesPendientesDeCliente(clientId: string) {
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      clientId,
+      status: { in: [CampaignStatus.REVIEW, CampaignStatus.ACTIVE] },
+      profiles: {
+        some: { status: "PENDING", participacion: "ACTIVO" },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      _count: {
+        select: {
+          profiles: { where: { status: "PENDING", participacion: "ACTIVO" } },
+        },
+      },
+    },
+  });
+
+  return campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    status: c.status,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    pendientes: c._count.profiles,
+  }));
+}
+
+/**
+ * El enlace de revision para un cliente que YA inicio sesion en el portal.
+ *
+ * Devuelve el token del enlace de aprobacion, reutilizando el vigente si
+ * lo hay y creando uno solo cuando no queda ninguno. No envia correo:
+ * quien llama ya esta dentro del portal.
+ *
+ * Por que existe, y no basta con el enlace del correo: ese token caduca,
+ * es de un solo uso y ademas exige un codigo enviado al correo
+ * registrado. Un cliente que entra por el portal y pulsa "Revisar" se
+ * encontraba con "el enlace ya no es valido" en cuanto el anterior
+ * vencia o se usaba, y no tenia forma de pedir otro —regenerarlo es una
+ * accion de la agencia—. Quedaba bloqueado sin nada que pudiera hacer.
+ *
+ * Saltarse el codigo por correo no afloja nada: ese codigo esta para
+ * demostrar que quien abre el enlace es el destinatario, y la cookie de
+ * sesion del portal ya lo demuestra —se obtuvo con usuario y
+ * contrasena—. Lo que no puede saltarse es de quien es la campana, y por
+ * eso `clientId` va en el where: sin el, un id en la barra de
+ * direcciones abriria la revision de otro cliente.
+ *
+ * El token creado se marca con el correo de quien entro, de modo que en
+ * la pestana Revisiones de la agencia se vea que el enlace lo abrio el
+ * cliente desde el portal y no que alguien lo genero a mano.
+ */
+export async function tokenDeRevisionParaCliente(
+  clientId: string,
+  campaignId: string,
+  email: string
+) {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: campaignId, clientId },
+    select: { id: true, status: true },
+  });
+
+  if (!campaign) throw new NotFoundError("Campaña no encontrada");
+
+  if (campaign.status !== "REVIEW" && campaign.status !== "ACTIVE") {
+    throw new ValidationError("Esta campaña no está en revisión");
+  }
+
+  const pendientes = await prisma.campaignProfile.count({
+    where: { campaignId, status: "PENDING", participacion: "ACTIVO" },
+  });
+
+  if (pendientes === 0) {
+    throw new ValidationError("No hay nada pendiente de revisar en esta campaña");
+  }
+
+  // Se reaprovecha el vigente antes de crear otro: si el cliente vuelve
+  // a pulsar "Revisar" sin haber terminado, debe continuar donde estaba
+  // y no abrir una revision distinta de la misma campana.
+  const vigente = await prisma.campaignApprovalToken.findFirst({
+    where: {
+      campaignId,
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { token: true },
+  });
+
+  if (vigente) return vigente.token;
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const creado = await prisma.campaignApprovalToken.create({
+    data: {
+      token: generateApprovalToken(),
+      expiresAt,
+      campaignId,
+      sentToEmail: email,
+      sentToName: "Portal del cliente",
+      // Se da por verificado en el acto: la sesion del portal ya
+      // identifico a esta persona, y dejarlo en blanco haria pensar que
+      // alguien entro sin identificarse.
+      verifiedAt: new Date(),
+      verifiedEmail: email,
+    },
+    select: { token: true },
+  });
+
+  return creado.token;
 }
