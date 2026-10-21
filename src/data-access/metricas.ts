@@ -123,15 +123,23 @@ export async function refrescarMetricas(
   return { consultadas: entregas.length, guardadas, porPlataforma: resumen };
 }
 
-/** Refresca ahora mismo todas las entregas de una campana. */
+/**
+ * Refresca ahora mismo todas las entregas de una campana.
+ *
+ * Tampoco filtra por `participacion`, por lo mismo que
+ * `historicoDeCampana`: si las publicaciones de un retirado entran en
+ * la grafica, tienen que leerse con las demas. Filtrandolas, pulsar
+ * "Actualizar" antes de un informe dejaba sus cifras un dia atrasadas
+ * frente al resto y la curva hacia un escalon que no estaba en los
+ * datos. La tarea diaria nunca las filtro —`entregasParaRefrescar` solo
+ * mira la URL y el plazo—, asi que esto tambien las pone de acuerdo.
+ */
 export async function refrescarMetricasDeCampana(campaignId: string) {
   const entregas = await prisma.campaignEntrega.findMany({
     where: {
       url: { not: null },
       campaignService: {
-        campaignProfilePlatform: {
-          campaignProfile: { campaignId, participacion: "ACTIVO" },
-        },
+        campaignProfilePlatform: { campaignProfile: { campaignId } },
       },
     },
     select: { id: true, url: true },
@@ -149,15 +157,33 @@ export async function refrescarMetricasDeCampana(campaignId: string) {
  * Devuelve una fila por captura y entrega. Agregar por dia se hace
  * arriba, en el componente, porque quien pinta la grafica es quien sabe
  * si quiere el total de la campana o el desglose por influencer.
+ *
+ * **Incluye a los retirados.** Impacto mide lo que la gente vio, no lo
+ * que se contrato: el contenido se publico, esas vistas existen y
+ * retirarse despues no las borra. Son los dos ejes de siempre
+ * —`status` dice si el cliente aprobo, `participacion` si sigue
+ * contratado— y aqui no manda ninguno de los dos, manda si hubo
+ * publicacion.
+ *
+ * Antes filtraba `participacion: "ACTIVO"` y eso rompia dos cosas a la
+ * vez. Dentro de la propia ficha de la agencia: la tabla por
+ * publicacion lista a los retirados —se arma sin filtro— mientras la
+ * curva y los totales los ignoraban, de modo que una fila visible no
+ * sumaba en ningun sitio. Y entre pantallas: el portal del cliente trae
+ * las capturas sin filtrar, asi que la misma campana le salia mas alta
+ * a el que a la agencia, y eso solo se descubre comparando dos
+ * pantallas en una reunion.
+ *
+ * El presupuesto y el total contratado siguen descontando a los
+ * retirados. Esa es otra pregunta —cuanto se paga— y tiene otra
+ * respuesta.
  */
 export async function historicoDeCampana(campaignId: string) {
   return prisma.campaignEntregaMetrica.findMany({
     where: {
       entrega: {
         campaignService: {
-          campaignProfilePlatform: {
-            campaignProfile: { campaignId, participacion: "ACTIVO" },
-          },
+          campaignProfilePlatform: { campaignProfile: { campaignId } },
         },
       },
     },
