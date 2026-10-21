@@ -47,6 +47,15 @@ export function ManageAccessDialog({
   const [open, setOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // `currentAccess` lo pinta la pagina de clientes, que es un componente
+  // de servidor: mientras este dialogo sigue abierto vale `null` aunque
+  // el acceso acabe de crearse. Sin esta marca, el boton de enviar el
+  // enlace no aparecia nunca justo cuando mas falta hace —recien creado
+  // el acceso, que es su unico momento util— y el aviso verde pedia
+  // pulsar algo que no estaba en pantalla.
+  const [creado, setCreado] = useState(false);
+  const hayAcceso = Boolean(currentAccess) || creado;
+
   const [formData, setFormData] = useState({
     email: currentAccess?.email || "",
     password: "",
@@ -102,18 +111,30 @@ export function ManageAccessDialog({
       },
       {
         onSuccess: () => {
+          const conContrasena = Boolean(formData.password);
           setFormData({ ...formData, password: "", confirmPassword: "" });
+
           if (currentAccess) {
             setOpen(false);
-          } else {
-            // Recien creado: lo util ahora es mandarle el enlace, no
-            // cerrar y tener que volver a abrir para hacerlo.
+            return;
+          }
+
+          setCreado(true);
+
+          if (conContrasena) {
             setAviso({
               ok: true,
               texto:
-                "Acceso creado. Envíale el enlace para que elija su contraseña.",
+                "Acceso creado. Ya puede entrar con la contraseña que indicaste.",
             });
+            return;
           }
+
+          // Creado sin contrasena: la cuenta existe y nadie puede entrar
+          // en ella hasta que llegue el enlace, asi que mandarlo no es un
+          // segundo paso opcional sino la otra mitad del alta. Pedir un
+          // clic mas solo servia para dejar accesos muertos a medio crear.
+          mandarEnlace();
         },
       },
     );
@@ -132,7 +153,10 @@ export function ManageAccessDialog({
               }
             : {
                 ok: false,
-                texto: `El enlace se generó, pero el correo no salió (${r.email.reason ?? "error"}). Revisa la configuración de correo.`,
+                // Se muestra `error`, no `reason`: el motivo es un
+                // codigo para el programa ("sin_remitente") y la frase
+                // dice que variable mirar.
+                texto: `El enlace se generó, pero el correo no salió: ${r.email.error ?? r.email.reason ?? "error desconocido"}`,
               }
         );
       },
@@ -272,7 +296,7 @@ export function ManageAccessDialog({
 
             {/* Solo con el acceso ya creado: el enlace va al correo
                 guardado, así que antes de guardarlo no hay destino. */}
-            {currentAccess && (
+            {hayAcceso && (
               <Button
                 type="button"
                 variant="outline"
@@ -312,7 +336,7 @@ export function ManageAccessDialog({
                 <Button type="submit" disabled={loading}>
                   {loading
                     ? "Guardando..."
-                    : currentAccess
+                    : hayAcceso
                     ? "Actualizar"
                     : "Crear Acceso"}
                 </Button>
