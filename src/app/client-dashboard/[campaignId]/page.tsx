@@ -17,6 +17,11 @@ import { formatCompactNumber, formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  BarraPresupuesto,
+  colorDeTexto,
+  porcentajeUsado,
+} from "@/components/campaigns/barra-presupuesto";
+import {
   CampaignTabs,
   type PestanaCampana,
 } from "@/components/campaigns/campaign-tabs";
@@ -173,6 +178,13 @@ async function Contenido({ params }: PageProps) {
   const presupuesto = Number(campana.budget);
   const pendientes = activos.filter((cp) => cp.status === "PENDING").length;
 
+  // El uso del presupuesto, con las mismas funciones que la ficha de la
+  // agencia. Las dos cifras que lo componen ya las ve el cliente, así
+  // que su diferencia y su porcentaje no destapan nada nuevo —y el
+  // margen sigue sin nombrarse, que es lo que no puede salir de aquí.
+  const usado = porcentajeUsado(totalContratado, presupuesto);
+  const excedido = totalContratado > presupuesto;
+
   const pestanas: PestanaCampana[] = [
     {
       valor: "impacto",
@@ -285,6 +297,24 @@ async function Contenido({ params }: PageProps) {
                     ${formatNumber(String(Math.round(totalContratado)))}
                   </span>
                 </div>
+                {/* Va pegado a Contratado, como en la ficha de la
+                    agencia: las tres cifras de dinero se leen juntas y
+                    los recuentos vienen después. */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {excedido ? "Excedente:" : "Disponible:"}
+                  </span>
+                  <span
+                    className={`font-bold tabular-nums ${
+                      excedido ? "text-red-600" : "text-blue-600"
+                    }`}
+                  >
+                    $
+                    {formatNumber(
+                      String(Math.round(Math.abs(presupuesto - totalContratado)))
+                    )}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">Creadores:</span>
                   <span className="font-medium">{activos.length}</span>
@@ -298,6 +328,26 @@ async function Contenido({ params }: PageProps) {
                   </span>
                 </div>
               </div>
+
+              {/* La misma barra que ve mercadeo, y del mismo módulo: dos
+                  copias podrían separar los umbrales y la misma campaña
+                  se vería verde en una pantalla y amarilla en la otra.
+
+                  Las cifras dicen cuánto queda; la barra dice si eso es
+                  mucho o poco sin tener que dividir de cabeza. Sin
+                  presupuesto no se pinta: no habría porcentaje que
+                  calcular. */}
+              {presupuesto > 0 && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Uso del presupuesto</span>
+                    <span className={`font-medium ${colorDeTexto(usado)}`}>
+                      {usado.toFixed(0)}% usado
+                    </span>
+                  </div>
+                  <BarraPresupuesto porcentaje={usado} />
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
