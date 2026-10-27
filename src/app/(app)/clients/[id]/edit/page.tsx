@@ -43,6 +43,7 @@ export default async function EditClientPage({
       email: contact.email,
       position: contact.position || "",
       isPrimary: contact.isPrimary,
+      isActive: contact.isActive,
     })),
   };
 

@@ -8,6 +8,10 @@ export const clientContactSchema = z.object({
   email: z.string().trim().email("Email inválido"),
   position: z.string().optional().default(""),
   isPrimary: z.boolean().default(false),
+  // Por defecto activo: un contacto que llega sin el campo —de un
+  // formulario viejo o de una llamada a la API— es uno que se acaba de
+  // crear, y nadie crea un contacto retirado.
+  isActive: z.boolean().default(true),
 });
 
 export type ClientContactPayload = z.infer<typeof clientContactSchema>;

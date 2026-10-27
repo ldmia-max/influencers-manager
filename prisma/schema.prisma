@@ -367,6 +367,10 @@ model ClientContact {
   email     String // Email del contacto (requerido)
   position  String? // Cargo (opcional)
   isPrimary Boolean  @default(false) // Contacto principal
+  // Un contacto que ya firmo una campana no se puede borrar: esa campana
+  // guarda quien la aprobo. Desactivarlo lo saca del selector al crear
+  // campanas sin tocar la historia.
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

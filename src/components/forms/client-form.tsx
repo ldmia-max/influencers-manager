@@ -18,6 +18,7 @@ interface ClientContact {
   email: string;
   position: string;
   isPrimary: boolean;
+  isActive: boolean;
 }
 
 interface ClientFormData {
@@ -48,6 +49,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
           email: "",
           position: "",
           isPrimary: true,
+          isActive: true,
         },
       ],
     }
@@ -95,6 +97,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
           email: "",
           position: "",
           isPrimary: false,
+          isActive: true,
         },
       ],
     });
@@ -122,6 +125,30 @@ export function ClientForm({ initialData }: ClientFormProps) {
       });
     }
 
+    // Desactivar a alguien es decir que ya no trabaja en la empresa, así
+    // que deja de ser a quien se llama y el puesto pasa al primero que
+    // siga activo. Sin ninguno activo la empresa no tendría a quién
+    // elegir al crear una campaña: el servidor también lo rechaza, pero
+    // aquí se avisa antes de guardar.
+    if (field === "isActive" && value === false) {
+      const quedaOtro = newContacts.some((c, i) => i !== index && c.isActive);
+
+      if (!quedaOtro) {
+        setValidationError(
+          "Debe quedar al menos un contacto activo: es a quien se elige al crear una campaña."
+        );
+        return;
+      }
+
+      newContacts[index] = { ...newContacts[index], isPrimary: false };
+
+      if (!newContacts.some((c) => c.isPrimary)) {
+        const relevo = newContacts.findIndex((c) => c.isActive);
+        newContacts[relevo] = { ...newContacts[relevo], isPrimary: true };
+      }
+    }
+
+    setValidationError("");
     setFormData({ ...formData, contacts: newContacts });
   };
 
@@ -201,7 +228,9 @@ export function ClientForm({ initialData }: ClientFormProps) {
           {formData.contacts.map((contact, index) => (
             <div
               key={index}
-              className="p-4 border rounded-lg space-y-4 relative"
+              className={`p-4 border rounded-lg space-y-4 relative ${
+                contact.isActive ? "" : "border-dashed bg-gray-50"
+              }`}
             >
               {formData.contacts.length > 1 && (
                 <Button
@@ -216,16 +245,40 @@ export function ClientForm({ initialData }: ClientFormProps) {
                 </Button>
               )}
 
-              <div className="flex items-center gap-2 mb-4">
-                <Switch
-                  checked={contact.isPrimary}
-                  onCheckedChange={(checked) =>
-                    updateContact(index, "isPrimary", checked)
-                  }
-                  disabled={loading}
-                />
-                <Label>Contacto Principal</Label>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-2 mb-4 pr-10">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={contact.isPrimary}
+                    onCheckedChange={(checked) =>
+                      updateContact(index, "isPrimary", checked)
+                    }
+                    disabled={loading || !contact.isActive}
+                  />
+                  <Label>Contacto Principal</Label>
+                </div>
+
+                {/* El contacto de una campaña no se puede borrar —esa
+                    campaña guarda quién la aprobó—, así que a quien se
+                    va de la empresa se le desactiva: desaparece del
+                    selector de contacto y su historia sigue en pie. */}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={contact.isActive}
+                    onCheckedChange={(checked) =>
+                      updateContact(index, "isActive", checked)
+                    }
+                    disabled={loading}
+                  />
+                  <Label>Activo</Label>
+                </div>
               </div>
+
+              {!contact.isActive && (
+                <p className="-mt-2 text-xs text-gray-500">
+                  No aparecerá al crear campañas. Las campañas que ya son
+                  suyas conservan su nombre.
+                </p>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">

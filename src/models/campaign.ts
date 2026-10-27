@@ -9,6 +9,7 @@ export interface ClientContact {
   firstName: string;
   lastName: string;
   email: string;
+  isActive: boolean;
 }
 
 export interface Client {

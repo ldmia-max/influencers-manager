@@ -18,28 +18,51 @@ interface ClientContact {
   email: string;
   position?: string;
   isPrimary?: boolean;
+  isActive?: boolean;
 }
 
+/** Un contacto sin el campo es uno activo: es lo que eran todos antes. */
+const sigueActivo = (c: ClientContact) => c.isActive !== false;
+
 /**
- * Deja exactamente un contacto principal.
+ * Deja exactamente un contacto principal, y que siga en la empresa.
  *
- * El formulario ya desmarca a los demas al marcar uno, pero no cubre el
- * caso de borrar al principal: quitandolo de la lista el cliente se
- * quedaba sin ninguno, y el listado de clientes —que lee
- * `where: { isPrimary: true }`— mostraba la empresa sin contacto aunque
- * tuviera tres.
+ * El formulario ya desmarca a los demas al marcar uno, pero no cubre ni
+ * borrar al principal ni desactivarlo: en ambos casos el cliente se
+ * quedaba sin ninguno —o con uno que ya no trabaja ahi— y el listado de
+ * clientes, que lee `where: { isPrimary: true }`, mostraba la empresa
+ * sin contacto aunque tuviera tres.
  *
- * Si no hay ninguno marcado se toma el primero. No es una eleccion con
- * criterio, pero "alguien" es mejor que "nadie" en una columna cuyo
- * unico trabajo es decir a quien llamar.
+ * Si no hay ninguno marcado se toma el primero de los activos. No es una
+ * eleccion con criterio, pero "alguien" es mejor que "nadie" en una
+ * columna cuyo unico trabajo es decir a quien llamar.
  */
 function conUnPrincipal(contacts: ClientContact[]): ClientContact[] {
   if (contacts.length === 0) return contacts;
 
-  const yaHay = contacts.findIndex((c) => c.isPrimary);
-  const principal = yaHay === -1 ? 0 : yaHay;
+  const candidatos = contacts.some(sigueActivo)
+    ? contacts.filter(sigueActivo)
+    : contacts;
+  const principal = candidatos.find((c) => c.isPrimary) ?? candidatos[0];
 
-  return contacts.map((c, i) => ({ ...c, isPrimary: i === principal }));
+  return contacts.map((c) => ({ ...c, isPrimary: c === principal }));
+}
+
+/**
+ * Desactivar al ultimo que quedaba dejaria a la empresa sin nadie a quien
+ * elegir al crear una campana —un formulario que no se puede completar—
+ * y el listado senalando como principal a alguien que ya se fue. Si la
+ * empresa entera deja de trabajar con la agencia, lo que se retira es la
+ * empresa, no sus contactos uno a uno.
+ */
+function exigirAlgunoActivo(contacts: ClientContact[]) {
+  if (contacts.length === 0) return;
+  if (contacts.some(sigueActivo)) return;
+
+  throw new ValidationError(
+    "La empresa debe conservar al menos un contacto activo: es a quien se " +
+      "elige al crear una campaña."
+  );
 }
 
 export async function getClientsWithContacts() {
@@ -47,7 +70,18 @@ export async function getClientsWithContacts() {
     orderBy: { companyName: "asc" },
     include: {
       contacts: {
-        select: { id: true, firstName: true, lastName: true, email: true },
+        // Los inactivos tambien viajan, y el selector de campana los
+        // esconde. Tienen que estar porque una campana ya guardada puede
+        // apuntar a uno de ellos: si no llegara, el editor abriria esa
+        // campana sin contacto y el primer guardado lo perderia.
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          isActive: true,
+        },
+        orderBy: [{ isPrimary: "desc" }, { firstName: "asc" }],
       },
     },
   });
@@ -145,7 +179,7 @@ export async function getClientById(id: string) {
     where: { id },
     include: {
       contacts: {
-        orderBy: { isPrimary: "desc" },
+        orderBy: [{ isActive: "desc" }, { isPrimary: "desc" }],
       },
       clientUser: {
         select: { id: true, email: true, isActive: true },
@@ -168,7 +202,7 @@ export async function getClientForEdit(id: string) {
     where: { id },
     include: {
       contacts: {
-        orderBy: { isPrimary: "desc" },
+        orderBy: [{ isActive: "desc" }, { isPrimary: "desc" }],
       },
     },
   });
@@ -194,6 +228,8 @@ export async function createClient(data: {
   if (existingClient) {
     throw new ValidationError("Ya existe un cliente con ese email");
   }
+
+  exigirAlgunoActivo(data.contacts || []);
 
   return prisma.client.create({
     data: {
@@ -238,6 +274,8 @@ export async function updateClient(
   if (duplicateEmail) {
     throw new ValidationError("Ya existe otro cliente con ese email");
   }
+
+  exigirAlgunoActivo(data.contacts);
 
   // Una sola normalizacion para los dos caminos: los que se actualizan
   // y los que se crean salen de la misma lista.
@@ -286,7 +324,8 @@ export async function updateClient(
         throw new ValidationError(
           `No se puede eliminar a ${contact.firstName} ${contact.lastName}: ` +
             `es el contacto de ${nombres}${resto}, que guardan quién las aprobó. ` +
-            `Puedes corregir sus datos, o cambiar el contacto en las campañas que sigan Abiertas.`
+            `Si ya no trabaja en la empresa, desactívalo: dejará de aparecer ` +
+            `al crear campañas y esas campañas conservan su nombre.`
         );
       }
 
@@ -309,6 +348,7 @@ export async function updateClient(
             email: contact.email,
             position: contact.position,
             isPrimary: contact.isPrimary,
+            isActive: contact.isActive ?? true,
           },
         })
       )
@@ -325,6 +365,7 @@ export async function updateClient(
           email: contact.email,
           position: contact.position,
           isPrimary: contact.isPrimary,
+          isActive: contact.isActive ?? true,
         })),
       });
     }
@@ -339,7 +380,7 @@ export async function updateClient(
       },
       include: {
         contacts: {
-          orderBy: { isPrimary: "desc" },
+          orderBy: [{ isActive: "desc" }, { isPrimary: "desc" }],
         },
         clientUser: {
           select: { id: true, email: true, isActive: true },

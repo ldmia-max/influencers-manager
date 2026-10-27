@@ -35,7 +35,16 @@ export function CampaignStepDetails() {
   const loading = useCampaignWizardStore((s) => s.loading);
 
   const selectedClient = clients.find((c) => c.id === formData.clientId);
-  const availableContacts = selectedClient?.contacts || [];
+
+  // Quien ya no trabaja en la empresa no se puede borrar —sus campañas
+  // guardan quién las aprobó—, se desactiva. Aquí desaparece, salvo que
+  // sea justo el contacto que esta campaña ya tenía guardado: quitárselo
+  // de la lista abriría la campaña sin contacto y el primer guardado lo
+  // perdería.
+  const todosLosContactos = selectedClient?.contacts || [];
+  const availableContacts = todosLosContactos.filter(
+    (c) => c.isActive || c.id === formData.clientContactId
+  );
 
   return (
     <Card>
@@ -169,6 +178,11 @@ export function CampaignStepDetails() {
                             )}
                           />
                           {contact.firstName} {contact.lastName}
+                          {!contact.isActive && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              (inactivo)
+                            </span>
+                          )}
                         </CommandItem>
                       ))}
                     </CommandGroup>

@@ -59,12 +59,19 @@ export default async function ClientsPage({
       skip,
       take: pageSize,
       include: {
+        // Vienen todos y se cuentan aquí: la empresa puede tener
+        // contactos desactivados —gente que ya no trabaja ahí— y
+        // sumarlos al total diría que hay más personas a quienes llamar
+        // de las que hay. Son diez clientes por página, no una consulta
+        // que merezca dos recuentos.
         contacts: {
-          where: { isPrimary: true },
-          take: 1,
-        },
-        _count: {
-          select: { contacts: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            isPrimary: true,
+            isActive: true,
+          },
         },
         clientUser: {
           select: {
@@ -126,7 +133,10 @@ export default async function ClientsPage({
                 </TableHeader>
                 <TableBody>
                   {clients.map((client) => {
-                    const primaryContact = client.contacts[0];
+                    const activos = client.contacts.filter((c) => c.isActive);
+                    const inactivos = client.contacts.length - activos.length;
+                    const primaryContact =
+                      activos.find((c) => c.isPrimary) ?? activos[0];
 
                     return (
                       <TableRow key={client.id}>
@@ -153,10 +163,18 @@ export default async function ClientsPage({
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">
-                            {client._count.contacts} contacto
-                            {client._count.contacts !== 1 ? "s" : ""}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {activos.length} contacto
+                              {activos.length !== 1 ? "s" : ""}
+                            </Badge>
+                            {inactivos > 0 && (
+                              <span className="text-xs text-gray-500">
+                                +{inactivos} inactivo
+                                {inactivos !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {client.clientUser ? (
