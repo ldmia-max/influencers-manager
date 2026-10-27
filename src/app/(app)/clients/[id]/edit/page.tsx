@@ -1,4 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { puede, type Rol } from "@/lib/permissions";
 import { getClientForEdit } from "@/data-access/clients";
 import { ClientForm } from "@/components/forms/client-form";
 
@@ -7,6 +9,19 @@ export default async function EditClientPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  // Aquí se gestionan también los contactos de la empresa, así que la
+  // guardia es la misma que la de actualizar un cliente: administración
+  // y mercadeo. El middleware solo comprueba que haya sesión.
+  if (!puede(session.user.role as Rol, "clientes", "actualizar")) {
+    redirect("/clients");
+  }
+
   const { id } = await params;
 
   const client = await getClientForEdit(id);

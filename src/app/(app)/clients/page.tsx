@@ -187,28 +187,40 @@ export default async function ClientsPage({
                                 }
                               />
                             )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  aria-label="Acciones"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem asChild>
-                                  <Link
-                                    href={`/clients/${client.id}/edit`}
-                                    className="flex items-center gap-2"
+                            {/* Editar es también donde se añaden,
+                                corrigen y quitan los contactos de la
+                                empresa, así que lo ve quien puede
+                                actualizar clientes: administración y
+                                mercadeo.
+
+                                La condición envuelve el menú entero y no
+                                solo su opción: contabilidad se quedaba
+                                con un botón que al pulsarlo abría una
+                                lista vacía. */}
+                            {puede(rol, "clientes", "actualizar") && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    aria-label="Acciones"
                                   >
-                                    <Pencil className="h-4 w-4" />
-                                    Editar
-                                  </Link>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem asChild>
+                                    <Link
+                                      href={`/clients/${client.id}/edit`}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                      Editar y contactos
+                                    </Link>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

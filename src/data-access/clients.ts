@@ -20,6 +20,28 @@ interface ClientContact {
   isPrimary?: boolean;
 }
 
+/**
+ * Deja exactamente un contacto principal.
+ *
+ * El formulario ya desmarca a los demas al marcar uno, pero no cubre el
+ * caso de borrar al principal: quitandolo de la lista el cliente se
+ * quedaba sin ninguno, y el listado de clientes —que lee
+ * `where: { isPrimary: true }`— mostraba la empresa sin contacto aunque
+ * tuviera tres.
+ *
+ * Si no hay ninguno marcado se toma el primero. No es una eleccion con
+ * criterio, pero "alguien" es mejor que "nadie" en una columna cuyo
+ * unico trabajo es decir a quien llamar.
+ */
+function conUnPrincipal(contacts: ClientContact[]): ClientContact[] {
+  if (contacts.length === 0) return contacts;
+
+  const yaHay = contacts.findIndex((c) => c.isPrimary);
+  const principal = yaHay === -1 ? 0 : yaHay;
+
+  return contacts.map((c, i) => ({ ...c, isPrimary: i === principal }));
+}
+
 export async function getClientsWithContacts() {
   return prisma.client.findMany({
     orderBy: { companyName: "asc" },
@@ -180,7 +202,7 @@ export async function createClient(data: {
       email: data.email,
       createdById: data.createdById,
       contacts: {
-        create: data.contacts || [],
+        create: conUnPrincipal(data.contacts || []),
       },
     },
     include: {
@@ -217,6 +239,10 @@ export async function updateClient(
     throw new ValidationError("Ya existe otro cliente con ese email");
   }
 
+  // Una sola normalizacion para los dos caminos: los que se actualizan
+  // y los que se crean salen de la misma lista.
+  const contactos = conUnPrincipal(data.contacts);
+
   return prisma.$transaction(async (tx) => {
     // Obtener contactos actuales del cliente
     const currentContacts = await tx.clientContact.findMany({
@@ -224,7 +250,7 @@ export async function updateClient(
     });
 
     const incomingContactIds = new Set(
-      data.contacts.filter(c => c.id).map(c => c.id!)
+      contactos.filter(c => c.id).map(c => c.id!)
     );
 
     // Identificar contactos a eliminar (que no están en la lista nueva)
@@ -232,21 +258,44 @@ export async function updateClient(
       c => !incomingContactIds.has(c.id)
     );
 
-    // Eliminar solo contactos que no están referenciados por campañas
+    // Un contacto con campañas no se borra, y hay que DECIRLO.
+    //
+    // Antes se saltaba el borrado en silencio: quien lo quitaba de la
+    // lista guardaba, volvía a entrar y se lo encontraba otra vez, sin
+    // una sola explicación. Un cambio que no se aplica y no se avisa es
+    // peor que uno que se rechaza.
+    //
+    // Y se rechaza porque esa campaña registra QUIÉN la aprobó. Es la
+    // misma razón por la que una campaña no se borra desde la
+    // aplicación: es historia comercial, no una fila que estorba.
     for (const contact of contactsToDelete) {
-      const campaignsUsingContact = await tx.campaign.count({
+      const enUso = await tx.campaign.findMany({
         where: { clientContactId: contact.id },
+        select: { name: true },
+        orderBy: { createdAt: "desc" },
+        take: 3,
       });
 
-      if (campaignsUsingContact === 0) {
-        await tx.clientContact.delete({ where: { id: contact.id } });
+      if (enUso.length > 0) {
+        const total = await tx.campaign.count({
+          where: { clientContactId: contact.id },
+        });
+        const nombres = enUso.map((c) => `«${c.name}»`).join(", ");
+        const resto = total > enUso.length ? ` y ${total - enUso.length} más` : "";
+
+        throw new ValidationError(
+          `No se puede eliminar a ${contact.firstName} ${contact.lastName}: ` +
+            `es el contacto de ${nombres}${resto}, que guardan quién las aprobó. ` +
+            `Puedes corregir sus datos, o cambiar el contacto en las campañas que sigan Abiertas.`
+        );
       }
-      // Si está en uso, simplemente no lo eliminamos
+
+      await tx.clientContact.delete({ where: { id: contact.id } });
     }
 
     // Separar contactos a actualizar vs. crear
-    const contactsToUpdate = data.contacts.filter(c => c.id);
-    const contactsToCreate = data.contacts.filter(c => !c.id);
+    const contactsToUpdate = contactos.filter(c => c.id);
+    const contactsToCreate = contactos.filter(c => !c.id);
 
     // Actualizar contactos existentes
     await Promise.all(
