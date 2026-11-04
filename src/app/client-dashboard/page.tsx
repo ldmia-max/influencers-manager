@@ -48,7 +48,7 @@ async function ContenidoPortal() {
     redirect("/client-login");
   }
 
-  const campaigns = await getCampaignsForClientPortal(sesion.clientId);
+  const campaigns = await getCampaignsForClientPortal(sesion.clientId, sesion.contactId);
 
   return (
     <>

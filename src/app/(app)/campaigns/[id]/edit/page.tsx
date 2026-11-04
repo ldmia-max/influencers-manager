@@ -56,6 +56,10 @@ export default async function EditCampaignPage({ params }: PageProps) {
     description: campaign.description || "",
     clientId: campaign.clientId,
     clientContactId: campaign.clientContactId,
+    // La lista completa, no solo el principal: el editor la devuelve
+    // tal cual al guardar, y si llegara vacia el primer guardado
+    // dejaria la campana con un solo contacto aprobador.
+    clientContactIds: campaign.contacts.map((c) => c.clientContactId),
     budget: Number(campaign.budget).toString(),
     startDate: campaign.startDate
       ? campaign.startDate.toISOString().split("T")[0]

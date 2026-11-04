@@ -33,6 +33,8 @@ export async function POST(req: Request) {
       clientId: client.id,
       companyName: client.companyName,
       email: client.email,
+      contactId: client.contactId,
+      contactName: client.contactName,
     });
 
     const almacen = await cookies();

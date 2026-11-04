@@ -44,13 +44,20 @@ export default async function EditClientPage({
       position: contact.position || "",
       isPrimary: contact.isPrimary,
       isActive: contact.isActive,
+      acceso: contact.acceso,
     })),
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Editar Cliente</h1>
-      <ClientForm initialData={initialData} />
+      {/* Dar credenciales del portal es administracion, no gestion de
+          clientes: crea cuentas que ven campanas y aprueban costes.
+          Mercadeo edita contactos pero no reparte accesos. */}
+      <ClientForm
+        initialData={initialData}
+        puedeDarAcceso={puede(session.user.role as Rol, "administracion", "actualizar")}
+      />
     </div>
   );
 }

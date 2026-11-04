@@ -498,6 +498,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                     </span>
                   )}
                 </div>
+                {/* Los demas que tambien aprueban. Solo si hay mas de
+                    uno: repetir al principal en una segunda linea no
+                    aporta nada. */}
+                {campaign.contacts.length > 1 && (
+                  <div className="border-t pt-2">
+                    <p className="text-xs text-gray-500">
+                      También aprueban:{" "}
+                      {campaign.contacts
+                        .map((c) => c.clientContact)
+                        .filter((c) => c.id !== campaign.clientContactId)
+                        .map((c) => `${c.firstName} ${c.lastName}`)
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1068,6 +1083,16 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campaignId={id}
           tokens={campaign.approvalTokens}
           campaignStatus={campaign.status}
+          decisiones={campaign.profiles.map((cp) => ({
+            influencer: cp.profile.name,
+            status: cp.status,
+            reviewedAt: cp.reviewedAt,
+            quien: cp.revisadoPor
+              ? `${cp.revisadoPor.firstName} ${cp.revisadoPor.lastName}`
+              : null,
+            quienEmail: cp.revisadoPor?.email ?? null,
+            motivo: cp.rejectionReason,
+          }))}
         />
       ),
     });

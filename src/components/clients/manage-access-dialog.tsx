@@ -25,14 +25,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  useCreateClientAccess,
-  useRevokeClientAccess,
+  useCreateContactAccess,
+  useRevokeContactAccess,
   useEnviarEnlaceDeAcceso,
 } from "@/hooks/mutations/use-client-mutations";
 
 interface ManageAccessDialogProps {
   clientId: string;
-  clientName: string;
+  /** El contacto cuyo acceso se gestiona. El acceso es suyo, no de la empresa. */
+  contactoId: string;
+  contactoNombre: string;
+  contactoEmail: string;
   currentAccess?: {
     email: string;
     isActive: boolean;
@@ -41,7 +44,9 @@ interface ManageAccessDialogProps {
 
 export function ManageAccessDialog({
   clientId,
-  clientName,
+  contactoId,
+  contactoNombre,
+  contactoEmail,
   currentAccess,
 }: ManageAccessDialogProps) {
   const [open, setOpen] = useState(false);
@@ -57,14 +62,16 @@ export function ManageAccessDialog({
   const hayAcceso = Boolean(currentAccess) || creado;
 
   const [formData, setFormData] = useState({
-    email: currentAccess?.email || "",
+    // Por defecto, el correo del propio contacto: es con el que se le
+    // escribe y el que reconocera al entrar.
+    email: currentAccess?.email || contactoEmail,
     password: "",
     confirmPassword: "",
     isActive: currentAccess?.isActive ?? true,
   });
 
-  const createAccess = useCreateClientAccess();
-  const revokeAccess = useRevokeClientAccess();
+  const createAccess = useCreateContactAccess();
+  const revokeAccess = useRevokeContactAccess();
   const enlace = useEnviarEnlaceDeAcceso();
 
   const error =
@@ -100,6 +107,7 @@ export function ManageAccessDialog({
     createAccess.mutate(
       {
         clientId,
+        contactoId,
         payload: {
           // El correo FALTABA. Sin el, la ruta recibia una cadena vacia
           // y la capa de datos cortaba con "El email es requerido", de
@@ -143,7 +151,7 @@ export function ManageAccessDialog({
   const mandarEnlace = () => {
     setValidationError("");
     setAviso(null);
-    enlace.mutate(clientId, {
+    enlace.mutate({ clientId, contactoId }, {
       onSuccess: (r) => {
         setAviso(
           r.email.sent
@@ -164,7 +172,7 @@ export function ManageAccessDialog({
   };
 
   const handleDelete = () => {
-    revokeAccess.mutate(clientId, {
+    revokeAccess.mutate({ clientId, contactoId }, {
       onSuccess: () => {
         setShowDeleteConfirm(false);
         setOpen(false);
@@ -178,18 +186,19 @@ export function ManageAccessDialog({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
+          <Button type="button" variant="outline" size="sm">
             <Key className="h-4 w-4 mr-2" />
-            {currentAccess ? "Gestionar Acceso" : "Crear Acceso"}
+            {currentAccess ? "Gestionar acceso" : "Crear acceso"}
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {currentAccess ? "Gestionar Acceso" : "Crear Acceso"}
+              {currentAccess ? "Gestionar acceso" : "Crear acceso"}
             </DialogTitle>
             <DialogDescription>
-              Configura las credenciales de acceso para {clientName}
+              Credenciales del portal para {contactoNombre}. Son suyas: lo que
+              apruebe quedará a su nombre.
             </DialogDescription>
           </DialogHeader>
 
@@ -207,7 +216,7 @@ export function ManageAccessDialog({
                 }
                 required
                 disabled={loading}
-                placeholder="cliente@empresa.com"
+                placeholder={contactoEmail || "contacto@empresa.com"}
               />
               <p className="text-xs text-gray-500">
                 Este email se usará para iniciar sesión en el portal de clientes
@@ -352,8 +361,9 @@ export function ManageAccessDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar acceso?</AlertDialogTitle>
             <AlertDialogDescription>
-              El cliente <strong>{clientName}</strong> ya no podrá iniciar sesión en
-              el portal. Esta acción no se puede deshacer.
+              <strong>{contactoNombre}</strong> ya no podrá entrar al portal.
+              Las campañas que haya aprobado conservan su nombre. Esta acción
+              no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {revokeAccess.error && <p className="text-sm text-red-600">{revokeAccess.error.message}</p>}

@@ -88,6 +88,11 @@ export async function convertirBriefACampana(
         // base era tener dos tarifas segun por donde entrara la
         // campana: el default se queda congelado y la constante no.
         markupPercentage: MARKUP_PERCENTAGE,
+        // Quien puede aprobar se lee SIEMPRE de esta lista, nunca de
+        // clientContactId. Una campana creada desde un brief sin ella
+        // seria una campana que nadie del cliente puede revisar ni ver
+        // en su portal.
+        contacts: { create: { clientContactId: contact.id } },
       },
       select: { id: true, name: true },
     });

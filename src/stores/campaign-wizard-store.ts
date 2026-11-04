@@ -84,6 +84,7 @@ const defaultFormData: CampaignData = {
   description: "",
   clientId: "",
   clientContactId: "",
+  clientContactIds: [],
   budget: "",
   startDate: "",
   endDate: "",

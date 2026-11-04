@@ -70,13 +70,18 @@ export async function GET(_req: Request, { params }: RouteParams) {
     );
 
     if (!sesion) {
-      return redirigirA("/client-login");
+      // Con el destino a cuestas: quien llega desde un enlace de
+      // aprobacion agotado viene a ver ESTA campana, y soltarle el
+      // listado tras identificarse le obliga a buscarla otra vez.
+      const destino = encodeURIComponent(`/api/client-portal/revisar/${campaignId}`);
+      return redirigirA(`/client-login?destino=${destino}`);
     }
 
     const token = await tokenDeRevisionParaCliente(
       sesion.clientId,
       campaignId,
-      sesion.email
+      sesion.email,
+      sesion.contactId
     );
 
     const respuesta = redirigirA(`/approve/${token}`);
@@ -88,10 +93,18 @@ export async function GET(_req: Request, { params }: RouteParams) {
 
     return respuesta;
   } catch (error) {
-    // Nada que revisar o campana ajena: se devuelve al listado en vez de
-    // dejar una pagina de error. El cliente llego aqui pulsando un boton
-    // que el portal le ofrecio, asi que el fallo es del portal, no suyo.
-    if (error instanceof NotFoundError || error instanceof ValidationError) {
+    // Nada que revisar: a la ficha de la campana. Es lo que venia a
+    // ver quien llega desde un enlace que otro contacto ya respondio, y
+    // esa pagina comprueba por su cuenta que la campana sea suya: si no
+    // lo es, no la encuentra.
+    if (error instanceof ValidationError) {
+      const { campaignId } = await params;
+      return redirigirA(`/client-dashboard/${campaignId}`);
+    }
+
+    // Campana ajena o inexistente: al listado. Decirle "no existe"
+    // frente a "no es tuya" seria confirmarle que existe.
+    if (error instanceof NotFoundError) {
       return redirigirA("/client-dashboard/revisiones?aviso=sin-pendientes");
     }
     console.error("Error abriendo la revisión desde el portal:", error);

@@ -40,36 +40,58 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         de: estadoAnterior,
         a: body.status,
         motivo: body.reason ?? null,
-        destinatario: result.emailData?.contactEmail ?? null,
+        destinatarios:
+          result.emailData?.destinatarios.map((d) => d.contactEmail) ?? null,
       },
       req,
     });
 
-    // Envio del correo al cliente al pasar a REVIEW.
+    // Envio del correo a CADA contacto de la campana al pasar a REVIEW.
     //
-    // Se ESPERA el resultado y se informa en la respuesta. El cambio de
-    // estado ya esta hecho y no se deshace porque falle el correo: la
-    // campana queda en revision y el enlace de aprobacion sigue siendo
-    // valido, asi que el equipo puede pasarselo al cliente a mano. Pero
-    // tiene que saberlo, y antes no se enteraba.
+    // Cada uno con su enlace: el codigo de verificacion viaja al correo
+    // al que se emitio, asi que un enlace comun solo lo podria abrir
+    // uno. Se ESPERAN todos y se informa en la respuesta. El cambio de
+    // estado ya esta hecho y no se deshace porque falle un correo: la
+    // campana queda en revision y los enlaces siguen siendo validos,
+    // asi que el equipo puede pasarlos a mano. Pero tiene que saber
+    // cuales no salieron, y antes no se enteraba.
     let email: { sent: boolean; reason?: string; error?: string } | undefined;
+    let enviados: { email: string; sent: boolean; error?: string }[] = [];
 
-    if (result.emailData && result.approvalToken) {
+    if (result.emailData) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      const envio = await notifyCampaignSentToReview({
-        contactEmail: result.emailData.contactEmail,
-        contactName: result.emailData.contactName,
-        campaignName: result.emailData.campaignName,
-        companyName: result.emailData.companyName,
-        approvalToken: result.approvalToken,
-        expiresAt,
-      });
+      enviados = await Promise.all(
+        result.emailData.destinatarios.map(async (destinatario) => {
+          const envio = await notifyCampaignSentToReview({
+            contactEmail: destinatario.contactEmail,
+            contactName: destinatario.contactName,
+            campaignName: result.emailData!.campaignName,
+            companyName: result.emailData!.companyName,
+            approvalToken: destinatario.token,
+            expiresAt,
+          });
+          return {
+            email: destinatario.contactEmail,
+            sent: envio.success,
+            error: envio.success ? undefined : envio.error ?? envio.reason,
+          };
+        })
+      );
 
-      email = envio.success
-        ? { sent: true }
-        : { sent: false, reason: envio.reason, error: envio.error };
+      // Un solo fallo basta para avisar: el aviso nombra a quien se
+      // quedo sin correo, y decir "enviado" porque tres de cuatro
+      // salieron es como no decir nada.
+      const fallidos = enviados.filter((e) => !e.sent);
+      email =
+        fallidos.length === 0
+          ? { sent: true }
+          : {
+              sent: false,
+              reason: fallidos[0].error,
+              error: `No salió el correo a ${fallidos.map((f) => f.email).join(", ")}`,
+            };
     }
 
     // Build response
@@ -80,11 +102,15 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       approvalUrl?: string;
       email?: { sent: boolean; reason?: string; error?: string };
       emailRecipient?: string;
+      destinatarios?: { email: string; sent: boolean; error?: string }[];
     } = {
       campaign: result.campaign,
       message: result.message,
       email,
-      emailRecipient: result.emailData?.contactEmail,
+      emailRecipient: result.emailData?.destinatarios
+        .map((d) => d.contactEmail)
+        .join(", "),
+      destinatarios: enviados.length > 0 ? enviados : undefined,
     };
 
     if (result.approvalToken) {

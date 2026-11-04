@@ -16,15 +16,22 @@ import {
 } from "@/components/ui/table";
 import { Link2, Copy, Check, Clock, CheckCircle2, XCircle, RefreshCw, Loader2 } from "lucide-react";
 import { regenerateApprovalToken } from "@/services/campaign";
-import type { ApprovalToken } from "@/models/campaign";
+import type { ApprovalToken, DecisionDeRevision } from "@/models/campaign";
 
 interface ApprovalTokensCardProps {
   campaignId: string;
   tokens: ApprovalToken[];
   campaignStatus: string;
+  /** Lo que cada contacto del cliente decidió, y cuándo. */
+  decisiones?: DecisionDeRevision[];
 }
 
-export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: ApprovalTokensCardProps) {
+export function ApprovalTokensCard({
+  campaignId,
+  tokens,
+  campaignStatus,
+  decisiones = [],
+}: ApprovalTokensCardProps) {
   const router = useRouter();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -40,15 +47,18 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
     [tokens]
   );
 
-  // Memoizar token activo (el más reciente que no ha sido usado y no ha expirado)
-  const activeToken = useMemo(
+  // Los enlaces vivos: uno por contacto de la campana, no uno solo.
+  const enlacesActivos = useMemo(
     () =>
-      sortedTokens.find((t) => {
-        const isExpired = new Date(t.expiresAt) < new Date();
-        return !t.usedAt && !isExpired;
-      }),
+      sortedTokens.filter((t) => !t.usedAt && new Date(t.expiresAt) >= new Date()),
     [sortedTokens]
   );
+
+  // El que se ofrece para copiar es el del primero de la lista, que por
+  // orden es el mas reciente. Los demas estan en el historial con su
+  // propio boton: pegarle al cliente el enlace de otra persona haria
+  // que la decision quedase firmada con un nombre que no es el suyo.
+  const activeToken = enlacesActivos[0];
 
   const baseUrl = typeof window !== "undefined"
     ? window.location.origin
@@ -144,7 +154,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Enlace de Aprobación
+            Enlaces de aprobación
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -166,7 +176,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5" />
-          Enlace de Aprobación
+          Enlaces de aprobación
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -223,7 +233,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
         {activeToken && admiteEnlace && (
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground">
-              URL activa para el cliente
+              Enlace de {activeToken.sentToName || activeToken.sentToEmail}
             </label>
             <div className="flex gap-2">
               <Input
@@ -244,12 +254,101 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
                 )}
               </Button>
             </div>
-            {getDaysUntilExpiry(activeToken.expiresAt) > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Expira en {getDaysUntilExpiry(activeToken.expiresAt)} día
-                {getDaysUntilExpiry(activeToken.expiresAt) !== 1 ? "s" : ""}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {getDaysUntilExpiry(activeToken.expiresAt) > 0 && (
+                <>
+                  Expira en {getDaysUntilExpiry(activeToken.expiresAt)} día
+                  {getDaysUntilExpiry(activeToken.expiresAt) !== 1 ? "s" : ""}.{" "}
+                </>
+              )}
+              {enlacesActivos.length > 1 && (
+                <>
+                  Cada contacto tiene el suyo ({enlacesActivos.length} en total):
+                  cópialos abajo, uno por persona.
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Quien decidio que.
+            Antes la campana solo guardaba CUANDO se reviso cada
+            influencer. Con varios contactos aprobando la misma
+            campana, saber quien dijo que si a un coste deja de ser un
+            detalle. */}
+        {decisiones.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">
+              Decisiones del cliente
+            </label>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Influencer</TableHead>
+                    <TableHead>Decisión</TableHead>
+                    <TableHead>Quién</TableHead>
+                    <TableHead>Cuándo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {decisiones.map((d, i) => (
+                    <TableRow key={`${d.influencer}-${i}`}>
+                      <TableCell className="text-sm font-medium">
+                        {d.influencer}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            d.status === "APPROVED"
+                              ? "default"
+                              : d.status === "REJECTED"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {d.status === "APPROVED"
+                            ? "Aprobado"
+                            : d.status === "REJECTED"
+                            ? "Rechazado"
+                            : "Pendiente"}
+                        </Badge>
+                        {d.motivo && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {d.motivo}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {d.quien ? (
+                          <div>
+                            <p className="font-medium">{d.quien}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {d.quienEmail}
+                            </p>
+                          </div>
+                        ) : (
+                          // Lo decidido antes de que se registrara
+                          // quien, y lo que aprueba la propia agencia.
+                          // Poner aqui al contacto principal seria
+                          // inventarse una firma.
+                          <span className="text-muted-foreground">
+                            {d.reviewedAt ? "Sin registrar" : "—"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {d.reviewedAt ? (
+                          formatDate(d.reviewedAt)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
 
@@ -265,7 +364,7 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
                   <TableRow>
                     <TableHead>Enviado a</TableHead>
                     <TableHead>Creado</TableHead>
-                    <TableHead>Expira</TableHead>
+                    <TableHead>Entró</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -290,8 +389,16 @@ export function ApprovalTokensCard({ campaignId, tokens, campaignStatus }: Appro
                         <TableCell className="text-sm">
                           {formatDate(token.createdAt)}
                         </TableCell>
+                        {/* Cuando verifico su correo. Es la prueba de
+                            que abrio el enlace quien lo recibio y no
+                            alguien a quien se lo reenviaron: el codigo
+                            solo llega a esa direccion. */}
                         <TableCell className="text-sm">
-                          {formatDate(token.expiresAt)}
+                          {token.verifiedAt ? (
+                            formatDate(token.verifiedAt)
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={status.variant} className="gap-1">

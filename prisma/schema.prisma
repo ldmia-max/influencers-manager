@@ -355,7 +355,9 @@ model Client {
 
   // Relaciones
   contacts   ClientContact[]
-  clientUser ClientUser? // Login del cliente
+  /// Los accesos al portal de esta empresa: uno por contacto, no uno
+  /// por empresa. Ver el comentario de ClientUser.
+  clientUsers ClientUser[]
   campaigns  Campaign[]
 }
 
@@ -375,9 +377,28 @@ model ClientContact {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId  String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+
+  /// Campanas donde es el contacto principal: el que encabeza la ficha
+  /// y firma los correos.
   campaigns Campaign[]
+
+  /// Campanas donde puede aprobar, principal incluido. Una empresa
+  /// reparte sus campanas entre areas, y quien no esta en esta lista no
+  /// ve la campana en su portal.
+  campanasQueAprueba CampaignContact[]
+
+  /// Su acceso al portal, si la agencia se lo ha dado. Es por persona y
+  /// no por empresa: quien aprueba tiene que ser alguien, no una cuenta
+  /// compartida de la que nadie responde.
+  acceso ClientUser?
+
+  /// Enlaces de aprobacion emitidos a su nombre.
+  tokensDeAprobacion CampaignApprovalToken[]
+
+  /// Influencers que ha aprobado o rechazado.
+  decisiones CampaignProfile[]
 }
 
 // ============ AUTENTICACION DE CLIENTES ============
@@ -395,10 +416,21 @@ model ClientUser {
   lockedUntil         DateTime?
 
   // Relaciones
+  //
+  // El acceso es de una PERSONA, no de la empresa. Antes habia uno por
+  // empresa (clientId era unico) y con el entraba cualquiera que
+  // tuviera la contrasena: la campana registraba que "el cliente"
+  // aprobo, sin que constase quien. Ahora cada contacto tiene el suyo,
+  // y clientId se queda solo para acotar lo que ve.
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId String @unique
+  clientId String
+
+  clientContact   ClientContact @relation(fields: [clientContactId], references: [id], onDelete: Cascade)
+  clientContactId String        @unique
 
   restablecimientos ClientPasswordReset[]
+
+  @@index([clientId])
 }
 
 /// Un enlace para poner contrasena en el portal del cliente.
@@ -518,11 +550,39 @@ model Campaign {
   // Perfiles en la campaña
   profiles CampaignProfile[]
 
+  /// Quienes pueden aprobar esta campana. Incluye siempre al principal.
+  /// Al enviar a revision cada uno recibe su propio enlace, de modo que
+  /// el codigo de verificacion viaja a su correo y la decision queda a
+  /// su nombre.
+  contacts CampaignContact[]
+
   // Tokens de aprobación
   approvalTokens CampaignApprovalToken[]
 
   // Briefs que originaron esta campaña (no agrega columna a Campaign)
   briefs CampaignBrief[]
+}
+
+/// Un contacto del cliente con derecho a revisar una campana.
+///
+/// Campaign.clientContactId sigue existiendo y es el principal —quien
+/// encabeza la ficha—, pero quien puede aprobar se lee SIEMPRE de aqui.
+/// Dos fuentes para la misma pregunta se contradicen tarde o temprano,
+/// asi que el principal tambien tiene su fila.
+model CampaignContact {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  /// Restrict, no Cascade: quitar a una persona de la empresa no puede
+  /// borrar en silencio su derecho sobre una campana que ya aprobo.
+  clientContact   ClientContact @relation(fields: [clientContactId], references: [id])
+  clientContactId String
+
+  @@unique([campaignId, clientContactId])
+  @@index([clientContactId])
 }
 
 // Token de aprobación para clientes
@@ -551,6 +611,12 @@ model CampaignApprovalToken {
   verifiedAt    DateTime?
   verifiedEmail String?
 
+  /// A quien se le emitio. Opcional porque los enlaces anteriores a los
+  /// contactos por campana solo guardaban el correo, y porque un enlace
+  /// sobrevive al contacto que lo recibio.
+  clientContact   ClientContact? @relation(fields: [clientContactId], references: [id], onDelete: SetNull)
+  clientContactId String?
+
   // Relaciones
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId String
@@ -565,6 +631,14 @@ model CampaignProfile {
   status          CampaignProfileStatus @default(PENDING)
   rejectionReason String? // Motivo de rechazo (opcional)
   reviewedAt      DateTime? // Fecha de revisión del cliente
+
+  /// Quien lo decidio. `reviewedAt` decia cuando, nunca quien, y con
+  /// varios contactos aprobando la misma campana esa es justo la
+  /// pregunta que hay que poder responder meses despues. Null en lo
+  /// decidido antes de que existiera el campo, y en lo que aprueba la
+  /// propia agencia.
+  revisadoPor   ClientContact? @relation(fields: [revisadoPorId], references: [id], onDelete: SetNull)
+  revisadoPorId String?
 
   // Relaciones
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)

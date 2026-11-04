@@ -42,6 +42,12 @@ export const createCampaignSchema = z.object({
   description: z.string().nullable().optional().transform(v => v ?? undefined),
   clientId: z.string().min(1, "El cliente es requerido"),
   clientContactId: z.string().min(1, "El contacto del cliente es requerido"),
+  /**
+   * Todos los que pueden aprobar, principal incluido. El servidor mete
+   * al principal aunque no venga: quien encabeza la campana no puede
+   * quedarse sin poder revisarla.
+   */
+  clientContactIds: z.array(z.string().min(1)).optional(),
   budget: z.number().positive("El presupuesto debe ser mayor a 0"),
   currency: z.string().optional(),
   startDate: z.string().nullable().optional().transform(v => v ?? undefined),
@@ -55,6 +61,7 @@ export const updateCampaignSchema = z.object({
   description: z.string().optional(),
   clientId: z.string().min(1, "El cliente es requerido").optional(),
   clientContactId: z.string().min(1, "El contacto del cliente es requerido").optional(),
+  clientContactIds: z.array(z.string().min(1)).optional(),
   budget: z.number().positive("El presupuesto debe ser mayor a 0").optional(),
   currency: z.string().optional(),
   startDate: z.string().nullable().optional(),

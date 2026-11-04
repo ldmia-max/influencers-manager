@@ -44,13 +44,20 @@ export async function updateClient(clientId: string, payload: UpdateClientPayloa
 
 
 /**
- * Create client portal access (set password)
+ * Da o actualiza el acceso al portal de UN contacto.
+ *
+ * El acceso es de una persona, no de la empresa: lo que aprueba tiene
+ * que quedar a nombre de alguien.
  */
-export async function createClientAccess(
+export async function createContactAccess(
   clientId: string,
+  contactoId: string,
   payload: ClientAccessPayload
 ): Promise<ClientAccessResult> {
-  return apiPost<ClientAccessResult>(`/api/clients/${clientId}/access`, payload);
+  return apiPost<ClientAccessResult>(
+    `/api/clients/${clientId}/contactos/${contactoId}/acceso`,
+    payload
+  );
 }
 
 /**
@@ -59,17 +66,26 @@ export async function createClientAccess(
  * Devuelve a quien se envio y como fue el correo, para que el boton
  * pueda decir que el enlace no salio en vez de dar por hecho que si.
  */
-export async function enviarEnlaceDeAcceso(clientId: string): Promise<{
+export async function enviarEnlaceDeAcceso(
+  clientId: string,
+  contactoId: string
+): Promise<{
   destino: string;
   expiresAt: string;
   email: { sent: boolean; reason?: string; error?: string };
 }> {
-  return apiPost(`/api/clients/${clientId}/access/enlace`, {});
+  return apiPost(
+    `/api/clients/${clientId}/contactos/${contactoId}/acceso/enlace`,
+    {}
+  );
 }
 
 /**
  * Revoke client portal access
  */
-export async function revokeClientAccess(clientId: string): Promise<{ success: boolean }> {
-  return apiDelete(`/api/clients/${clientId}/access`);
+export async function revokeContactAccess(
+  clientId: string,
+  contactoId: string
+): Promise<{ success: boolean }> {
+  return apiDelete(`/api/clients/${clientId}/contactos/${contactoId}/acceso`);
 }

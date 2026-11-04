@@ -131,6 +131,7 @@ export function ReemplazarInfluencer({
         description: "",
         clientId: "",
         clientContactId: "",
+        clientContactIds: [],
         budget: String(Math.max(0, Math.round(presupuesto - totalActual))),
         startDate: "",
         endDate: "",

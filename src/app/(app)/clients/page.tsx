@@ -21,7 +21,6 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Building2 } from "lucide-react";
-import { ManageAccessDialog } from "@/components/clients/manage-access-dialog";
 
 interface SearchParams {
   search?: string;
@@ -71,12 +70,11 @@ export default async function ClientsPage({
             email: true,
             isPrimary: true,
             isActive: true,
-          },
-        },
-        clientUser: {
-          select: {
-            email: true,
-            isActive: true,
+            // El acceso al portal es de cada persona, no de la empresa.
+            // Aqui solo se cuenta: darlo o quitarlo se hace en la ficha
+            // del contacto, que es donde se sabe a quien se le esta
+            // dando.
+            acceso: { select: { isActive: true } },
           },
         },
       },
@@ -85,7 +83,6 @@ export default async function ClientsPage({
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const isAdmin = session?.user.role === "ADMIN";
 
   return (
     <div className="space-y-6">
@@ -127,13 +124,14 @@ export default async function ClientsPage({
                     <TableHead>Email</TableHead>
                     <TableHead>Contacto Principal</TableHead>
                     <TableHead>Total Contactos</TableHead>
-                    <TableHead>Estado Login</TableHead>
+                    <TableHead>Acceso al portal</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clients.map((client) => {
                     const activos = client.contacts.filter((c) => c.isActive);
+                    const conAcceso = activos.filter((c) => c.acceso).length;
                     const inactivos = client.contacts.length - activos.length;
                     const primaryContact =
                       activos.find((c) => c.isPrimary) ?? activos[0];
@@ -177,34 +175,20 @@ export default async function ClientsPage({
                           </div>
                         </TableCell>
                         <TableCell>
-                          {client.clientUser ? (
+                          {conAcceso === 0 ? (
+                            <Badge variant="outline">Sin acceso</Badge>
+                          ) : (
                             <Badge
                               variant={
-                                client.clientUser.isActive ? "default" : "secondary"
+                                conAcceso === activos.length ? "default" : "secondary"
                               }
                             >
-                              {client.clientUser.isActive ? "Activo" : "Inactivo"}
+                              {conAcceso} de {activos.length}
                             </Badge>
-                          ) : (
-                            <Badge variant="outline">Sin acceso</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {isAdmin && (
-                              <ManageAccessDialog
-                                clientId={client.id}
-                                clientName={client.companyName}
-                                currentAccess={
-                                  client.clientUser
-                                    ? {
-                                        email: client.clientUser.email,
-                                        isActive: client.clientUser.isActive,
-                                      }
-                                    : null
-                                }
-                              />
-                            )}
                             {/* Editar es también donde se añaden,
                                 corrigen y quitan los contactos de la
                                 empresa, así que lo ve quien puede

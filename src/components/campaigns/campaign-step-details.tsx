@@ -46,6 +46,30 @@ export function CampaignStepDetails() {
     (c) => c.isActive || c.id === formData.clientContactId
   );
 
+  // El principal siempre puede aprobar: encabeza la ficha y firma los
+  // correos, asi que no tendria sentido que no pudiera revisar lo que
+  // lleva su nombre. El servidor lo mete igualmente; aqui se muestra
+  // marcado y sin poder quitarse, para que nadie lo intente.
+  const aprobadores = new Set(
+    [formData.clientContactId, ...formData.clientContactIds].filter(Boolean)
+  );
+
+  const alternarAprobador = (id: string) => {
+    if (id === formData.clientContactId) return;
+    const siguiente = new Set(aprobadores);
+    if (siguiente.has(id)) siguiente.delete(id);
+    else siguiente.add(id);
+    setFormData({ ...formData, clientContactIds: [...siguiente] });
+  };
+
+  const elegirPrincipal = (id: string) => {
+    setFormData({
+      ...formData,
+      clientContactId: id,
+      clientContactIds: [...new Set([id, ...formData.clientContactIds])],
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -107,6 +131,7 @@ export function CampaignStepDetails() {
                               ...formData,
                               clientId: client.id,
                               clientContactId: "",
+                              clientContactIds: [],
                             });
                             setClientPopoverOpen(false);
                           }}
@@ -131,7 +156,7 @@ export function CampaignStepDetails() {
 
           <div className="space-y-2">
             <Label>
-              Contacto <span className="text-red-500">*</span>
+              Contacto principal <span className="text-red-500">*</span>
             </Label>
             <Popover open={contactPopoverOpen} onOpenChange={setContactPopoverOpen}>
               <PopoverTrigger asChild>
@@ -165,7 +190,7 @@ export function CampaignStepDetails() {
                           key={contact.id}
                           value={`${contact.firstName} ${contact.lastName}`}
                           onSelect={() => {
-                            setFormData({ ...formData, clientContactId: contact.id });
+                            elegirPrincipal(contact.id);
                             setContactPopoverOpen(false);
                           }}
                         >
@@ -192,6 +217,60 @@ export function CampaignStepDetails() {
             </Popover>
           </div>
         </div>
+
+        {/* Quien puede aprobar.
+            Aparece solo con cliente elegido y con mas de un contacto:
+            con uno solo no hay nada que decidir y seria una fila vacia
+            pidiendo atencion. */}
+        {formData.clientId && availableContacts.length > 1 && (
+          <div className="space-y-2 rounded-md border bg-gray-50/60 p-3">
+            <div>
+              <Label>Quién puede aprobar esta campaña</Label>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Cada uno recibirá su propio enlace al enviarla a revisión, y
+                solo ellos verán la campaña en el portal.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {availableContacts.map((contact) => {
+                const esPrincipal = contact.id === formData.clientContactId;
+                const marcado = aprobadores.has(contact.id);
+                return (
+                  <label
+                    key={contact.id}
+                    className={cn(
+                      "flex items-start gap-2 rounded-md border bg-white p-2 text-sm",
+                      esPrincipal
+                        ? "cursor-default border-gray-200"
+                        : "cursor-pointer hover:border-gray-300"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 accent-gray-900"
+                      checked={marcado}
+                      disabled={loading || esPrincipal}
+                      onChange={() => alternarAprobador(contact.id)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-gray-800">
+                        {contact.firstName} {contact.lastName}
+                        {esPrincipal && (
+                          <span className="ml-1 text-xs font-normal text-gray-500">
+                            (principal)
+                          </span>
+                        )}
+                      </span>
+                      <span className="block truncate text-xs text-gray-500">
+                        {contact.email}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">

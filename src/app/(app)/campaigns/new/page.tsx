@@ -22,6 +22,7 @@ export default async function NewCampaignPage() {
     description: "",
     clientId: "",
     clientContactId: "",
+    clientContactIds: [],
     budget: "",
     startDate: "",
     endDate: "",

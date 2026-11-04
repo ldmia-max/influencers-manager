@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { exigirPermiso } from "@/lib/api-guard";
+import { accesoDeContacto } from "@/data-access/clients";
+import { NotFoundError } from "@/data-access/errors";
 import { solicitarEnlaceDeContrasena } from "@/data-access/client-password";
 import { notifyEnlaceContrasena } from "@/lib/emails/client-notifications";
 import { auditar, ACCIONES } from "@/lib/audit";
@@ -10,15 +11,15 @@ function baseUrl() {
 }
 
 const MOTIVOS: Record<string, string> = {
-  SIN_CUENTA: "Este cliente todavía no tiene acceso al portal.",
-  INACTIVO: "El acceso de este cliente está desactivado.",
+  SIN_CUENTA: "Este contacto todavía no tiene acceso al portal.",
+  INACTIVO: "El acceso de este contacto está desactivado.",
   RECIENTE: "Se envió un enlace hace menos de un minuto.",
 };
 
 /**
- * POST /api/clients/[id]/access/enlace
+ * POST /api/clients/[id]/contactos/[contactoId]/acceso/enlace
  *
- * Manda al cliente el enlace para que elija su contrasena.
+ * Manda a ese contacto el enlace para que elija su contrasena.
  *
  * Existe para que dar de alta a un cliente no obligue a nadie a
  * inventarse una contrasena y hacersela llegar por WhatsApp o de viva
@@ -37,26 +38,17 @@ const MOTIVOS: Record<string, string> = {
  */
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string; contactoId: string }> }
 ) {
   try {
     const sesion = await exigirPermiso("administracion", "actualizar");
     if (sesion instanceof NextResponse) return sesion;
 
-    const { id } = await params;
+    const { id, contactoId } = await params;
 
-    const cliente = await prisma.client.findUnique({
-      where: { id },
-      select: {
-        companyName: true,
-        clientUser: { select: { email: true } },
-      },
-    });
+    const contacto = await accesoDeContacto(id, contactoId);
 
-    if (!cliente) {
-      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-    }
-    if (!cliente.clientUser) {
+    if (!contacto.acceso) {
       return NextResponse.json(
         { error: MOTIVOS.SIN_CUENTA, code: "SIN_CUENTA" },
         { status: 400 }
@@ -64,7 +56,7 @@ export async function POST(
     }
 
     const solicitud = await solicitarEnlaceDeContrasena(
-      cliente.clientUser.email,
+      contacto.acceso.email,
       "AGENCIA",
       // Sin freno: llamar aqui exige sesion y permiso, asi que no es la
       // via por la que alguien inundaria una bandeja de entrada.
@@ -91,8 +83,8 @@ export async function POST(
 
     await auditar({
       action: ACCIONES.contrasenaPortalSolicitada,
-      entity: "Client",
-      entityId: id,
+      entity: "ClientContact",
+      entityId: contactoId,
       actorType: "USER",
       actorId: sesion.userId,
       actorEmail: sesion.email,
@@ -101,6 +93,7 @@ export async function POST(
         : `No se pudo enviar a ${solicitud.email} el enlace de contraseña: ${resultado.reason}`,
       metadata: {
         empresa: solicitud.companyName,
+        contacto: contacto.nombre,
         emailPortal: solicitud.email,
         correoEnviado: resultado.success,
       },
@@ -115,6 +108,9 @@ export async function POST(
         : { sent: false, reason: resultado.reason, error: resultado.error },
     });
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Error enviando el enlace de contraseña del portal:", error);
     return NextResponse.json(
       { error: "No se pudo enviar el enlace" },

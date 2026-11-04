@@ -86,8 +86,9 @@ export {
   getClientForEdit,
   createClient,
   updateClient,
-  createOrUpdateClientAccess,
-  deleteClientAccess,
+  createOrUpdateContactAccess,
+  deleteContactAccess,
+  accesoDeContacto,
   loginClient,
 } from "./clients";
 

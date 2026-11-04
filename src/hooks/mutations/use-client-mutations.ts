@@ -3,8 +3,8 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   createClient,
   updateClient,
-  createClientAccess,
-  revokeClientAccess,
+  createContactAccess,
+  revokeContactAccess,
   enviarEnlaceDeAcceso,
 } from "@/services/client";
 import type {
@@ -58,16 +58,16 @@ export function useUpdateClient() {
 // Create Client Access (set portal password)
 // =============================================================================
 
-export function useCreateClientAccess() {
+export function useCreateContactAccess() {
   const queryClient = useQueryClient();
 
   return useMutation<
     ClientAccessResult,
     Error,
-    { clientId: string; payload: ClientAccessPayload }
+    { clientId: string; contactoId: string; payload: ClientAccessPayload }
   >({
-    mutationFn: ({ clientId, payload }) =>
-      createClientAccess(clientId, payload),
+    mutationFn: ({ clientId, contactoId, payload }) =>
+      createContactAccess(clientId, contactoId, payload),
     onSuccess: (_, { clientId }) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.clients.detail(clientId),
@@ -83,12 +83,13 @@ export function useCreateClientAccess() {
 // Revoke Client Access
 // =============================================================================
 
-export function useRevokeClientAccess() {
+export function useRevokeContactAccess() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (clientId: string) => revokeClientAccess(clientId),
-    onSuccess: (_, clientId) => {
+    mutationFn: ({ clientId, contactoId }: { clientId: string; contactoId: string }) =>
+      revokeContactAccess(clientId, contactoId),
+    onSuccess: (_, { clientId }) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.clients.detail(clientId),
       });
@@ -109,6 +110,7 @@ export function useRevokeClientAccess() {
  */
 export function useEnviarEnlaceDeAcceso() {
   return useMutation({
-    mutationFn: (clientId: string) => enviarEnlaceDeAcceso(clientId),
+    mutationFn: ({ clientId, contactoId }: { clientId: string; contactoId: string }) =>
+      enviarEnlaceDeAcceso(clientId, contactoId),
   });
 }

@@ -73,7 +73,7 @@ async function Contenido({ params }: PageProps) {
     redirect("/client-login");
   }
 
-  const campana = await getCampaignResultsForClient(sesion.clientId, campaignId);
+  const campana = await getCampaignResultsForClient(sesion.clientId, campaignId, sesion.contactId);
 
   // Un 404 sin mas, tanto si la campana no existe como si es de otro
   // cliente: distinguir los dos casos le confirmaria a un curioso que

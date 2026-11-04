@@ -27,7 +27,10 @@ export interface CampaignData {
   name: string;
   description: string;
   clientId: string;
+  /** Contacto principal: encabeza la ficha y firma los correos. */
   clientContactId: string;
+  /** Todos los que pueden aprobar, principal incluido. */
+  clientContactIds: string[];
   budget: string;
   startDate: string;
   endDate: string;
@@ -208,6 +211,19 @@ export interface ApprovalToken {
   createdAt: Date | string;
   sentToEmail: string;
   sentToName: string | null;
+  /** Cuando superó la verificación por correo, si llegó a hacerlo. */
+  verifiedAt?: Date | string | null;
+  clientContactId?: string | null;
+}
+
+/** Lo que un contacto del cliente decidió sobre un influencer. */
+export interface DecisionDeRevision {
+  influencer: string;
+  status: string;
+  reviewedAt: Date | string | null;
+  quien: string | null;
+  quienEmail: string | null;
+  motivo: string | null;
 }
 
 export interface CampaignFormData {
@@ -215,6 +231,7 @@ export interface CampaignFormData {
   description: string;
   clientId: string;
   clientContactId: string;
+  clientContactIds: string[];
   budget: string;
   startDate: string;
   endDate: string;

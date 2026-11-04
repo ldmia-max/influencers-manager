@@ -298,6 +298,16 @@ export async function submitApproval(
 
   validateToken(approvalToken);
 
+  // Quien esta decidiendo. El enlace se emite a una persona concreta y
+  // el codigo de verificacion viaja a SU correo, asi que el token es la
+  // firma: sin esto la campana solo registraba que "el cliente" dijo
+  // que si, y con varios contactos aprobando la misma campana esa es
+  // justo la pregunta que hay que poder responder meses despues.
+  const quienDecide = approvalToken!.clientContactId;
+  const nombreDeQuienDecide =
+    approvalToken!.sentToName ??
+    `${approvalToken!.campaign.clientContact.firstName} ${approvalToken!.campaign.clientContact.lastName}`;
+
   const now = new Date();
 
   /**
@@ -357,6 +367,7 @@ export async function submitApproval(
           status: profile.status,
           rejectionReason: profile.rejectionReason || null,
           reviewedAt: now,
+          revisadoPorId: quienDecide,
         },
       });
     }
@@ -456,7 +467,9 @@ export async function submitApproval(
       campaignId: approvalToken!.campaign.id,
       campaignName: approvalToken!.campaign.name,
       clientName: approvalToken!.campaign.client.companyName,
-      contactName: `${approvalToken!.campaign.clientContact.firstName} ${approvalToken!.campaign.clientContact.lastName}`,
+      // Quien respondio, no el contacto principal: el correo al equipo
+      // tiene que nombrar a la persona que acaba de decidir.
+      contactName: nombreDeQuienDecide,
       createdById: approvalToken!.campaign.createdById,
       // El correo al equipo habla de lo que se acaba de decidir, no de
       // lo que ya estaba decidido de antes.
@@ -490,27 +503,46 @@ export async function getRejectedProfileDetails(profileIds: string[]) {
 export async function estadoDelToken(token: string) {
   const registro = await prisma.campaignApprovalToken.findUnique({
     where: { token },
-    include: { campaign: { select: { name: true, status: true } } },
+    include: { campaign: { select: { id: true, name: true, status: true } } },
   });
 
   if (!registro) throw new NotFoundError("Token no encontrado");
-  if (registro.usedAt) throw new ValidationError("USED_TOKEN");
   if (registro.expiresAt < new Date()) throw new ValidationError("EXPIRED_TOKEN");
-  // La misma lista que admite la aprobacion en si. Exigir REVIEW aqui
-  // dejaba fuera el caso para el que existe el enlace en una campana en
-  // marcha: el cliente recibia el correo del reemplazo, abria el enlace
-  // y se encontraba "la campana ya no esta disponible para revision",
-  // sin poder pedir siquiera su codigo.
-  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(registro.campaign.status)) {
-    throw new ValidationError("INVALID_STATUS");
-  }
+
+  /**
+   * Un enlace agotado no es un error: es una revision que ya pasó.
+   *
+   * Cada contacto de la campana recibe el suyo, y basta con que uno
+   * conteste para que no quede nada que decidir. Los demas abrian el
+   * enlace y se encontraban "este enlace ya fue utilizado", que suena a
+   * averia y les deja sin ver lo que su compañero acababa de aprobar en
+   * su nombre. Se les manda al portal, donde la campana sigue estando.
+   *
+   * Son tres situaciones y las tres llevan al mismo sitio: su propio
+   * enlace ya se uso, otro contesto antes y no queda nada pendiente, o
+   * la campana salio de los estados que admiten aprobacion.
+   */
+  const pendientes = await prisma.campaignProfile.count({
+    where: {
+      campaignId: registro.campaignId,
+      status: "PENDING",
+      participacion: "ACTIVO",
+    },
+  });
+
+  const agotado =
+    Boolean(registro.usedAt) ||
+    pendientes === 0 ||
+    !ESTADOS_QUE_ADMITEN_APROBACION.includes(registro.campaign.status);
 
   return {
+    campaignId: registro.campaign.id,
     campaignName: registro.campaign.name,
     sentToName: registro.sentToName,
     // Pista del tipo "ma***@empresa.com": suficiente para que el
     // destinatario legitimo se reconozca, inutil para adivinarla.
     pistaCorreo: enmascararCorreo(registro.sentToEmail),
+    agotado,
   };
 }
 

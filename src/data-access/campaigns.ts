@@ -226,6 +226,15 @@ export async function getCampaignDetail(id: string) {
         select: { id: true, firstName: true, lastName: true, email: true, phone: true, position: true },
       },
       createdBy: { select: { id: true, name: true } },
+      // Los contactos que pueden aprobar, para que la pestaña Revisiones
+      // diga a quién se mandó y quién falta por contestar.
+      contacts: {
+        select: {
+          clientContact: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+        },
+      },
       approvalTokens: {
         select: {
           id: true,
@@ -235,11 +244,19 @@ export async function getCampaignDetail(id: string) {
           createdAt: true,
           sentToEmail: true,
           sentToName: true,
+          verifiedAt: true,
+          clientContactId: true,
         },
         orderBy: { createdAt: "desc" },
       },
       profiles: {
         include: {
+          // Quien lo aprobó o rechazó. `reviewedAt` decía cuándo y
+          // nunca quién: con varios contactos aprobando la misma
+          // campaña, es la pregunta que hay que poder responder.
+          revisadoPor: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
           profile: {
             select: {
               id: true,
@@ -323,6 +340,7 @@ export async function getCampaignForEdit(id: string) {
     include: {
       client: { select: { id: true, companyName: true } },
       clientContact: { select: { id: true, firstName: true, lastName: true } },
+      contacts: { select: { clientContactId: true } },
       profiles: {
         include: {
           profile: { select: { id: true, name: true } },
@@ -371,11 +389,48 @@ export async function getDashboardCampaigns(userId: string, verTodas: boolean) {
 
 // --- Mutations ---
 
+/**
+ * La lista definitiva de quienes pueden aprobar una campana.
+ *
+ * El principal entra siempre, lo pidan o no: encabeza la ficha, firma
+ * los correos y seria absurdo que no pudiera revisar lo que lleva su
+ * nombre. Los demas tienen que ser contactos de la misma empresa —el id
+ * llega del navegador— y activos, porque invitar a aprobar a alguien
+ * que ya no trabaja alli es mandar un correo a una direccion muerta.
+ */
+function contactosDeLaCampana(
+  contactosDelCliente: { id: string; isActive: boolean }[],
+  principalId: string,
+  otrosIds: string[] | undefined
+): string[] {
+  const validos = new Map(contactosDelCliente.map((c) => [c.id, c]));
+  const elegidos = new Set<string>([principalId]);
+
+  for (const id of otrosIds ?? []) {
+    const contacto = validos.get(id);
+    if (!contacto) {
+      throw new ValidationError(
+        "Alguno de los contactos seleccionados no pertenece a este cliente"
+      );
+    }
+    if (!contacto.isActive && id !== principalId) {
+      throw new ValidationError(
+        "No se puede invitar a aprobar a un contacto inactivo"
+      );
+    }
+    elegidos.add(id);
+  }
+
+  return [...elegidos];
+}
+
 export async function createCampaign(data: {
   name: string;
   description?: string;
   clientId: string;
   clientContactId: string;
+  /** Los demas que tambien pueden aprobar. El principal entra solo. */
+  clientContactIds?: string[];
   budget: number;
   currency?: string;
   startDate?: string;
@@ -400,6 +455,12 @@ export async function createCampaign(data: {
     throw new ValidationError("El contacto no pertenece al cliente seleccionado");
   }
 
+  const contactos = contactosDeLaCampana(
+    client.contacts,
+    data.clientContactId,
+    data.clientContactIds
+  );
+
   return prisma.campaign.create({
     data: {
       name: data.name,
@@ -415,6 +476,7 @@ export async function createCampaign(data: {
       // depende de la constante global: subirla el ano que viene no le
       // cambiara los precios.
       markupPercentage: MARKUP_PERCENTAGE,
+      contacts: { create: contactos.map((id) => ({ clientContactId: id })) },
     },
     include: {
       client: { select: { id: true, companyName: true } },
@@ -431,6 +493,7 @@ export async function updateCampaign(
     description?: string;
     clientId?: string;
     clientContactId?: string;
+    clientContactIds?: string[];
     budget?: number;
     currency?: string;
     startDate?: string | null;
@@ -448,9 +511,16 @@ export async function updateCampaign(
     throw new ValidationError("Solo se pueden editar campañas en estado borrador o pendiente");
   }
 
-  if (data.clientId && data.clientContactId) {
+  // La lista de contactos se rehace cuando llega, y para eso hace falta
+  // saber quien es el principal: puede venir en esta misma llamada o
+  // seguir siendo el que ya tenia la campana.
+  const principalId = data.clientContactId ?? existing.clientContactId;
+  const clientId = data.clientId ?? existing.clientId;
+  let contactos: string[] | null = null;
+
+  if ((data.clientId && data.clientContactId) || data.clientContactIds) {
     const client = await prisma.client.findUnique({
-      where: { id: data.clientId },
+      where: { id: clientId },
       include: { contacts: true },
     });
 
@@ -458,10 +528,41 @@ export async function updateCampaign(
       throw new NotFoundError("Cliente no encontrado");
     }
 
-    const contactBelongsToClient = client.contacts.some((c) => c.id === data.clientContactId);
+    const contactBelongsToClient = client.contacts.some((c) => c.id === principalId);
     if (!contactBelongsToClient) {
       throw new ValidationError("El contacto no pertenece al cliente seleccionado");
     }
+
+    if (data.clientContactIds) {
+      contactos = contactosDeLaCampana(
+        client.contacts,
+        principalId,
+        data.clientContactIds
+      );
+    }
+  }
+
+  if (contactos) {
+    // Se rehace entera en vez de calcular altas y bajas: la lista es
+    // corta y lo que manda el formulario es el estado completo. Borrar
+    // una fila no borra nada mas —CampaignContact solo dice quien puede
+    // revisar—, asi que el unico efecto de quitar a alguien es que deja
+    // de ver la campana.
+    const lista = contactos;
+    await prisma.$transaction([
+      prisma.campaignContact.deleteMany({
+        where: { campaignId: id, clientContactId: { notIn: lista } },
+      }),
+      ...lista.map((clientContactId) =>
+        prisma.campaignContact.upsert({
+          where: {
+            campaignId_clientContactId: { campaignId: id, clientContactId },
+          },
+          create: { campaignId: id, clientContactId },
+          update: {},
+        })
+      ),
+    ]);
   }
 
   return prisma.campaign.update({
@@ -502,6 +603,19 @@ export async function transitionCampaignStatus(
     include: {
       client: { select: { companyName: true } },
       clientContact: { select: { firstName: true, lastName: true, email: true } },
+      contacts: {
+        select: {
+          clientContact: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              isActive: true,
+            },
+          },
+        },
+      },
       profiles: {
         select: {
           id: true,
@@ -569,19 +683,38 @@ export async function transitionCampaignStatus(
       data: { isApproved: true, rejectionReason: null, reviewedAt: null },
     });
 
-    approvalToken = generateApprovalToken();
+    // Un enlace POR CONTACTO, no uno compartido.
+    //
+    // El codigo de verificacion viaja al correo al que se emitio el
+    // enlace, asi que un unico enlace para cuatro personas solo lo
+    // puede abrir una: las otras tres tendrian que pedirselo. Y lo que
+    // quedaria registrado seria "lo aprobo el cliente", sin nombre.
+    // Con uno cada uno, cada quien entra con lo suyo y cada decision
+    // lleva firma.
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    await prisma.campaignApprovalToken.create({
-      data: {
-        token: approvalToken,
+    const destinatarios = contactosQueAprueban(campaign);
+
+    await prisma.campaignApprovalToken.createMany({
+      data: destinatarios.map((c) => ({
+        token: generateApprovalToken(),
         expiresAt,
         campaignId,
-        sentToEmail: campaign.clientContact.email,
-        sentToName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
-      },
+        clientContactId: c.id,
+        sentToEmail: c.email,
+        sentToName: `${c.firstName} ${c.lastName}`,
+      })),
     });
+
+    // El que se devuelve es el del principal: es el que la agencia
+    // copia al portapapeles cuando quiere pegarlo a mano.
+    const delPrincipal = await prisma.campaignApprovalToken.findFirst({
+      where: { campaignId, clientContactId: campaign.clientContactId, usedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { token: true },
+    });
+    approvalToken = delPrincipal?.token ?? null;
   }
 
   // ACTIVE transition: validate approvals
@@ -673,13 +806,78 @@ export async function transitionCampaignStatus(
     approvalToken,
     emailData: newStatus === "REVIEW"
       ? {
-          contactEmail: campaign.clientContact.email,
-          contactName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
           campaignName: campaign.name,
           companyName: campaign.client.companyName,
+          // Cada uno con SU enlace. La ruta los recorre y manda un
+          // correo a cada quien.
+          destinatarios: await enlacesDeRevision(campaignId),
         }
       : null,
   };
+}
+
+/**
+ * Contactos con derecho a aprobar, tal y como estan guardados.
+ *
+ * Se filtran los inactivos: alguien pudo dejar la empresa entre que se
+ * monto la campana y se envio a revision, y mandarle el enlace seria
+ * escribir a una direccion que ya no lee nadie. El principal se cuela
+ * igualmente si la lista quedara vacia —una campana sin nadie a quien
+ * mandarsela no se puede revisar, y es mejor un correo que rebota que
+ * una revision que no sale.
+ */
+function contactosQueAprueban(campaign: {
+  clientContactId: string;
+  clientContact: { firstName: string; lastName: string; email: string };
+  contacts: {
+    clientContact: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      isActive: boolean;
+    };
+  }[];
+}) {
+  const activos = campaign.contacts
+    .map((c) => c.clientContact)
+    .filter((c) => c.isActive);
+
+  if (activos.length > 0) return activos;
+
+  return [
+    {
+      id: campaign.clientContactId,
+      firstName: campaign.clientContact.firstName,
+      lastName: campaign.clientContact.lastName,
+      email: campaign.clientContact.email,
+      isActive: true,
+    },
+  ];
+}
+
+/** Los enlaces vigentes de una campana, uno por destinatario. */
+async function enlacesDeRevision(campaignId: string) {
+  const tokens = await prisma.campaignApprovalToken.findMany({
+    where: { campaignId, usedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+    select: { token: true, sentToEmail: true, sentToName: true, clientContactId: true },
+  });
+
+  // Si por lo que sea hubiera dos vigentes para la misma persona, se
+  // manda el mas reciente: dos correos con dos enlaces distintos para
+  // la misma campana es la forma mas rapida de que no se abra ninguno.
+  const porPersona = new Map<string, (typeof tokens)[number]>();
+  for (const t of tokens) {
+    const clave = t.clientContactId ?? t.sentToEmail.toLowerCase();
+    if (!porPersona.has(clave)) porPersona.set(clave, t);
+  }
+
+  return [...porPersona.values()].map((t) => ({
+    token: t.token,
+    contactEmail: t.sentToEmail,
+    contactName: t.sentToName ?? t.sentToEmail,
+  }));
 }
 
 export async function regenerateApprovalToken(campaignId: string) {
@@ -688,6 +886,19 @@ export async function regenerateApprovalToken(campaignId: string) {
     include: {
       clientContact: {
         select: { firstName: true, lastName: true, email: true },
+      },
+      contacts: {
+        select: {
+          clientContact: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              isActive: true,
+            },
+          },
+        },
       },
     },
   });
@@ -716,28 +927,68 @@ export async function regenerateApprovalToken(campaignId: string) {
     }
   }
 
-  const token = generateApprovalToken();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
-  const newToken = await prisma.campaignApprovalToken.create({
-    data: {
-      token,
-      expiresAt,
-      campaignId,
-      sentToEmail: campaign.clientContact.email,
-      sentToName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
-    },
+  const destinatarios = contactosQueAprueban(campaign);
+  const base = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "");
+
+  // Los vigentes se invalidan antes de emitir los nuevos. Si no, cada
+  // reenvio dejaria otro enlace vivo de la misma campana y la bandeja
+  // del cliente acabaria con tres, sin saber cual es el bueno.
+  await prisma.campaignApprovalToken.updateMany({
+    where: { campaignId, usedAt: null, expiresAt: { gt: new Date() } },
+    data: { expiresAt: new Date() },
   });
 
+  const nuevos = await Promise.all(
+    destinatarios.map((c) =>
+      prisma.campaignApprovalToken.create({
+        data: {
+          token: generateApprovalToken(),
+          expiresAt,
+          campaignId,
+          clientContactId: c.id,
+          sentToEmail: c.email,
+          sentToName: `${c.firstName} ${c.lastName}`,
+        },
+        select: { id: true, token: true, sentToEmail: true, sentToName: true, expiresAt: true, createdAt: true, usedAt: true },
+      })
+    )
+  );
+
+  const delPrincipal =
+    nuevos.find((t) => t.sentToEmail === campaign.clientContact.email) ?? nuevos[0];
+
   return {
-    token: newToken,
-    approvalUrl: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/approve/${token}`,
-    contactEmail: campaign.clientContact.email,
-    contactName: `${campaign.clientContact.firstName} ${campaign.clientContact.lastName}`,
+    token: delPrincipal,
+    approvalUrl: `${base}/approve/${delPrincipal.token}`,
+    contactEmail: delPrincipal.sentToEmail,
+    contactName: delPrincipal.sentToName ?? delPrincipal.sentToEmail,
     campaignName: campaign.name,
     expiresAt,
+    destinatarios: nuevos.map((t) => ({
+      token: t.token,
+      contactEmail: t.sentToEmail,
+      contactName: t.sentToName ?? t.sentToEmail,
+    })),
   };
+}
+
+/**
+ * El filtro por contacto, escrito una sola vez.
+ *
+ * `clientId` separa una empresa de otra. Esto separa a una persona de
+ * otra DENTRO de la misma empresa: una campana solo existe para quien
+ * figura en ella, de modo que repartirlas entre areas del cliente
+ * —marketing la suya, producto la suya— sea posible y que un enlace que
+ * llegue a manos de otro contacto no abra nada.
+ *
+ * Va siempre junto a `clientId`, nunca en su lugar: un id de contacto
+ * de otra empresa no deberia poder usarse ni por error.
+ */
+function soloSusCampanas(contactId: string) {
+  return { contacts: { some: { clientContactId: contactId } } };
 }
 
 /**
@@ -753,10 +1004,14 @@ export async function regenerateApprovalToken(campaignId: string) {
  * Devuelve el presupuesto ya formateado como cadena porque Decimal de
  * Prisma no puede cruzar a un componente de cliente.
  */
-export async function getCampaignsForClientPortal(clientId: string) {
+export async function getCampaignsForClientPortal(
+  clientId: string,
+  contactId: string
+) {
   const campaigns = await prisma.campaign.findMany({
     where: {
       clientId,
+      ...soloSusCampanas(contactId),
       status: { not: CampaignStatus.DRAFT },
     },
     orderBy: { createdAt: "desc" },
@@ -849,12 +1104,14 @@ export async function setCampaignMarkup(id: string, markup: number) {
  */
 export async function getCampaignResultsForClient(
   clientId: string,
-  campaignId: string
+  campaignId: string,
+  contactId: string
 ) {
   const campaign = await prisma.campaign.findFirst({
     where: {
       id: campaignId,
       clientId,
+      ...soloSusCampanas(contactId),
       status: { not: CampaignStatus.DRAFT },
     },
     select: {
@@ -1037,10 +1294,14 @@ export async function getCampaignResultsForClient(
  *
  * `clientId` viene de la cookie firmada, como en todo el portal.
  */
-export async function revisionesPendientesDeCliente(clientId: string) {
+export async function revisionesPendientesDeCliente(
+  clientId: string,
+  contactId: string
+) {
   const campaigns = await prisma.campaign.findMany({
     where: {
       clientId,
+      ...soloSusCampanas(contactId),
       status: { in: [CampaignStatus.REVIEW, CampaignStatus.ACTIVE] },
       profiles: {
         some: { status: "PENDING", participacion: "ACTIVO" },
@@ -1101,10 +1362,11 @@ export async function revisionesPendientesDeCliente(clientId: string) {
 export async function tokenDeRevisionParaCliente(
   clientId: string,
   campaignId: string,
-  email: string
+  email: string,
+  contactId: string
 ) {
   const campaign = await prisma.campaign.findFirst({
-    where: { id: campaignId, clientId },
+    where: { id: campaignId, clientId, ...soloSusCampanas(contactId) },
     select: { id: true, status: true },
   });
 
@@ -1122,12 +1384,18 @@ export async function tokenDeRevisionParaCliente(
     throw new ValidationError("No hay nada pendiente de revisar en esta campaña");
   }
 
-  // Se reaprovecha el vigente antes de crear otro: si el cliente vuelve
-  // a pulsar "Revisar" sin haber terminado, debe continuar donde estaba
-  // y no abrir una revision distinta de la misma campana.
+  // Se reaprovecha el SUYO antes de crear otro: si vuelve a pulsar
+  // "Revisar" sin haber terminado, debe continuar donde estaba y no
+  // abrir una revision distinta de la misma campana.
+  //
+  // El filtro por contacto es lo importante. Antes se cogia cualquier
+  // enlace vigente de la campana, y con varios contactos eso entregaba
+  // a quien entraba el enlace emitido a OTRA persona: la decision
+  // habria quedado firmada con su nombre y su correo.
   const vigente = await prisma.campaignApprovalToken.findFirst({
     where: {
       campaignId,
+      clientContactId: contactId,
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
@@ -1135,7 +1403,18 @@ export async function tokenDeRevisionParaCliente(
     select: { token: true },
   });
 
-  if (vigente) return vigente.token;
+  if (vigente) {
+    // Queda constancia de que entro, aunque el enlace lo hubiera creado
+    // el envio a revision. La sesion del portal identifica a esta
+    // persona igual que lo haria el codigo por correo, y sin esta marca
+    // la pestana Revisiones mostraba "—" en la columna de quien entro
+    // justo para quien acababa de aprobar desde el portal.
+    await prisma.campaignApprovalToken.updateMany({
+      where: { token: vigente.token, verifiedAt: null },
+      data: { verifiedAt: new Date(), verifiedEmail: email },
+    });
+    return vigente.token;
+  }
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
@@ -1145,6 +1424,7 @@ export async function tokenDeRevisionParaCliente(
       token: generateApprovalToken(),
       expiresAt,
       campaignId,
+      clientContactId: contactId,
       sentToEmail: email,
       sentToName: "Portal del cliente",
       // Se da por verificado en el acto: la sesion del portal ya

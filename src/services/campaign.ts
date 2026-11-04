@@ -113,6 +113,7 @@ export function buildCampaignPayload(formData: CampaignFormData): CreateCampaign
     description: formData.description || undefined,
     clientId: formData.clientId,
     clientContactId: formData.clientContactId,
+    clientContactIds: formData.clientContactIds,
     budget: parseInt(formData.budget, 10),
     startDate: formData.startDate || undefined,
     endDate: formData.endDate || undefined,

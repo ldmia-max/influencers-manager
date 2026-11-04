@@ -62,6 +62,7 @@ export function CampaignFromCartEditor({ clients, profiles }: CampaignFromCartEd
     description: "",
     clientId: "",
     clientContactId: "",
+    clientContactIds: [],
     budget: "",
     startDate: "",
     endDate: "",

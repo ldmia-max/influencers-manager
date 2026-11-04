@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { clientLogin } from "@/services/auth";
 import type { ClientLoginPayload } from "@/services/auth";
@@ -12,7 +12,46 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/**
+ * A donde se va tras identificarse.
+ *
+ * Solo se admite una ruta del propio portal. `destino` llega por la
+ * barra de direcciones, asi que sin esta comprobacion bastaria un
+ * enlace a /client-login?destino=https://otro-sitio para que la
+ * aplicacion mandase alli a quien acaba de poner su contrasena,
+ * avalando con su dominio una pagina que no es suya.
+ *
+ * Una ruta que empiece por "//" tambien sale del sitio —el navegador la
+ * lee como "//host/ruta"—, de ahi que no baste con exigir que empiece
+ * por "/".
+ */
+const DESTINOS_ADMITIDOS = ["/client-dashboard", "/api/client-portal/"];
+
+function destinoSeguro(destino: string | null): string {
+  if (!destino) return "/client-dashboard";
+  if (destino.startsWith("//")) return "/client-dashboard";
+  return DESTINOS_ADMITIDOS.some((ruta) => destino.startsWith(ruta))
+    ? destino
+    : "/client-dashboard";
+}
+
 export default function ClientLoginPage() {
+  // useSearchParams necesita un limite de suspension: con
+  // cacheComponents esta pagina es estatica y leer la query fuera de el
+  // rompe el build.
+  return (
+    <Suspense fallback={<Formulario destino="/client-dashboard" />}>
+      <ConDestino />
+    </Suspense>
+  );
+}
+
+function ConDestino() {
+  const destino = destinoSeguro(useSearchParams().get("destino"));
+  return <Formulario destino={destino} />;
+}
+
+function Formulario({ destino }: { destino: string }) {
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
@@ -22,7 +61,15 @@ export default function ClientLoginPage() {
   const loginMutation = useMutation({
     mutationFn: (payload: ClientLoginPayload) => clientLogin(payload),
     onSuccess: () => {
-      router.push("/client-dashboard");
+      // replace y no push: si el destino es la ruta que resuelve la
+      // revision, el boton de atras devolveria al login ya resuelto.
+      // Y una ruta de /api se navega con el navegador, no con el
+      // router, que solo sabe de paginas.
+      if (destino.startsWith("/api/")) {
+        window.location.replace(destino);
+        return;
+      }
+      router.replace(destino);
       router.refresh();
     },
   });

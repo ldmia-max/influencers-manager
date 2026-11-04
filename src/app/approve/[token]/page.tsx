@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { VerificacionAcceso } from "@/components/approve/verificacion-acceso";
@@ -107,10 +107,13 @@ interface ApprovalState {
 }
 
 interface EstadoAcceso {
+  campaignId: string;
   campaignName: string;
   sentToName: string | null;
   pistaCorreo: string;
   verificado: boolean;
+  /** Ya no hay nada que decidir por aquí: la revisión sigue en el portal. */
+  agotado: boolean;
 }
 
 export default function ApprovePage() {
@@ -539,7 +542,21 @@ export default function ApprovePage() {
     );
   }
 
-  // 3) Enlace valido pero sin verificar: puerta de acceso.
+  // 3) Enlace agotado: la revision continua en el portal.
+  //
+  // Cada contacto de la campana tiene su propio enlace y basta con que
+  // uno conteste para que no quede nada pendiente. Al resto no se les
+  // dice "este enlace ya fue utilizado" —suena a averia y les deja sin
+  // ver lo que se aprobo en su nombre—: se les lleva al portal, que es
+  // donde la campana sigue estando y donde entran identificandose.
+  //
+  // La ruta de destino redirige sola a /client-login si no hay sesion,
+  // y vuelve aqui con ella puesta.
+  if (acceso?.agotado) {
+    return <RevisionEnElPortal campaignId={acceso.campaignId} campaignName={acceso.campaignName} />;
+  }
+
+  // 4) Enlace valido pero sin verificar: puerta de acceso.
   if (acceso && !acceso.verificado) {
     return (
       <VerificacionAcceso
@@ -956,6 +973,55 @@ export default function ApprovePage() {
           />
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/**
+ * Pantalla puente hacia el portal cuando el enlace ya no decide nada.
+ *
+ * Redirige sola, pero escribe antes lo que esta pasando: un salto mudo
+ * a una pantalla de login deja al cliente sin saber si hizo algo mal.
+ * `replace` y no `push` para que el boton de atras no les devuelva aqui
+ * en bucle.
+ */
+function RevisionEnElPortal({
+  campaignId,
+  campaignName,
+}: {
+  campaignId: string;
+  campaignName: string;
+}) {
+  const destino = `/api/client-portal/revisar/${campaignId}`;
+
+  useEffect(() => {
+    const id = setTimeout(() => window.location.replace(destino), 1200);
+    return () => clearTimeout(id);
+  }, [destino]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle className="text-lg">{campaignName}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Esta revisión ya fue respondida. Te llevamos al portal, donde
+            puedes ver la campaña y lo que se aprobó.
+          </p>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary" />
+            Abriendo el portal...
+          </div>
+          <a
+            href={destino}
+            className="inline-block text-sm font-medium text-primary underline"
+          >
+            Ir ahora
+          </a>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -58,7 +58,7 @@ async function Contenido({
     redirect("/client-login");
   }
 
-  const campanas = await revisionesPendientesDeCliente(sesion.clientId);
+  const campanas = await revisionesPendientesDeCliente(sesion.clientId, sesion.contactId);
   const textoAviso = aviso ? AVISOS[aviso] : null;
 
   return (

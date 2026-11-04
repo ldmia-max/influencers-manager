@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Trash2, Plus } from "lucide-react";
+import { ManageAccessDialog } from "@/components/clients/manage-access-dialog";
 
 interface ClientContact {
   id?: string;
@@ -19,6 +20,8 @@ interface ClientContact {
   position: string;
   isPrimary: boolean;
   isActive: boolean;
+  /** Su cuenta del portal, si la tiene. Solo la hay en contactos guardados. */
+  acceso?: { id: string; email: string; isActive: boolean } | null;
 }
 
 interface ClientFormData {
@@ -31,9 +34,10 @@ interface ClientFormData {
 
 interface ClientFormProps {
   initialData?: ClientFormData;
+  puedeDarAcceso?: boolean;
 }
 
-export function ClientForm({ initialData }: ClientFormProps) {
+export function ClientForm({ initialData, puedeDarAcceso = false }: ClientFormProps) {
   const router = useRouter();
 
   const [formData, setFormData] = useState<ClientFormData>(
@@ -278,6 +282,43 @@ export function ClientForm({ initialData }: ClientFormProps) {
                   No aparecerá al crear campañas. Las campañas que ya son
                   suyas conservan su nombre.
                 </p>
+              )}
+
+              {/* El acceso al portal es de esta persona, no de la
+                  empresa: lo que apruebe queda a su nombre. Solo en
+                  contactos ya guardados —uno que se está escribiendo
+                  todavía no existe para darle credenciales— y solo si
+                  quien edita puede repartirlos. */}
+              {puedeDarAcceso && contact.id && initialData?.id && (
+                <div className="flex flex-wrap items-center gap-3 border-t pt-3">
+                  <span className="text-xs text-gray-500">Portal:</span>
+                  {contact.acceso ? (
+                    <span className="text-xs font-medium text-gray-700">
+                      {contact.acceso.email}
+                      {!contact.acceso.isActive && (
+                        <span className="ml-1 font-normal text-amber-700">
+                          (desactivado)
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-500">sin acceso</span>
+                  )}
+                  <ManageAccessDialog
+                    clientId={initialData.id}
+                    contactoId={contact.id}
+                    contactoNombre={`${contact.firstName} ${contact.lastName}`.trim()}
+                    contactoEmail={contact.email}
+                    currentAccess={
+                      contact.acceso
+                        ? {
+                            email: contact.acceso.email,
+                            isActive: contact.acceso.isActive,
+                          }
+                        : null
+                    }
+                  />
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
