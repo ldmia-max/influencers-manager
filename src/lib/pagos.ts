@@ -185,6 +185,7 @@ export const COLOR_PAGO: Record<EstadoPago, string> = {
 export interface DatosDePago {
   cuentaCobroUrl: string | null;
   certificadoUrl: string | null;
+  contratoUrl: string | null;
   documento: string | null;
   loPagaElCliente: boolean;
   /** Cuanto falta por pagar. */
@@ -209,10 +210,17 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
   // le pide cuenta de cobro a nadie, solo espera la confirmacion.
   if (pago.loPagaElCliente) return "REGISTRADO";
 
-  // Solo la cuenta de cobro y el certificado son imprescindibles. El
-  // RUT y la ARL son opcionales: ayudan a confirmar como factura, pero
-  // su ausencia no impide registrar ni pagar.
-  if (pago.cuentaCobroUrl && pago.certificadoUrl) return "DOCUMENTOS_RECIBIDOS";
+  // Imprescindibles son tres: la cuenta de cobro, el certificado
+  // bancario y el contrato. El RUT y la ARL ayudan a confirmar como
+  // factura, y "otros" es lo que haga falta archivar, pero ninguno de
+  // los tres frena nada.
+  //
+  // El contrato se sumo despues, asi que los pagos antiguos que lo
+  // tenian todo menos ese papel volvieron a "Faltan documentos". Es lo
+  // correcto: eran pagos sin contrato y nadie lo estaba viendo.
+  if (pago.cuentaCobroUrl && pago.certificadoUrl && pago.contratoUrl) {
+    return "DOCUMENTOS_RECIBIDOS";
+  }
   return "PENDIENTE_DOCUMENTOS";
 }
 

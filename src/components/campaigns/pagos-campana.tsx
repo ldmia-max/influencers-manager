@@ -14,8 +14,14 @@ import {
 import { formatNumber } from "@/lib/format";
 import { ETIQUETA_TIPO_PERSONA } from "@/lib/pagos";
 import type { PagoVista } from "@/data-access/pagos";
-import { apiPatch } from "@/services/api";
-import { Adjunto, Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
+import { apiDelete, apiPatch, apiPost } from "@/services/api";
+import {
+  Adjunto,
+  Dinero,
+  EstadoBadge,
+  Otros,
+  Vencimiento,
+} from "@/components/pagos/piezas";
 
 const SIN_TIPO = "__sin__";
 
@@ -46,6 +52,24 @@ export function PagosCampana({
   });
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Los papeles sueltos van por su propia ruta: se suman y se quitan de
+   * uno en uno, no se reemplazan como los huecos con etiqueta.
+   *
+   * Recarga la pagina igual que `guardar`, y por lo mismo: el estado
+   * del pago es calculado y router.refresh() no repinta en produccion.
+   */
+  const enviar = async (url: string, metodo: "POST" | "DELETE", datos?: unknown) => {
+    setError(null);
+    try {
+      if (metodo === "POST") await apiPost(url, datos);
+      else await apiDelete(url);
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Algo falló");
+    }
+  };
 
   const guardar = async (id: string, datos: Record<string, unknown>) => {
     setOcupado(id);
@@ -241,20 +265,51 @@ export function PagosCampana({
                             }
                           />
                         )}
-                        {/* La ARL solo se le pide a quien factura como
-                            juridica. Mostrarsela a una persona natural
-                            seria pedirle un documento que no tiene. */}
-                        {p.tipoPersona === "JURIDICA" && (
-                          <Adjunto
-                            url={p.arlUrl}
-                            nombre={p.arlNombre}
-                            etiqueta="ARL"
-                            puedeSubir={puedeEditar}
-                            onSubido={(doc) =>
-                              guardar(p.campaignProfileId, { arl: doc })
-                            }
-                          />
-                        )}
+                        {/* El contrato es el tercer imprescindible:
+                            sin el, el pago se queda en "Faltan
+                            documentos" por mucha cuenta de cobro que
+                            haya. */}
+                        <Adjunto
+                          url={p.contratoUrl}
+                          nombre={p.contratoNombre}
+                          etiqueta="contrato"
+                          puedeSubir={puedeEditar}
+                          onSubido={(doc) =>
+                            guardar(p.campaignProfileId, { contrato: doc })
+                          }
+                        />
+                        {/* La ARL se ofrece siempre aunque se le pida
+                            sobre todo a quien factura como juridica: el
+                            tipo de persona lo fija contabilidad mas
+                            tarde, asi que esconderla hasta entonces
+                            significaba que mercadeo —que es quien tiene
+                            el papel— casi nunca llegaba a ver el hueco. */}
+                        <Adjunto
+                          url={p.arlUrl}
+                          nombre={p.arlNombre}
+                          etiqueta="ARL"
+                          puedeSubir={puedeEditar}
+                          onSubido={(doc) =>
+                            guardar(p.campaignProfileId, { arl: doc })
+                          }
+                        />
+                        <Otros
+                          documentos={p.otros}
+                          puedeEditar={puedeEditar}
+                          onAnadir={(doc) =>
+                            enviar(
+                              `/api/pagos/${p.campaignProfileId}/documentos/otros`,
+                              "POST",
+                              doc
+                            )
+                          }
+                          onQuitar={(id) =>
+                            enviar(
+                              `/api/pagos/${p.campaignProfileId}/documentos/otros/${id}`,
+                              "DELETE"
+                            )
+                          }
+                        />
                       </td>
                       <td className="px-2 py-2">
                         {editando === p.campaignProfileId ? (

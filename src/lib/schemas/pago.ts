@@ -11,9 +11,9 @@ const tipoPersona = z.enum(["NATURAL", "JURIDICA"]);
  * Lo que aporta mercadeo: los documentos, la fecha desde la que corre el
  * plazo y el tipo de persona que se pactó al negociar.
  *
- * Imprescindibles son dos, la cuenta de cobro y el certificado bancario.
- * El RUT y la ARL son opcionales —la ARL además solo se le pide a quien
- * factura como jurídica—, así que su ausencia no frena el registro.
+ * Imprescindibles son tres: la cuenta de cobro, el certificado bancario
+ * y el contrato. El RUT y la ARL son opcionales —ayudan a confirmar cómo
+ * factura—, así que su ausencia no frena el registro.
  *
  * `null` retira un adjunto o deja el tipo en "todavía no se sabe";
  * ausente lo deja como estaba.
@@ -24,6 +24,7 @@ export const documentacionPagoSchema = z
     certificado: adjunto.nullish(),
     rut: adjunto.nullish(),
     arl: adjunto.nullish(),
+    contrato: adjunto.nullish(),
     fechaCuentaCobro: z.coerce.date().nullish(),
     tipoPersona: tipoPersona.nullish(),
     observaciones: z.string().max(1000).nullish(),
@@ -31,6 +32,14 @@ export const documentacionPagoSchema = z
   .refine((d) => Object.keys(d).length > 0, {
     message: "No hay nada que cambiar",
   });
+
+/**
+ * Un papel suelto que se suma a la documentación.
+ *
+ * Sin `null`, al revés que los de arriba: aquí no se reemplaza nada, se
+ * añade. Para quitar uno está el DELETE con su id.
+ */
+export const otroDocumentoSchema = adjunto;
 
 /** Lo que anota contabilidad. */
 export const registroPagoSchema = z

@@ -81,6 +81,12 @@ const SELECCION = {
       rutNombre: true,
       arlUrl: true,
       arlNombre: true,
+      contratoUrl: true,
+      contratoNombre: true,
+      otros: {
+        select: { id: true, url: true, nombre: true },
+        orderBy: { subidoEn: "asc" },
+      },
       fechaCuentaCobro: true,
       tipoPersona: true,
       documento: true,
@@ -172,6 +178,10 @@ export interface PagoVista {
   rutNombre: string | null;
   arlUrl: string | null;
   arlNombre: string | null;
+  contratoUrl: string | null;
+  contratoNombre: string | null;
+  /** Los papeles sueltos. Pueden ser varios y el nombre los describe. */
+  otros: { id: string; url: string; nombre: string }[];
 
   fechaCuentaCobro: string | null;
   documento: string | null;
@@ -295,6 +305,7 @@ function aVista(cp: Fila): PagoVista {
         ? {
             cuentaCobroUrl: pago.cuentaCobroUrl,
             certificadoUrl: pago.certificadoUrl,
+            contratoUrl: pago.contratoUrl,
             documento: pago.documento,
             loPagaElCliente: pago.loPagaElCliente,
             saldo,
@@ -312,6 +323,9 @@ function aVista(cp: Fila): PagoVista {
     rutNombre: pago?.rutNombre ?? null,
     arlUrl: pago?.arlUrl ?? null,
     arlNombre: pago?.arlNombre ?? null,
+    contratoUrl: pago?.contratoUrl ?? null,
+    contratoNombre: pago?.contratoNombre ?? null,
+    otros: pago?.otros ?? [],
 
     fechaCuentaCobro: fecha ? fecha.toISOString() : null,
     documento: pago?.documento ?? null,
@@ -491,6 +505,7 @@ export async function guardarDocumentacionDePago(
     certificado?: { url: string; nombre: string } | null;
     rut?: { url: string; nombre: string } | null;
     arl?: { url: string; nombre: string } | null;
+    contrato?: { url: string; nombre: string } | null;
     fechaCuentaCobro?: Date | null;
     tipoPersona?: TipoPersona | null;
     observaciones?: string | null;
@@ -515,6 +530,10 @@ export async function guardarDocumentacionDePago(
       arlUrl: datos.arl?.url ?? null,
       arlNombre: datos.arl?.nombre ?? null,
     }),
+    ...(datos.contrato !== undefined && {
+      contratoUrl: datos.contrato?.url ?? null,
+      contratoNombre: datos.contrato?.nombre ?? null,
+    }),
     ...(datos.fechaCuentaCobro !== undefined && {
       fechaCuentaCobro: datos.fechaCuentaCobro,
     }),
@@ -529,6 +548,69 @@ export async function guardarDocumentacionDePago(
     create: { campaignProfileId, ...campos },
     update: campos,
   });
+
+  return obtenerPago(campaignProfileId);
+}
+
+/**
+ * Anade un papel suelto a la documentacion de un pago.
+ *
+ * Va por su propia funcion y no por guardarDocumentacionDePago porque
+ * aqui se SUMA en vez de reemplazar: los huecos con etiqueta guardan un
+ * documento cada uno y subir otro pisa el anterior, mientras que de
+ * estos caben los que hagan falta.
+ */
+export async function agregarOtroDocumento(
+  campaignProfileId: string,
+  documento: { url: string; nombre: string }
+) {
+  await asegurarPago(campaignProfileId);
+
+  // El pago puede no existir todavia: un influencer sin documentacion
+  // no tiene fila hasta que se le cuelga algo.
+  const pago = await prisma.pagoInfluencer.upsert({
+    where: { campaignProfileId },
+    create: { campaignProfileId },
+    update: {},
+    select: { id: true },
+  });
+
+  await prisma.pagoDocumento.create({
+    data: {
+      pagoId: pago.id,
+      url: documento.url,
+      nombre: documento.nombre.trim().slice(0, 200),
+    },
+  });
+
+  return obtenerPago(campaignProfileId);
+}
+
+/**
+ * Quita uno de esos papeles.
+ *
+ * El documento tiene que ser de ESTE pago, no basta con que el id
+ * exista: sin esa comprobacion, quien pueda editar la documentacion de
+ * una campana podria borrar la de cualquier otra con solo adivinar un
+ * id. El archivo subido no se borra del disco —puede estar referenciado
+ * desde otro sitio y recuperarlo es imposible—, solo deja de figurar.
+ */
+export async function quitarOtroDocumento(
+  campaignProfileId: string,
+  documentoId: string
+) {
+  await asegurarPago(campaignProfileId);
+
+  const documento = await prisma.pagoDocumento.findFirst({
+    where: { id: documentoId, pago: { campaignProfileId } },
+    select: { id: true },
+  });
+
+  if (!documento) {
+    throw new NotFoundError("Ese documento no es de este influencer");
+  }
+
+  await prisma.pagoDocumento.delete({ where: { id: documento.id } });
 
   return obtenerPago(campaignProfileId);
 }

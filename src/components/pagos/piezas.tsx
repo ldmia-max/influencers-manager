@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, FileText, Loader2, Paperclip } from "lucide-react";
+import { AlertTriangle, FileText, Loader2, Paperclip, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/format";
 import {
@@ -170,6 +170,103 @@ export function Adjunto({
             <Paperclip className="h-3 w-3" />
           )}
           {url ? "Reemplazar" : "Subir"}
+          <input
+            type="file"
+            className="hidden"
+            disabled={subiendo}
+            onChange={(e) => {
+              const a = e.target.files?.[0];
+              if (a) subir(a);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      )}
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Los papeles sueltos de un pago: los que no tienen hueco propio.
+ *
+ * A diferencia de `Adjunto`, aquí se suman en vez de reemplazarse, así
+ * que cada uno necesita su propio enlace y su propia papelera. El
+ * nombre del archivo es lo único que dice qué es —no se pide una
+ * descripción—, de modo que se muestra entero en vez de una etiqueta
+ * fija: "ARL" o "RUT" se entienden solos, "otro" no.
+ */
+export function Otros({
+  documentos,
+  puedeEditar,
+  onAnadir,
+  onQuitar,
+}: {
+  documentos: { id: string; url: string; nombre: string }[];
+  puedeEditar?: boolean;
+  /** Ausentes en la vista de contabilidad, que solo mira. */
+  onAnadir?: (doc: { url: string; nombre: string }) => Promise<void>;
+  onQuitar?: (id: string) => Promise<void>;
+}) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subir = async (archivo: File) => {
+    setSubiendo(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("archivo", archivo);
+      const res = await fetch("/api/pagos/upload", { method: "POST", body: form });
+      const datos = await res.json();
+      if (!res.ok) throw new Error(datos.error ?? "No se pudo subir");
+      await onAnadir?.(datos);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  return (
+    <div className="space-y-0.5">
+      {documentos.length === 0 ? (
+        <span className="text-gray-400">sin otros</span>
+      ) : (
+        documentos.map((d) => (
+          <span key={d.id} className="flex items-center gap-1">
+            <a
+              href={d.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-w-0 items-center gap-1 text-violet-700 hover:underline"
+              title={d.nombre}
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="max-w-[9rem] truncate">{d.nombre}</span>
+            </a>
+            {puedeEditar && onQuitar && (
+              <button
+                type="button"
+                title="Quitar este documento"
+                className="shrink-0 text-gray-300 hover:text-red-600"
+                onClick={() => onQuitar(d.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        ))
+      )}
+
+      {puedeEditar && onAnadir && (
+        <label className="flex cursor-pointer items-center gap-1 text-[11px] text-violet-700 hover:underline">
+          {subiendo ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Paperclip className="h-3 w-3" />
+          )}
+          Añadir otro
           <input
             type="file"
             className="hidden"

@@ -1045,10 +1045,27 @@ model PagoInfluencer {
   rutUrl    String?
   rutNombre String?
 
-  /// La ARL, que solo se pide a quien factura como juridica. Opcional,
-  /// igual que el RUT.
+  /// La ARL. Opcional, igual que el RUT.
+  ///
+  /// Se le pide sobre todo a quien factura como juridica, pero el hueco
+  /// se ofrece siempre: el tipo de persona lo fija contabilidad mas
+  /// tarde, asi que esconder la ARL hasta entonces significaba que
+  /// mercadeo —que es quien tiene el documento en la mano— casi nunca
+  /// llegaba a verlo.
   arlUrl    String?
   arlNombre String?
+
+  /// El contrato firmado para ESTA campana.
+  ///
+  /// Obligatorio, al reves que el RUT y la ARL: sin el, el pago no pasa
+  /// de "Faltan documentos". Es el unico papel que acredita que se
+  /// pacto el trabajo que se esta pagando, y pagar sin el deja a la
+  /// agencia sin con que responder.
+  contratoUrl    String?
+  contratoNombre String?
+
+  /// Los demas papeles, los que no tienen hueco propio.
+  otros PagoDocumento[]
 
   /// Fecha de la cuenta de cobro.
   ///
@@ -1097,6 +1114,28 @@ model PagoInfluencer {
   updatedAt DateTime @updatedAt
 
   @@index([fechaCuentaCobro])
+}
+
+/// Un papel suelto de un pago: lo que no es cuenta de cobro,
+/// certificado, RUT, ARL ni contrato.
+///
+/// Tabla aparte y no otra pareja de columnas porque ni se sabe cuantos
+/// son ni que son: una autorizacion de uso de imagen, un anexo al
+/// contrato, el soporte de una retencion. Caben varios por pago y el
+/// nombre del archivo es lo unico que los describe, que es justo por lo
+/// que no merecen un hueco con etiqueta propia.
+model PagoDocumento {
+  id String @id @default(cuid())
+
+  pago   PagoInfluencer @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  pagoId String
+
+  url    String
+  nombre String
+
+  subidoEn DateTime @default(now())
+
+  @@index([pagoId])
 }
 
 /// Un pago parcial contra un PagoInfluencer.

@@ -17,7 +17,13 @@ import { formatNumber } from "@/lib/format";
 import { mesLegible } from "@/lib/pagos";
 import type { GrupoDeCampana, PagoVista } from "@/data-access/pagos";
 import { apiDelete, apiPatch, apiPost } from "@/services/api";
-import { Adjunto, Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
+import {
+  Adjunto,
+  Dinero,
+  EstadoBadge,
+  Otros,
+  Vencimiento,
+} from "@/components/pagos/piezas";
 
 const SIN_TIPO = "__sin__";
 
@@ -428,10 +434,15 @@ function Fila({
             etiqueta="certificado"
           />
           <Adjunto url={p.rutUrl} nombre={p.rutNombre} etiqueta="RUT" />
-          {/* La ARL solo la aporta quien factura como juridica. */}
-          {p.tipoPersona === "JURIDICA" && (
-            <Adjunto url={p.arlUrl} nombre={p.arlNombre} etiqueta="ARL" />
-          )}
+          <Adjunto
+            url={p.contratoUrl}
+            nombre={p.contratoNombre}
+            etiqueta="contrato"
+          />
+          <Adjunto url={p.arlUrl} nombre={p.arlNombre} etiqueta="ARL" />
+          {/* Aqui solo se miran: quitarlos es de mercadeo, que es quien
+              los subio y sabe que son. */}
+          <Otros documentos={p.otros} />
         </td>
         <td className="px-2 py-2">
           <EstadoBadge estado={p.estado} loPagaElCliente={p.loPagaElCliente} />
