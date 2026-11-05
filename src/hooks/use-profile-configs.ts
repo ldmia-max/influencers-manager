@@ -117,11 +117,35 @@ export function useProfileConfigs(
   );
 
   useEffect(() => {
+    /**
+     * Los ids VIVOS, no los de la instantanea de render.
+     *
+     * CampaignEditor inicializa el store durante su propio render, y
+     * useSyncExternalStore conserva la instantanea anterior durante esa
+     * misma pasada: este efecto corria una primera vez creyendo que no
+     * habia ningun influencer elegido. Como prevConfigs si traia la
+     * configuracion recien cargada, la daba por "quitada" y la borraba;
+     * en la segunda pasada ya no quedaba nada que reaprovechar y se
+     * reconstruia desde el catalogo, con las plataformas sin marcar y
+     * las cantidades a cero.
+     *
+     * El efecto se veia asi: abrir una campana guardada mostraba al
+     * influencer elegido pero sin formatos, total 0, y guardar mandaba
+     * `profiles: []` —es decir, abrir el editor y guardar sin tocar
+     * nada se llevaba por delante la linea contratada entera, con sus
+     * entregas y sus metricas.
+     *
+     * getState() dentro del efecto siempre devuelve lo que el store
+     * tiene de verdad. La dependencia sigue siendo la instantanea, que
+     * es lo que dice CUANDO volver a mirar.
+     */
+    const idsVivos = useCampaignWizardStore.getState().selectedProfileIds;
+
     setProfileConfigs((prevConfigs: ProfileConfig[]) => {
       const currentIds = new Set(prevConfigs.map((c) => c.profileId));
-      const newIds = new Set(selectedProfileIds);
+      const newIds = new Set(idsVivos);
 
-      const hasNewProfiles = selectedProfileIds.some((id) => !currentIds.has(id));
+      const hasNewProfiles = idsVivos.some((id) => !currentIds.has(id));
       const hasRemovedProfiles = prevConfigs.some((c) => !newIds.has(c.profileId));
       // Una config a medio construir —sin nombre de plataforma— viene de
       // la base de datos y hay que completarla con el catalogo.
@@ -133,7 +157,7 @@ export function useProfileConfigs(
         return prevConfigs;
       }
 
-      return selectedProfileIds.map((profileId) => {
+      return idsVivos.map((profileId) => {
         const existingConf = prevConfigs.find((c) => c.profileId === profileId);
         if (
           existingConf &&
