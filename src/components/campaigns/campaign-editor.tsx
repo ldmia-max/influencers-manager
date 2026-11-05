@@ -38,6 +38,15 @@ export type { ProfileWithServices } from "@/models/campaign";
 // después del paint) y la inicialización render-phase de la nueva instancia.
 let _activeEditorSessionId: string | null = null;
 
+/**
+ * Version del borrador que se guarda en sessionStorage.
+ *
+ * Subirla invalida todos los borradores anteriores. Se sube cuando un
+ * arreglo deja de ser suficiente porque el estado ya guardado en los
+ * navegadores es el que esta mal.
+ */
+const ESQUEMA_BORRADOR = 2;
+
 export function CampaignEditor({
   campaignId: initialCampaignId,
   initialData,
@@ -138,6 +147,7 @@ export function CampaignEditor({
       const raw = sessionStorage.getItem(storageKey);
       if (!raw) return;
       const saved = JSON.parse(raw) as {
+        v?: number;
         campaignId?: string;
         formData?: CampaignData;
         selectedProfileIds?: string[];
@@ -147,6 +157,18 @@ export function CampaignEditor({
       };
       // Guard: only restore if it belongs to the same campaign.
       if (saved.campaignId !== initialCampaignId) return;
+      /**
+       * Lo guardado por una version anterior se descarta entero.
+       *
+       * Esto restaura por encima de lo que acaba de traer el servidor, y
+       * sin este sello un estado corrupto escrito antes del arreglo
+       * revivia en cada apertura: sessionStorage sobrevive a las
+       * recargas y a los despliegues mientras la pestana siga abierta.
+       * Costaba la configuracion de formatos —y con ella la campana al
+       * guardar—, asi que ante la duda se pierde lo no guardado, que es
+       * un formulario, no datos.
+       */
+      if (saved.v !== ESQUEMA_BORRADOR) return;
       useCampaignWizardStore.setState({
         ...saved,
         // Always reset transient / UI-only state.
@@ -167,10 +189,17 @@ export function CampaignEditor({
     if (!storageKey) return;
     const unsubscribe = useCampaignWizardStore.subscribe((state) => {
       if (state.loading) return; // skip mid-save snapshots
+      // Al desmontarse el editor se llama a reset(), y el store queda sin
+      // campaignId: sin esto, salir de la pantalla escribia un borrador
+      // vacio encima del bueno. La restauracion ya lo descartaba por el
+      // guardia de campaignId, pero guardar basura y confiar en que
+      // alguien la filtre despues es como se llega a un incidente.
+      if (state.campaignId !== initialCampaignId) return;
       try {
         sessionStorage.setItem(
           storageKey,
           JSON.stringify({
+            v: ESQUEMA_BORRADOR,
             campaignId: state.campaignId,
             formData: state.formData,
             selectedProfileIds: state.selectedProfileIds,
@@ -194,7 +223,10 @@ export function CampaignEditor({
   // La configuracion de formatos la construye useProfileConfigs, que
   // vive fuera para que el modal de sustitucion pueda montar el mismo
   // paso de perfiles sin arrastrar el editor entero.
-  useProfileConfigs(profiles, filters);
+  // `existingConfig` va tambien como red de seguridad: si lo que hay en
+  // el store no sirve —tipicamente restaurado de sessionStorage— es la
+  // unica fuente desde la que se puede reconstruir sin inventar nada.
+  useProfileConfigs(profiles, filters, existingConfig);
 
   // -------------------------------------------------------------------------
   // Step validation
@@ -295,7 +327,42 @@ export function CampaignEditor({
         await updateCampaign(currentCampaignId!, payload);
       }
 
+      /**
+       * Lo que se manda tiene que parecerse a lo que se esta viendo.
+       *
+       * El envio se arma filtrando las redes marcadas, asi que una
+       * configuracion que no cargo bien produce una lista vacia sin que
+       * falle nada: la pantalla sigue enseniando a los creadores
+       * elegidos —esos salen de `selectedProfileIds`, que es otro
+       * estado— mientras el guardado los quita a todos. Asi se vacio una
+       * campana En proceso y se perdio una en Revision.
+       *
+       * El servidor tambien lo rechaza ahora, pero avisar aqui dice que
+       * hacer y evita el viaje.
+       */
+      const vivo = useCampaignWizardStore.getState();
+
+      const sinResolver = vivo.selectedProfileIds.filter((id) => {
+        const conf = vivo.profileConfigs.find((pc) => pc.profileId === id);
+        return !conf || conf.platforms.length === 0;
+      });
+
+      if (sinResolver.length > 0) {
+        throw new Error(
+          "La configuración de formatos no se cargó bien, así que no se guardó nada. " +
+            "Recarga la página (F5) y vuelve a intentarlo."
+        );
+      }
+
       const currentPayload = profilesPayloadRef.current;
+
+      if (currentPayload.length === 0 && vivo.selectedProfileIds.length > 0) {
+        throw new Error(
+          "No hay ningún formato marcado, así que guardar dejaría la campaña sin creadores. " +
+            "Marca al menos una red, o quita con su papelera a quien sobre."
+        );
+      }
+
       await saveCampaignProfiles(currentCampaignId!, currentPayload);
 
       if (sendToReview) {

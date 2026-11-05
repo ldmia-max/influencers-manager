@@ -57,7 +57,15 @@ export function construirCombo(
 
 export function useProfileConfigs(
   profiles: ProfileWithServices[],
-  filters: Pick<UseProfileFiltersReturn, "selectedPlatforms" | "selectedServices">
+  filters: Pick<UseProfileFiltersReturn, "selectedPlatforms" | "selectedServices">,
+  /**
+   * La configuracion tal como la trajo el servidor.
+   *
+   * Es la unica fuente fiable para reparar un estado corrupto: lo que
+   * haya en el store puede venir de sessionStorage y estar vacio. Ver el
+   * efecto de mas abajo.
+   */
+  configDelServidor: ProfileConfig[] = []
 ) {
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const setProfileConfigs = useCampaignWizardStore((s) => s.setProfileConfigs);
@@ -141,17 +149,42 @@ export function useProfileConfigs(
      */
     const idsVivos = useCampaignWizardStore.getState().selectedProfileIds;
 
+    /**
+     * Una config sirve cuando tiene redes Y esas redes vienen resueltas
+     * contra el catalogo (de ahi sale `platformName`). Lo que llega de
+     * la base viene a medias, sin nombre de red, y hay que completarlo.
+     */
+    const estaResuelta = (c: ProfileConfig) =>
+      c.platforms.length > 0 && Boolean(c.platforms[0]?.platformName);
+
+    /**
+     * Reparable = no sirve, y el catalogo YA tiene con que arreglarla.
+     *
+     * La segunda mitad es la que importa. Si el catalogo todavia no
+     * conoce al perfil, reconstruir produce una config sin una sola red,
+     * y una config sin redes no se podia volver a detectar: la condicion
+     * anterior era `platforms.length > 0 && !platformName`, que con
+     * `platforms: []` es falsa. Es decir, se quedaba rota para siempre
+     * —y sessionStorage la devolvia intacta en cada apertura, tambien
+     * despues de desplegar el arreglo del martes.
+     *
+     * Lo que se veia: el creador marcado, su tarjeta con el nombre pero
+     * sin ninguna red debajo, «Total Formatos $0», y al guardar un envio
+     * vacio que retiraba o borraba a todo el reparto.
+     */
+    const esReparable = (c: ProfileConfig) => {
+      if (estaResuelta(c)) return false;
+      const delCatalogo = profiles.find((p) => p.id === c.profileId);
+      return Boolean(delCatalogo && delCatalogo.socialAccounts.length > 0);
+    };
+
     setProfileConfigs((prevConfigs: ProfileConfig[]) => {
       const currentIds = new Set(prevConfigs.map((c) => c.profileId));
       const newIds = new Set(idsVivos);
 
       const hasNewProfiles = idsVivos.some((id) => !currentIds.has(id));
       const hasRemovedProfiles = prevConfigs.some((c) => !newIds.has(c.profileId));
-      // Una config a medio construir —sin nombre de plataforma— viene de
-      // la base de datos y hay que completarla con el catalogo.
-      const hasIncompleteConfigs = prevConfigs.some(
-        (c) => c.platforms.length > 0 && !c.platforms[0]?.platformName
-      );
+      const hasIncompleteConfigs = prevConfigs.some(esReparable);
 
       if (!hasNewProfiles && !hasRemovedProfiles && !hasIncompleteConfigs) {
         return prevConfigs;
@@ -159,14 +192,21 @@ export function useProfileConfigs(
 
       return idsVivos.map((profileId) => {
         const existingConf = prevConfigs.find((c) => c.profileId === profileId);
-        if (
-          existingConf &&
-          existingConf.platforms.length > 0 &&
-          existingConf.platforms[0].platformName
-        ) {
-          return existingConf;
-        }
-        return createProfileConfig(profileId, existingConf);
+        if (existingConf && estaResuelta(existingConf)) return existingConf;
+
+        /**
+         * De donde se reconstruye. Una config sin redes no conserva ni
+         * una seleccion ni un precio, asi que reaprovecharla equivale a
+         * empezar de cero con todo desmarcado. Cuando eso pasa, la
+         * fuente buena es lo que trajo el servidor, que es lo que la
+         * campana tiene contratado de verdad.
+         */
+        const base =
+          existingConf && existingConf.platforms.length > 0
+            ? existingConf
+            : configDelServidor.find((c) => c.profileId === profileId) ?? existingConf;
+
+        return createProfileConfig(profileId, base);
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedProfileIds is primitive array; setProfileConfigs is stable

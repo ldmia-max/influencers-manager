@@ -173,6 +173,38 @@ export async function setCampaignProfiles(
       select: SELECCION_ACTUAL,
     });
 
+    /**
+     * Una campana que el cliente ya vio no se queda sin nadie.
+     *
+     * Llegar aqui con la lista vacia teniendo gente dentro no es una
+     * decision de nadie: es una pantalla que se rompio. Paso en
+     * produccion. El editor perdia la configuracion de formatos, armaba
+     * el envio filtrando las redes marcadas, no quedaba ninguna, y
+     * mandaba `profiles: []`. Desde aqui eso era indistinguible de
+     * "quitalos a todos", asi que una campana En proceso retiro a su
+     * reparto entero y una en Revision lo perdio —sin aprobar y sin
+     * entregas, la regla de abajo borra— sin que nadie lo pidiera.
+     *
+     * En DRAFT vaciar es legitimo y no cuesta nada: debajo no hay ni una
+     * aprobacion ni una entrega. A partir de REVIEW no lo es, por la
+     * misma razon por la que transitionCampaignStatus no deja SALIR de
+     * DRAFT vacia: una campana que el cliente esta revisando, o que ya
+     * esta en marcha, sin un solo creador no describe nada real.
+     *
+     * Se comprueba dentro de la transaccion y contra lo que hay de
+     * verdad en la base, no contra lo que diga el cliente.
+     */
+    const activos = actuales.filter((cp) => cp.participacion !== "RETIRADO");
+
+    if (empezada && entrantes.length === 0 && activos.length > 0) {
+      throw new ValidationError(
+        `No se guardó nada: la campaña tiene ${activos.length} ` +
+          `${activos.length === 1 ? "creador" : "creadores"} y la petición llegó sin ninguno. ` +
+          "Si el editor mostraba «Total Formatos $0», recárgalo antes de volver a guardar. " +
+          "Para sacar a alguien, quítalo con su papelera; si se cae la campaña entera, cancélala."
+      );
+    }
+
     // -----------------------------------------------------------------
     // Los que salen de la seleccion
     // -----------------------------------------------------------------
