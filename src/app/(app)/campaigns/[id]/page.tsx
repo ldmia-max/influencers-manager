@@ -1110,9 +1110,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           <Badge className={CAMPAIGN_STATUS_COLORS[campaign.status]}>
             {CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}
           </Badge>
-          {/* Editar solo con la campana Abierta. PENDING es la misma
-              etapa para campanas guardadas antes del cambio. */}
-          {(campaign.status === "DRAFT" || campaign.status === "PENDING") && (
+          {/* Se edita hasta que la campana termina, y solo lo ve quien
+              puede: administracion y mercadeo. Cerrada y Cancelada no,
+              que su coste ya es historia. */}
+          {campaign.status !== "COMPLETED" &&
+            campaign.status !== "CANCELLED" &&
+            puede(rol, "campanas", "actualizar") && (
             <Link href={`/campaigns/${id}/edit`}>
               <Button variant="outline">
                 <Pencil className="h-4 w-4 mr-2" />

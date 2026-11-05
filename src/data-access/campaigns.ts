@@ -507,8 +507,32 @@ export async function updateCampaign(
     throw new NotFoundError("Campaña no encontrada");
   }
 
-  if (existing.status !== "DRAFT" && existing.status !== "PENDING") {
-    throw new ValidationError("Solo se pueden editar campañas en estado borrador o pendiente");
+  /**
+   * Una campana terminal no se edita.
+   *
+   * Abierta, Revision y En proceso si: mercadeo necesita poder corregir
+   * el nombre, ampliar el presupuesto o sumar a alguien que apruebe sin
+   * tener que cancelar y rehacer. Cerrada y Cancelada no: su coste ya es
+   * historia y contabilidad puede haberlo pagado.
+   *
+   * Lo que no se puede tocar nunca es QUIEN es el cliente. Cambiarlo en
+   * una campana que ya salio seria entregarle a otra empresa, en su
+   * portal, una campana que no es suya —y dejar a la que si la aprobo
+   * sin ella.
+   */
+  if (existing.status === "COMPLETED" || existing.status === "CANCELLED") {
+    throw new ValidationError(
+      "Una campaña cerrada o cancelada ya no se edita: su coste es historia."
+    );
+  }
+
+  if (data.clientId && data.clientId !== existing.clientId) {
+    const yaSalio = existing.status !== "DRAFT" && existing.status !== "PENDING";
+    if (yaSalio) {
+      throw new ValidationError(
+        "No se puede cambiar el cliente de una campaña que ya se envió. Crea una campaña nueva para el otro cliente."
+      );
+    }
   }
 
   // La lista de contactos se rehace cuando llega, y para eso hace falta

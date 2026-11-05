@@ -249,7 +249,11 @@ export function CampaignStepSummary() {
               className="w-full"
             >
               <Save className="h-4 w-4 mr-2" />
-              {loading ? "Guardando..." : "Guardar Borrador"}
+              {loading
+                ? "Guardando..."
+                : currentStatus === "DRAFT" || currentStatus === "PENDING"
+                  ? "Guardar Borrador"
+                  : "Guardar cambios"}
             </Button>
 
             {(currentStatus === "DRAFT" || currentStatus === "PENDING") && (

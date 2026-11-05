@@ -411,6 +411,25 @@ export function CampaignEditor({
       <div className="space-y-6">
         <CampaignWizardSteps currentStep={currentStep} onStepClick={goToStep} />
 
+        {/* Editar una campana que el cliente ya vio no es lo mismo que
+            armarla. Lo que se guarda aqui va a una propuesta que esta
+            sobre su mesa o a un trabajo que ya esta en marcha, y quien
+            edita tiene que saberlo antes de tocar nada. */}
+        {(currentStatus === "REVIEW" || currentStatus === "ACTIVE") && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-medium text-amber-900">
+              {currentStatus === "REVIEW"
+                ? "El cliente tiene esta campaña sobre la mesa"
+                : "Esta campaña ya está en proceso"}
+            </p>
+            <p className="mt-1 text-xs text-amber-800">
+              {currentStatus === "REVIEW"
+                ? "Lo que cambies aquí se lo encontrará al abrir su enlace, y puede que no sea lo que le anunciaste. Avísale si el cambio es de fondo."
+                : "Hay precios que el cliente aprobó y contenido ya publicado. Quitar a alguien que ya entregó no lo borra: lo retira, y su contenido y sus cifras se conservan."}
+            </p>
+          </div>
+        )}
+
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600">{error}</p>

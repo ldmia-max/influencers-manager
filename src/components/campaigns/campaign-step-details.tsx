@@ -25,7 +25,7 @@ import { useCampaignWizard } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
 
 export function CampaignStepDetails() {
-  const { clients } = useCampaignWizard();
+  const { clients, currentStatus } = useCampaignWizard();
   const formData = useCampaignWizardStore((s) => s.formData);
   const setFormData = useCampaignWizardStore((s) => s.setFormData);
   const clientPopoverOpen = useCampaignWizardStore((s) => s.clientPopoverOpen);
@@ -230,6 +230,17 @@ export function CampaignStepDetails() {
                 Cada uno recibirá su propio enlace al enviarla a revisión, y
                 solo ellos verán la campaña en el portal.
               </p>
+              {/* La campana ya salio: los enlaces se emitieron al
+                  enviarla, asi que quien se sume ahora no tiene ninguno.
+                  Decir donde se consigue evita el "lo agregue y no le
+                  llego nada". */}
+              {(currentStatus === "REVIEW" || currentStatus === "ACTIVE") && (
+                <p className="mt-1 text-xs text-amber-700">
+                  Esta campaña ya se envió: quien añadas ahora verá la campaña
+                  en su portal, pero su enlace de aprobación se genera desde la
+                  pestaña Revisiones.
+                </p>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {availableContacts.map((contact) => {

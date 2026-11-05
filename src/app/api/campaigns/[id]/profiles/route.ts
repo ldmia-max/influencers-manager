@@ -51,9 +51,14 @@ export async function POST(req: Request, { params }: RouteParams) {
     const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
     if (sinPermiso) return sinPermiso;
 
-    if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
+    // Hasta que la campana termina. Lo que protege a una ya empezada no
+    // es cerrarle la puerta, sino que setCampaignProfiles sea
+    // incremental: reconoce cada fila en vez de rehacerla, se niega a
+    // borrar nada que tenga contenido publicado y no refresca precios
+    // que el cliente ya aprobo.
+    if (campaign.status === "COMPLETED" || campaign.status === "CANCELLED") {
       return NextResponse.json(
-        { error: "Solo se pueden modificar campañas en estado borrador o pendiente" },
+        { error: "Una campaña cerrada o cancelada ya no se edita." },
         { status: 400 }
       );
     }
@@ -89,9 +94,13 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     const sinPermiso = exigirPropiedad(sesion, "campanas", campaign.createdById);
     if (sinPermiso) return sinPermiso;
 
+    // Aqui SI se exige Abierta: removeCampaignProfiles borra en seco,
+    // sin mirar si lo que se lleva tiene contenido publicado. Quitar a
+    // alguien de una campana en marcha se hace desde su ficha, que lo
+    // retira y conserva lo que entrego.
     if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
       return NextResponse.json(
-        { error: "Solo se pueden modificar campañas en estado borrador o pendiente" },
+        { error: "Solo se pueden eliminar perfiles de una campaña abierta" },
         { status: 400 }
       );
     }

@@ -4,7 +4,7 @@ import { CampaignEditor } from "@/components/campaigns/campaign-editor";
 import { getCampaignForEdit } from "@/data-access/campaigns";
 import { getClientsWithContacts } from "@/data-access/clients";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
-import { exigePropiedadParaEscribir, type Rol } from "@/lib/permissions";
+import { exigePropiedadParaEscribir, puede, type Rol } from "@/lib/permissions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -35,12 +35,26 @@ export default async function EditCampaignPage({ params }: PageProps) {
     redirect("/campaigns");
   }
 
-  // Solo se edita una campana Abierta. En Revision la esta mirando el
-  // cliente y cambiarla por debajo le mostraria una propuesta distinta a
-  // la que aprueba; en En proceso hay precios ya aprobados y contenido ya
-  // publicado. Alli los influencers se anaden o retiran desde la ficha,
-  // que es una operacion acotada y no una reedicion.
-  if (campaign.status !== "DRAFT" && campaign.status !== "PENDING") {
+  // Editar es de administracion y mercadeo. Contabilidad lee campanas
+  // para pagarlas y no arma ninguna; el middleware solo comprueba que
+  // haya sesion, asi que sin esto llegaba al formulario entero y se
+  // chocaba con un 403 al guardar.
+  if (!puede(session.user.role as Rol, "campanas", "actualizar")) {
+    redirect(`/campaigns/${id}`);
+  }
+
+  // Se edita hasta que la campana termina.
+  //
+  // Abierta, Revision y En proceso: mercadeo necesita corregir datos,
+  // ampliar el presupuesto o sumar a alguien que apruebe sin cancelar y
+  // rehacer la campana. Cerrada y Cancelada no: su coste ya es historia
+  // y contabilidad puede haberlo pagado.
+  //
+  // Lo que protege a una campana ya empezada no es cerrarle el editor,
+  // es que el guardado sea incremental: setCampaignProfiles reconoce
+  // cada fila en vez de rehacerla, no borra nada que tenga contenido
+  // publicado, y no refresca precios que el cliente ya aprobo.
+  if (campaign.status === "COMPLETED" || campaign.status === "CANCELLED") {
     redirect(`/campaigns/${id}`);
   }
 

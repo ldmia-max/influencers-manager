@@ -50,31 +50,104 @@ export async function getCampaignProfiles(campaignId: string) {
   });
 }
 
+/**
+ * Clave con la que se reconoce un formato dentro de una plataforma.
+ *
+ * El combo no sale del tarifario y no tiene profileServiceId, asi que
+ * ocupa una clave propia. Hay como mucho uno por plataforma.
+ */
+const COMBO = "__combo__";
+const claveDeFormato = (s: {
+  esCombo?: boolean | null;
+  profileServiceId?: string | null;
+}) => (s.esCombo ? COMBO : s.profileServiceId ?? COMBO);
+
+/** Lo que hace falta saber de cada influencer ya guardado. */
+const SELECCION_ACTUAL = {
+  id: true,
+  profileId: true,
+  status: true,
+  rejectionReason: true,
+  participacion: true,
+  profile: { select: { name: true } },
+  platforms: {
+    select: {
+      id: true,
+      socialAccountId: true,
+      services: {
+        select: {
+          id: true,
+          esCombo: true,
+          profileServiceId: true,
+          _count: { select: { entregas: true } },
+          profileService: {
+            select: { serviceType: { select: { displayName: true } } },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+/**
+ * Guarda la linea de influencers de una campana.
+ *
+ * **Es incremental a proposito.** Antes borraba y volvia a crear todas
+ * las plataformas y formatos de cada influencer en cada guardado, y eso
+ * se llevaba por delante, en cascada, todo lo que cuelga de un formato:
+ * las entregas registradas, sus metricas, la fecha limite, las notas
+ * del cliente y cualquier precio renegociado. Con la campana Abierta no
+ * existe nada de eso todavia y el atajo no se notaba; en cuanto el
+ * editor se abrio a campanas enviadas o en marcha, guardar sin tocar
+ * nada habria borrado el trabajo ya publicado.
+ *
+ * Ahora cada fila se reconoce y se actualiza: la plataforma por su
+ * cuenta social, el formato por su tarifa de origen. Lo que desaparece
+ * de la seleccion se borra solo si no tiene nada publicado; si lo
+ * tiene, el guardado se rechaza nombrandolo, porque esa no es una
+ * decision que deba tomarse sin enterarse.
+ */
 export async function setCampaignProfiles(
   campaignId: string,
   profiles: ProfileInput[]
 ) {
-  // If no profiles, clear all
-  if (!profiles || profiles.length === 0) {
-    await prisma.campaignProfile.deleteMany({ where: { campaignId } });
-    return [];
-  }
-
-  // Validate profiles exist
-  const profileIds = profiles.map((p) => p.profileId);
-  const existingProfiles = await prisma.profile.findMany({
-    where: { id: { in: profileIds } },
-    include: { socialAccounts: { include: { services: true } } },
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { status: true },
   });
 
-  if (existingProfiles.length !== profileIds.length) {
-    throw new ValidationError("Algunos perfiles no existen");
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
   }
 
-  // Load all profile services for price lookup
+  /**
+   * Una campana "empezada" es la que el cliente ya vio.
+   *
+   * A partir de ahi los precios dejan de refrescarse desde el tarifario:
+   * el cliente aprobo un importe concreto, y que suba solo porque el
+   * influencer cambio su tarifa seria cambiarle el trato por detras.
+   * Repreciar sigue siendo posible por la via acotada y auditada de
+   * cambiarPrecioDeFormato().
+   */
+  const empezada = campaign.status !== "DRAFT" && campaign.status !== "PENDING";
+
+  const entrantes = profiles ?? [];
+  const profileIds = entrantes.map((p) => p.profileId);
+
+  if (profileIds.length > 0) {
+    const existen = await prisma.profile.findMany({
+      where: { id: { in: profileIds } },
+      select: { id: true },
+    });
+
+    if (existen.length !== profileIds.length) {
+      throw new ValidationError("Algunos perfiles no existen");
+    }
+  }
+
   // Los combos no tienen tarifa que consultar: su precio se escribe al
   // armar la campana, asi que se excluyen de esta busqueda.
-  const allServiceIds = profiles.flatMap((p) =>
+  const idsDeTarifas = entrantes.flatMap((p) =>
     p.platforms.flatMap((pl) =>
       pl.services
         .filter((s) => !s.esCombo && s.profileServiceId)
@@ -82,133 +155,235 @@ export async function setCampaignProfiles(
     )
   );
 
-  const profileServicesData = await prisma.profileService.findMany({
-    where: { id: { in: allServiceIds } },
+  const tarifas = await prisma.profileService.findMany({
+    where: { id: { in: idsDeTarifas } },
   });
 
-  const profileServiceMap = new Map(
-    profileServicesData.map((ps) => [ps.id, ps])
-  );
+  const tarifaPorId = new Map(tarifas.map((ps) => [ps.id, ps]));
 
-  for (const serviceId of allServiceIds) {
-    if (!profileServiceMap.has(serviceId)) {
-      throw new ValidationError(`Formato no encontrado: ${serviceId}`);
+  for (const id of idsDeTarifas) {
+    if (!tarifaPorId.has(id)) {
+      throw new ValidationError(`Formato no encontrado: ${id}`);
     }
   }
 
-  // Execute in transaction
   return prisma.$transaction(async (tx) => {
-    const currentCampaignProfiles = await tx.campaignProfile.findMany({
+    const actuales = await tx.campaignProfile.findMany({
       where: { campaignId },
-      select: { profileId: true, status: true, rejectionReason: true },
+      select: SELECCION_ACTUAL,
     });
 
-    const newProfileIds = profiles.map((p) => p.profileId);
+    // -----------------------------------------------------------------
+    // Los que salen de la seleccion
+    // -----------------------------------------------------------------
+    const quedan = new Set(profileIds);
 
-    const fuera = currentCampaignProfiles.filter(
-      (cp) => !newProfileIds.includes(cp.profileId)
-    );
+    for (const cp of actuales) {
+      if (quedan.has(cp.profileId)) continue;
+      if (cp.participacion === "RETIRADO") continue;
 
-    // A quien el cliente rechazo NO se le borra: se le retira.
-    //
-    // Su fila es el historial del rechazo —quien fue y por que— y hay
-    // que conservarla, pero tampoco puede seguir sumando en el total de
-    // la campana. Retirarlo resuelve las dos cosas a la vez, que es
-    // justo para lo que existe `participacion`. Borrarlo, en cambio,
-    // dejaba a la agencia sin saber a quien se habia propuesto.
-    const rechazados = fuera.filter((cp) => cp.status === "REJECTED");
-    for (const cp of rechazados) {
-      await tx.campaignProfile.updateMany({
-        where: { campaignId, profileId: cp.profileId },
-        data: {
-          participacion: "RETIRADO",
-          origenRetiro: "CLIENTE",
-          motivoRetiro: cp.rejectionReason,
-          retiradoEn: new Date(),
-        },
-      });
-    }
+      const publicado = cp.platforms.some((pl) =>
+        pl.services.some((s) => s._count.entregas > 0)
+      );
 
-    // Al resto, que solo se quito al editar, si se le borra: no hay nada
-    // que recordar de un perfil que nunca llego a proponerse.
-    const profileIdsToDelete = fuera
-      .filter((cp) => cp.status !== "REJECTED")
-      .map((cp) => cp.profileId);
-
-    if (profileIdsToDelete.length > 0) {
-      await tx.campaignProfile.deleteMany({
-        where: { campaignId, profileId: { in: profileIdsToDelete } },
-      });
-    }
-
-    const createdProfiles = [];
-
-    for (const profileInput of profiles) {
-      const existingCampaignProfile = await tx.campaignProfile.findUnique({
-        where: {
-          campaignId_profileId: {
-            campaignId,
-            profileId: profileInput.profileId,
+      /**
+       * A quien el cliente rechazo NO se le borra: se le retira.
+       *
+       * Su fila es el historial del rechazo —quien fue y por que— y hay
+       * que conservarla, pero tampoco puede seguir sumando en el total
+       * de la campana. Retirarlo resuelve las dos cosas a la vez.
+       */
+      if (cp.status === "REJECTED") {
+        await tx.campaignProfile.update({
+          where: { id: cp.id },
+          data: {
+            participacion: "RETIRADO",
+            origenRetiro: "CLIENTE",
+            motivoRetiro: cp.rejectionReason,
+            retiradoEn: new Date(),
           },
-        },
-      });
+        });
+        continue;
+      }
 
-      if (existingCampaignProfile) {
-        await tx.campaignProfilePlatform.deleteMany({
-          where: { campaignProfileId: existingCampaignProfile.id },
+      /**
+       * Al que el cliente aprobo, o al que ya publico algo, tampoco.
+       * Eso es trabajo contratado y, en el segundo caso, contenido que
+       * existe ahi fuera con sus metricas detras. Se retira, que es la
+       * operacion que la aplicacion ya tiene para esto y la que deja
+       * libre el presupuesto sin perder la historia.
+       */
+      if (publicado || cp.status === "APPROVED") {
+        await tx.campaignProfile.update({
+          where: { id: cp.id },
+          data: {
+            participacion: "RETIRADO",
+            origenRetiro: "AGENCIA",
+            motivoRetiro: "Retirado al editar la campaña",
+            retiradoEn: new Date(),
+          },
+        });
+        continue;
+      }
+
+      // Nadie lo aprobo y no publico nada: no hay nada que recordar.
+      await tx.campaignProfile.delete({ where: { id: cp.id } });
+    }
+
+    // -----------------------------------------------------------------
+    // Los que entran o siguen
+    // -----------------------------------------------------------------
+    const resultado: { id: string; profileId: string }[] = [];
+
+    for (const entrada of entrantes) {
+      const previo = actuales.find((c) => c.profileId === entrada.profileId);
+
+      const campaignProfile =
+        previo ??
+        (await tx.campaignProfile.create({
+          data: { campaignId, profileId: entrada.profileId },
+          select: SELECCION_ACTUAL,
+        }));
+
+      // Volver a elegir a alguien retirado lo devuelve a la campana, que
+      // es lo mismo que hace el boton "Devolver a la campana" de su
+      // ficha. Sin esto seguiria sin contar aunque apareciera elegido.
+      if (previo?.participacion === "RETIRADO") {
+        await tx.campaignProfile.update({
+          where: { id: previo.id },
+          data: {
+            participacion: "ACTIVO",
+            origenRetiro: null,
+            motivoRetiro: null,
+            retiradoEn: null,
+          },
         });
       }
 
-      const campaignProfile = existingCampaignProfile
-        ? existingCampaignProfile
-        : await tx.campaignProfile.create({
-            data: { campaignId, profileId: profileInput.profileId },
-          });
+      const cuentasEntrantes = new Set(
+        entrada.platforms.map((pl) => pl.socialAccountId)
+      );
 
-      for (const platformInput of profileInput.platforms) {
-        const campaignPlatform = await tx.campaignProfilePlatform.create({
-          data: {
-            campaignProfileId: campaignProfile.id,
-            socialAccountId: platformInput.socialAccountId,
-          },
-        });
+      // --- redes que salen ---
+      for (const pl of campaignProfile.platforms) {
+        if (cuentasEntrantes.has(pl.socialAccountId)) continue;
 
+        if (pl.services.some((s) => s._count.entregas > 0)) {
+          throw new ValidationError(
+            `No se puede quitar esa red de ${campaignProfile.profile.name}: ya tiene contenido publicado. Retíralo de la campaña si ya no participa.`
+          );
+        }
+        await tx.campaignProfilePlatform.delete({ where: { id: pl.id } });
+      }
+
+      // --- redes que entran o siguen ---
+      for (const platformInput of entrada.platforms) {
+        const plPrevia = campaignProfile.platforms.find(
+          (pl) => pl.socialAccountId === platformInput.socialAccountId
+        );
+
+        const plataformaId =
+          plPrevia?.id ??
+          (
+            await tx.campaignProfilePlatform.create({
+              data: {
+                campaignProfileId: campaignProfile.id,
+                socialAccountId: platformInput.socialAccountId,
+              },
+              select: { id: true },
+            })
+          ).id;
+
+        const previos = plPrevia?.services ?? [];
+        const clavesEntrantes = new Set(
+          platformInput.services.map(claveDeFormato)
+        );
+
+        // --- formatos que salen ---
+        for (const sv of previos) {
+          if (clavesEntrantes.has(claveDeFormato(sv))) continue;
+
+          if (sv._count.entregas > 0) {
+            const nombre =
+              sv.profileService?.serviceType.displayName ?? "ese formato";
+            throw new ValidationError(
+              `No se puede quitar ${nombre} de ${campaignProfile.profile.name}: ya tiene contenido publicado.`
+            );
+          }
+          await tx.campaignService.delete({ where: { id: sv.id } });
+        }
+
+        // --- formatos que entran o siguen ---
         for (const serviceInput of platformInput.services) {
+          const svPrevio = previos.find(
+            (sv) => claveDeFormato(sv) === claveDeFormato(serviceInput)
+          );
+
           if (serviceInput.esCombo) {
             // El precio viene del formulario, no del tarifario, y la
             // cantidad es siempre 1: un combo es un acuerdo cerrado.
-            await tx.campaignService.create({
-              data: {
-                campaignProfilePlatformId: campaignPlatform.id,
-                profileServiceId: null,
-                esCombo: true,
-                comboDescripcion: serviceInput.comboDescripcion?.trim() || null,
-                quantity: 1,
-                basePrice: serviceInput.comboPrecio ?? 0,
-                currency: "COP",
-              },
-            });
+            if (svPrevio) {
+              await tx.campaignService.update({
+                where: { id: svPrevio.id },
+                data: {
+                  esCombo: true,
+                  comboDescripcion: serviceInput.comboDescripcion?.trim() || null,
+                  quantity: 1,
+                  ...(empezada
+                    ? {}
+                    : { basePrice: serviceInput.comboPrecio ?? 0 }),
+                },
+              });
+            } else {
+              await tx.campaignService.create({
+                data: {
+                  campaignProfilePlatformId: plataformaId,
+                  profileServiceId: null,
+                  esCombo: true,
+                  comboDescripcion: serviceInput.comboDescripcion?.trim() || null,
+                  quantity: 1,
+                  basePrice: serviceInput.comboPrecio ?? 0,
+                  currency: "COP",
+                },
+              });
+            }
             continue;
           }
 
-          const profileService = profileServiceMap.get(serviceInput.profileServiceId!)!;
+          const tarifa = tarifaPorId.get(serviceInput.profileServiceId!)!;
 
-          await tx.campaignService.create({
-            data: {
-              campaignProfilePlatformId: campaignPlatform.id,
-              profileServiceId: serviceInput.profileServiceId,
-              quantity: serviceInput.quantity,
-              basePrice: profileService.price,
-              currency: profileService.currency,
-            },
-          });
+          if (svPrevio) {
+            await tx.campaignService.update({
+              where: { id: svPrevio.id },
+              data: {
+                quantity: serviceInput.quantity,
+                // El precio solo se refresca mientras sigue Abierta.
+                ...(empezada
+                  ? {}
+                  : { basePrice: tarifa.price, currency: tarifa.currency }),
+              },
+            });
+          } else {
+            await tx.campaignService.create({
+              data: {
+                campaignProfilePlatformId: plataformaId,
+                profileServiceId: serviceInput.profileServiceId,
+                quantity: serviceInput.quantity,
+                basePrice: tarifa.price,
+                currency: tarifa.currency,
+              },
+            });
+          }
         }
       }
 
-      createdProfiles.push(campaignProfile);
+      resultado.push({
+        id: campaignProfile.id,
+        profileId: campaignProfile.profileId,
+      });
     }
 
-    return createdProfiles;
+    return resultado;
   });
 }
 
