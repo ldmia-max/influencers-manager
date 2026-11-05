@@ -78,6 +78,7 @@ const SELECCION_ACTUAL = {
         select: {
           id: true,
           esCombo: true,
+          basePrice: true,
           profileServiceId: true,
           _count: { select: { entregas: true } },
           profileService: {
@@ -205,6 +206,30 @@ export async function setCampaignProfiles(
       );
     }
 
+    /**
+     * Lo que hay que poder reconstruir despues.
+     *
+     * Este guardado mueve dinero contratado y puede hacer desaparecer a
+     * un influencer de una campana, y hasta ahora no dejaba ni rastro:
+     * cuando el editor vacio una campana en produccion no hubo forma de
+     * saber quien estaba dentro antes. La ruta convierte estas dos
+     * listas en entradas de auditoria.
+     */
+    const repreciados: {
+      campaignServiceId: string;
+      influencer: string;
+      formato: string;
+      de: number;
+      a: number;
+    }[] = [];
+
+    const salidas: {
+      campaignProfileId: string;
+      influencer: string;
+      desenlace: "RETIRADO" | "BORRADO";
+      motivo: string;
+    }[] = [];
+
     // -----------------------------------------------------------------
     // Los que salen de la seleccion
     // -----------------------------------------------------------------
@@ -235,6 +260,12 @@ export async function setCampaignProfiles(
             retiradoEn: new Date(),
           },
         });
+        salidas.push({
+          campaignProfileId: cp.id,
+          influencer: cp.profile.name,
+          desenlace: "RETIRADO",
+          motivo: cp.rejectionReason ?? "Rechazado por el cliente",
+        });
         continue;
       }
 
@@ -255,11 +286,25 @@ export async function setCampaignProfiles(
             retiradoEn: new Date(),
           },
         });
+        salidas.push({
+          campaignProfileId: cp.id,
+          influencer: cp.profile.name,
+          desenlace: "RETIRADO",
+          motivo: publicado
+            ? "Ya había publicado contenido"
+            : "El cliente lo había aprobado",
+        });
         continue;
       }
 
       // Nadie lo aprobo y no publico nada: no hay nada que recordar.
       await tx.campaignProfile.delete({ where: { id: cp.id } });
+      salidas.push({
+        campaignProfileId: cp.id,
+        influencer: cp.profile.name,
+        desenlace: "BORRADO",
+        motivo: "Nadie lo había aprobado y no había publicado nada",
+      });
     }
 
     // -----------------------------------------------------------------
@@ -355,15 +400,47 @@ export async function setCampaignProfiles(
             // El precio viene del formulario, no del tarifario, y la
             // cantidad es siempre 1: un combo es un acuerdo cerrado.
             if (svPrevio) {
+              /**
+               * El precio del combo SI se guarda, tambien con la campana
+               * en marcha, al reves que el de un formato normal.
+               *
+               * El congelado de precios existe para que una subida de
+               * tarifa no cambie por detras un importe que el cliente ya
+               * aprobo. Un combo no sale de ningun tarifario: su cifra
+               * solo puede haberla escrito una persona en este
+               * formulario. Congelarla no protegia de nada automatico,
+               * solo tiraba a la basura lo que mercadeo acababa de
+               * teclear —el formulario decia "guardado" y el precio
+               * seguia siendo el viejo.
+               *
+               * Como si es dinero ya contratado, el cambio se devuelve
+               * para que la ruta lo audite, igual que hace la via
+               * estrecha de cambiarPrecioDeFormato().
+               */
+              const nuevoPrecio = serviceInput.comboPrecio ?? 0;
+              const precioPrevio = Number(svPrevio.basePrice);
+
+              if (empezada && nuevoPrecio !== precioPrevio) {
+                repreciados.push({
+                  campaignServiceId: svPrevio.id,
+                  influencer: campaignProfile.profile.name,
+                  formato: `Combo${
+                    serviceInput.comboDescripcion?.trim()
+                      ? ` (${serviceInput.comboDescripcion.trim()})`
+                      : ""
+                  }`,
+                  de: precioPrevio,
+                  a: nuevoPrecio,
+                });
+              }
+
               await tx.campaignService.update({
                 where: { id: svPrevio.id },
                 data: {
                   esCombo: true,
                   comboDescripcion: serviceInput.comboDescripcion?.trim() || null,
                   quantity: 1,
-                  ...(empezada
-                    ? {}
-                    : { basePrice: serviceInput.comboPrecio ?? 0 }),
+                  basePrice: nuevoPrecio,
                 },
               });
             } else {
@@ -415,7 +492,7 @@ export async function setCampaignProfiles(
       });
     }
 
-    return resultado;
+    return { perfiles: resultado, repreciados, salidas };
   });
 }
 

@@ -45,7 +45,10 @@ let _activeEditorSessionId: string | null = null;
  * arreglo deja de ser suficiente porque el estado ya guardado en los
  * navegadores es el que esta mal.
  */
-const ESQUEMA_BORRADOR = 2;
+// 3: hasta aqui el borrador guardaba los combos apagados y a cero —no
+// viajaban desde la base— y los precios del tarifario en vez de los
+// contratados. Guardar uno de esos borraba el combo de la campana.
+const ESQUEMA_BORRADOR = 3;
 
 export function CampaignEditor({
   campaignId: initialCampaignId,
@@ -226,7 +229,15 @@ export function CampaignEditor({
   // `existingConfig` va tambien como red de seguridad: si lo que hay en
   // el store no sirve —tipicamente restaurado de sessionStorage— es la
   // unica fuente desde la que se puede reconstruir sin inventar nada.
-  useProfileConfigs(profiles, filters, existingConfig);
+  // El ultimo argumento es la misma regla que el servidor: en cuanto el
+  // cliente ha visto la campana, el precio que manda es el contratado y
+  // no el del tarifario.
+  useProfileConfigs(
+    profiles,
+    filters,
+    existingConfig,
+    currentStatus !== "DRAFT" && currentStatus !== "PENDING"
+  );
 
   // -------------------------------------------------------------------------
   // Step validation

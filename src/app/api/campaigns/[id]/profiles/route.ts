@@ -9,6 +9,8 @@ import { ValidationError, NotFoundError } from "@/data-access/errors";
 import { exigirPermiso, exigirPropiedad } from "@/lib/api-guard";
 import { parseBody } from "@/lib/validate-request";
 import { setCampaignProfilesSchema, removeCampaignProfilesSchema } from "@/lib/schemas/campaign";
+import { auditar, ACCIONES } from "@/lib/audit";
+import { formatNumber } from "@/lib/format";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -67,7 +69,69 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (body instanceof NextResponse) return body;
     const result = await setCampaignProfiles(campaignId, body.profiles);
 
-    return NextResponse.json({ profiles: result }, { status: 201 });
+    /**
+     * Lo que este guardado se llevo por delante, y lo que reprecio.
+     *
+     * El editor puede retirar o borrar influencers y cambiar el precio
+     * de un combo ya contratado, y hasta ahora no quedaba constancia de
+     * ninguna de las dos cosas: cuando una campana se vacio en
+     * produccion no hubo manera de saber quien estaba dentro. Se audita
+     * fila a fila para poder nombrar a cada uno; auditar no interrumpe
+     * el guardado, que ya esta hecho y confirmado.
+     */
+    for (const salida of result.salidas) {
+      await auditar({
+        action:
+          salida.desenlace === "BORRADO"
+            ? ACCIONES.influencerDescartado
+            : ACCIONES.influencerRetirado,
+        entity: "CampaignProfile",
+        entityId: salida.campaignProfileId,
+        actorType: "USER",
+        actorId: sesion.userId,
+        actorEmail: sesion.email,
+        summary:
+          `${salida.desenlace === "BORRADO" ? "Quitó" : "Retiró"} a ` +
+          `${salida.influencer} de "${campaign.name}" al editar la campaña` +
+          ` — ${salida.motivo}`,
+        metadata: {
+          campanaId: campaignId,
+          estadoCampana: campaign.status,
+          influencer: salida.influencer,
+          desenlace: salida.desenlace,
+          motivo: salida.motivo,
+          desdeElEditor: true,
+        },
+        req,
+      });
+    }
+
+    for (const cambio of result.repreciados) {
+      await auditar({
+        action: ACCIONES.formatoRepreciado,
+        entity: "CampaignService",
+        entityId: cambio.campaignServiceId,
+        actorType: "USER",
+        actorId: sesion.userId,
+        actorEmail: sesion.email,
+        summary:
+          `Cambió el precio de ${cambio.formato} de ${cambio.influencer}` +
+          ` en "${campaign.name}": de $${formatNumber(Math.round(cambio.de))}` +
+          ` a $${formatNumber(Math.round(cambio.a))} — desde el editor`,
+        metadata: {
+          campanaId: campaignId,
+          estadoCampana: campaign.status,
+          influencer: cambio.influencer,
+          formato: cambio.formato,
+          de: cambio.de,
+          a: cambio.a,
+          desdeElEditor: true,
+        },
+        req,
+      });
+    }
+
+    return NextResponse.json({ profiles: result.perfiles }, { status: 201 });
   } catch (error) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

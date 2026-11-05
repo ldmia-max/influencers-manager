@@ -128,7 +128,14 @@ export default async function EditCampaignPage({ params }: PageProps) {
         serviceTypeId: "",
         serviceName: "",
         quantity: cs.quantity,
+        // El precio CONTRATADO, que en una campana ya empezada no es el
+        // del tarifario: el cliente aprobo este importe y es el que hay
+        // que ver y conservar.
         basePrice: Number(cs.basePrice),
+        // Lo unico que identifica a un combo. Si no viaja hasta aqui el
+        // editor lo reconstruye apagado y el guardado lo borra.
+        esCombo: cs.esCombo,
+        comboDescripcion: cs.comboDescripcion ?? "",
       })),
     })),
   }));

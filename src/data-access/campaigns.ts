@@ -348,7 +348,23 @@ export async function getCampaignForEdit(id: string) {
             include: {
               socialAccount: { select: { id: true } },
               services: {
-                select: { id: true, quantity: true, basePrice: true, profileServiceId: true },
+                /**
+                 * `esCombo` y su descripcion son imprescindibles aqui.
+                 *
+                 * Un combo no tiene profileServiceId —no sale del
+                 * tarifario—, asi que sin esta bandera nada lo
+                 * distingue de una fila vacia. Sin ella el editor lo
+                 * cargaba apagado y a cero, y guardar borraba un
+                 * formato que el cliente ya habia aprobado.
+                 */
+                select: {
+                  id: true,
+                  quantity: true,
+                  basePrice: true,
+                  profileServiceId: true,
+                  esCombo: true,
+                  comboDescripcion: true,
+                },
               },
             },
           },

@@ -65,7 +65,18 @@ export function useProfileConfigs(
    * haya en el store puede venir de sessionStorage y estar vacio. Ver el
    * efecto de mas abajo.
    */
-  configDelServidor: ProfileConfig[] = []
+  configDelServidor: ProfileConfig[] = [],
+  /**
+   * La campana ya la vio el cliente, asi que sus precios estan
+   * congelados: manda lo contratado, no el tarifario.
+   *
+   * Es la misma regla que aplica setCampaignProfiles en el servidor, y
+   * tiene que aplicarse tambien aqui. Sin esto el editor mostraba la
+   * tarifa de hoy sobre una campana ya aprobada —un influencer que
+   * hubiera subido su precio aparecia mas caro de lo contratado—, y el
+   * presupuesto se medía contra un numero que la campana no tiene.
+   */
+  preciosCongelados = false
 ) {
   const selectedProfileIds = useCampaignWizardStore((s) => s.selectedProfileIds);
   const setProfileConfigs = useCampaignWizardStore((s) => s.setProfileConfigs);
@@ -113,7 +124,10 @@ export function useProfileConfigs(
                     serviceTypeId: s.serviceType.id,
                     serviceName: s.serviceType.displayName,
                     quantity: existingService?.quantity ?? (shouldSelectService ? 1 : 0),
-                    basePrice: Number(s.price),
+                    basePrice:
+                      preciosCongelados && existingService
+                        ? existingService.basePrice
+                        : Number(s.price),
                   };
                 })
                 .concat(construirCombo(existingPlatform)),
@@ -121,7 +135,7 @@ export function useProfileConfigs(
           }) || [],
       };
     },
-    [profiles, selectedPlatforms, selectedServices]
+    [profiles, selectedPlatforms, selectedServices, preciosCongelados]
   );
 
   useEffect(() => {
