@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "./errors";
-import { calculateServiceTotal, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import {
+  calculateServiceTotal,
+  MARKUP_PERCENTAGE,
+  periodoDeCampana,
+} from "@/lib/campaign-utils";
 import {
   calcularImpuestos,
   estadoDePago,
   hipotesis,
-  mesDelPago,
   plazoDePago,
   reservaMaxima,
   utilidadDe,
@@ -57,6 +60,10 @@ const SELECCION = {
       budget: true,
       markupPercentage: true,
       startDate: true,
+      // El periodo al que se imputa, que es con el que contabilidad
+      // agrupa. No se deduce de startDate: lo decide mercadeo.
+      mes: true,
+      anio: true,
       client: { select: { id: true, companyName: true } },
     },
   },
@@ -117,8 +124,15 @@ export interface PagoVista {
   campana: string;
   clienteId: string;
   cliente: string;
-  /** "YYYY-MM" del arranque de la campana, para filtrar por mes. */
-  mesCampana: string | null;
+  /**
+   * "YYYY-MM" del periodo al que se imputa la campana.
+   *
+   * Sale de Campaign.mes/anio, que mercadeo elige, y NO de startDate.
+   * Antes se deducia de la fecha de arranque y no habia forma de
+   * corregirlo: una campana que empieza el 28 de octubre y se paga con
+   * el presupuesto de noviembre aparecia en octubre para siempre.
+   */
+  mesCampana: string;
 
   /** Coste contratado, sin el margen. Es lo que contabilidad paga. */
   base: number;
@@ -259,7 +273,7 @@ function aVista(cp: Fila): PagoVista {
     campana: cp.campaign.name,
     clienteId: cp.campaign.client.id,
     cliente: cp.campaign.client.companyName,
-    mesCampana: mesDelPago(cp.campaign.startDate),
+    mesCampana: periodoDeCampana(cp.campaign.anio, cp.campaign.mes),
 
     base,
     precioCliente,

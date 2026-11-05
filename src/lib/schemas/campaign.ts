@@ -52,6 +52,13 @@ export const createCampaignSchema = z.object({
   currency: z.string().optional(),
   startDate: z.string().nullable().optional().transform(v => v ?? undefined),
   endDate: z.string().nullable().optional().transform(v => v ?? undefined),
+  /**
+   * El periodo con cuyo presupuesto se paga esta campana. Obligatorio,
+   * al reves que las fechas: una campana sin mes desaparece del control
+   * de gastos justo cuando hay que pagarla.
+   */
+  mes: z.number().int().min(1).max(12),
+  anio: z.number().int().min(2000).max(2100),
 });
 
 export type CreateCampaignPayload = z.infer<typeof createCampaignSchema>;
@@ -66,6 +73,10 @@ export const updateCampaignSchema = z.object({
   currency: z.string().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
+  // Opcionales aqui porque toda actualizacion es parcial, pero no
+  // anulables: la campana no puede quedarse sin periodo.
+  mes: z.number().int().min(1).max(12).optional(),
+  anio: z.number().int().min(2000).max(2100).optional(),
 });
 
 export type UpdateCampaignPayload = z.infer<typeof updateCampaignSchema>;

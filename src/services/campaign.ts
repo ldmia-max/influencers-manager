@@ -117,5 +117,9 @@ export function buildCampaignPayload(formData: CampaignFormData): CreateCampaign
     budget: parseInt(formData.budget, 10),
     startDate: formData.startDate || undefined,
     endDate: formData.endDate || undefined,
+    // Periodo de imputacion. No cae a undefined como las fechas: es
+    // obligatorio, y el formulario siempre lo trae con valor.
+    mes: parseInt(formData.mes, 10),
+    anio: parseInt(formData.anio, 10),
   };
 }

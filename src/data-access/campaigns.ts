@@ -451,6 +451,9 @@ export async function createCampaign(data: {
   currency?: string;
   startDate?: string;
   endDate?: string;
+  /** Periodo de imputacion. Obligatorio: ver el modelo Campaign. */
+  mes: number;
+  anio: number;
   createdById: string;
 }) {
   if (data.budget <= 0) {
@@ -487,6 +490,8 @@ export async function createCampaign(data: {
       currency: data.currency || "COP",
       startDate: data.startDate ? new Date(data.startDate) : null,
       endDate: data.endDate ? new Date(data.endDate) : null,
+      mes: data.mes,
+      anio: data.anio,
       createdById: data.createdById,
       // Congela el margen vigente. A partir de aqui esta campana ya no
       // depende de la constante global: subirla el ano que viene no le
@@ -514,6 +519,9 @@ export async function updateCampaign(
     currency?: string;
     startDate?: string | null;
     endDate?: string | null;
+    /** Periodo de imputacion. Se puede mover, pero no vaciar. */
+    mes?: number;
+    anio?: number;
     status?: CampaignStatus;
   }
 ) {
@@ -620,6 +628,8 @@ export async function updateCampaign(
       ...(data.endDate !== undefined && {
         endDate: data.endDate ? new Date(data.endDate) : null,
       }),
+      ...(data.mes !== undefined && { mes: data.mes }),
+      ...(data.anio !== undefined && { anio: data.anio }),
       ...(data.status && { status: data.status }),
     },
     include: {

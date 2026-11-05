@@ -13,6 +13,7 @@
  */
 
 import { diaEnAgencia } from "./fechas-agencia";
+import { MESES_DEL_ANO } from "./campaign-utils";
 
 /** Dias de plazo desde la cuenta de cobro. Acordado con contabilidad. */
 export const DIAS_DE_PLAZO = 60;
@@ -273,21 +274,15 @@ function diasEntre(desde: string, hasta: string): number {
   return Math.round((aUtc(hasta) - aUtc(desde)) / (24 * 60 * 60 * 1000));
 }
 
-/** El mes al que pertenece el pago, "YYYY-MM". Null sin cuenta de cobro. */
-export function mesDelPago(fechaCuentaCobro: string | Date | null): string | null {
-  if (!fechaCuentaCobro) return null;
-  const f = new Date(fechaCuentaCobro);
-  if (Number.isNaN(f.getTime())) return null;
-  return diaEnAgencia(f).slice(0, 7);
-}
-
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
+/*
+ * mesDelPago() vivia aqui y deducia el mes de una fecha. Lo sustituye
+ * periodoDeCampana(anio, mes) en campaign-utils: el mes con el que
+ * contabilidad agrupa ya no se deduce de ninguna fecha, lo elige
+ * mercadeo en la campana.
+ */
 
 /** "2026-08" -> "agosto 2026". */
 export function mesLegible(mes: string): string {
   const [ano, m] = mes.split("-");
-  return `${MESES[Number(m) - 1] ?? m} ${ano}`;
+  return `${MESES_DEL_ANO[Number(m) - 1] ?? m} ${ano}`;
 }

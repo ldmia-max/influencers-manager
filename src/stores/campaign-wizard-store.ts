@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { calculateMarkupPrice, MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import {
+  calculateMarkupPrice,
+  MARKUP_PERCENTAGE,
+  periodoDeImputacion,
+} from "@/lib/campaign-utils";
 import type { CampaignData, ProfileConfig, WizardStep } from "@/models/campaign";
 
 // =============================================================================
@@ -88,6 +92,11 @@ const defaultFormData: CampaignData = {
   budget: "",
   startDate: "",
   endDate: "",
+  // El mes en curso, en la zona de la agencia. Es lo que acierta casi
+  // siempre, y es obligatorio: una campana sin periodo no aparece en el
+  // control de gastos.
+  mes: String(periodoDeImputacion().mes),
+  anio: String(periodoDeImputacion().anio),
 };
 
 const defaultState = {

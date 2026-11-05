@@ -28,12 +28,15 @@ import {
 import { getCachedReachRanges } from "@/lib/cache";
 import { CampaignStatus } from "@prisma/client";
 import { exigePropiedadParaLeer, type Rol, puede } from "@/lib/permissions";
-import { calcularTotalCampana } from "@/lib/campaign-utils";
+import { calcularTotalCampana, periodoDeCampana, periodoLegible } from "@/lib/campaign-utils";
+import { FiltroMesCampana } from "@/components/campaigns/filtro-mes-campana";
 
 interface SearchParams {
   search?: string;
   clientId?: string;
   status?: string;
+  /** Mes de imputacion, "YYYY-MM". */
+  periodo?: string;
   page?: string;
   pageSize?: string;
 }
@@ -55,6 +58,21 @@ export default async function CampaignsPage({
     (session?.user.role ?? "USER") as Rol,
     "campanas"
   );
+
+  /**
+   * "2026-11" -> { anio: 2026, mes: 11 }.
+   *
+   * Null cuando no viene o viene mal formado: un parametro invento no
+   * debe vaciar la lista, debe no filtrar.
+   */
+  const periodoFiltrado = (() => {
+    const bruto = params.periodo?.match(/^(\d{4})-(\d{2})$/);
+    if (!bruto) return null;
+    const anio = Number(bruto[1]);
+    const mes = Number(bruto[2]);
+    if (mes < 1 || mes > 12) return null;
+    return { anio, mes };
+  })();
 
   const where = {
     AND: [
@@ -81,10 +99,25 @@ export default async function CampaignsPage({
       params.clientId ? { clientId: params.clientId } : {},
       // Filtro por status
       params.status ? { status: params.status as CampaignStatus } : {},
+      // Filtro por el mes al que se imputa la campana. Es el mes con
+      // cuyo presupuesto se paga, no el de las fechas de ejecucion.
+      periodoFiltrado
+        ? { anio: periodoFiltrado.anio, mes: periodoFiltrado.mes }
+        : {},
     ],
   };
 
-  const [campaigns, total, reachRanges] = await Promise.all([
+  /**
+   * El alcance de lo que esta persona puede ver, sin los demas filtros.
+   *
+   * El desplegable de meses se arma con ESTO y no con `where`: si se
+   * armara con los filtros aplicados, elegir noviembre dejaria el
+   * desplegable con noviembre como unica opcion y no habria forma de
+   * volver a otro mes sin tocar la URL.
+   */
+  const alcanceVisible = verTodas ? {} : { createdById: session?.user.id };
+
+  const [campaigns, total, reachRanges, periodos] = await Promise.all([
     prisma.campaign.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -120,6 +153,12 @@ export default async function CampaignsPage({
     }),
     prisma.campaign.count({ where }),
     getCachedReachRanges(),
+    prisma.campaign.findMany({
+      where: alcanceVisible,
+      select: { anio: true, mes: true },
+      distinct: ["anio", "mes"],
+      orderBy: [{ anio: "desc" }, { mes: "desc" }],
+    }),
   ]);
 
   // Convertir reach ranges a formato esperado
@@ -189,9 +228,20 @@ export default async function CampaignsPage({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Fuera del condicional a proposito: si el filtro deja la
+              lista vacia, el desplegable tiene que seguir ahi para
+              poder volver a otro mes. */}
+          {periodos.length > 0 && (
+            <FiltroMesCampana
+              periodos={periodos.map((p) => periodoDeCampana(p.anio, p.mes))}
+            />
+          )}
+
           {campaignsWithTotals.length === 0 ? (
             <p className="text-gray-500 text-center py-8">
-              No hay campañas creadas aún.{" "}
+              {periodoFiltrado
+                ? "No hay campañas en ese mes."
+                : "No hay campañas creadas aún."}{" "}
               <Link
                 href="/campaigns/new"
                 className="text-blue-600 hover:underline"
@@ -207,6 +257,7 @@ export default async function CampaignsPage({
                     <TableHead>Nombre</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Contacto</TableHead>
+                    <TableHead>Mes</TableHead>
                     <TableHead>Presupuesto</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Alcance</TableHead>
@@ -232,6 +283,9 @@ export default async function CampaignsPage({
                         <TableCell>
                           {campaign.clientContact.firstName}{" "}
                           {campaign.clientContact.lastName}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {periodoLegible(campaign.anio, campaign.mes)}
                         </TableCell>
                         <TableCell>
                           ${formatNumber(budgetNum.toString())}

@@ -1,4 +1,5 @@
 import { Decimal } from "@prisma/client/runtime/library";
+import { diaEnAgencia } from "./fechas-agencia";
 
 /**
  * Visualizaciones que se estiman por cada seguidor contratado.
@@ -369,4 +370,89 @@ export function nombreDelAlcanceEn(
 ): string | null {
   if (!plataforma) return null;
   return ALCANCE_POR_RED[plataforma.trim().toLowerCase()] ?? null;
+}
+
+// =============================================================================
+// Periodo de imputacion: el mes y el ano con cuyo presupuesto se paga
+// =============================================================================
+
+/**
+ * Los doce meses, en minusculas y en orden.
+ *
+ * Viven aqui y no en pagos.ts porque los usan los dos lados: el
+ * selector del formulario de campana y las etiquetas de contabilidad.
+ * Dos listas acabarian escribiendo el mismo mes de dos maneras.
+ */
+export const MESES_DEL_ANO = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+] as const;
+
+/**
+ * La clave con la que se agrupa: 2026 y 11 -> "2026-11".
+ *
+ * Es el mismo formato que ya devolvia mesDelPago(), para que el filtro
+ * de /pagos siga comparando cadenas y ordenandolas sin convertir nada.
+ */
+export function periodoDeCampana(anio: number, mes: number): string {
+  return `${anio}-${String(mes).padStart(2, "0")}`;
+}
+
+/** 2026 y 11 -> "Noviembre 2026". */
+export function periodoLegible(anio: number, mes: number): string {
+  const nombre = MESES_DEL_ANO[mes - 1];
+  if (!nombre) return `${mes}/${anio}`;
+  return `${nombre[0].toUpperCase()}${nombre.slice(1)} ${anio}`;
+}
+
+/**
+ * Los anos que ofrece el selector.
+ *
+ * Del anterior al siguiente, que cubre cerrar lo del ano pasado y dejar
+ * armado lo del que viene. `incluir` mete ademas el ano que la campana
+ * ya tiene: al abrir una de 2024 su valor debe seguir en la lista, o el
+ * selector apareceria vacio y guardar la movería de ano sin avisar.
+ */
+export function aniosSeleccionables(incluir?: number | null): number[] {
+  const actual = new Date().getFullYear();
+  const anos = new Set([actual - 1, actual, actual + 1]);
+  if (incluir) anos.add(incluir);
+  return [...anos].sort((a, b) => b - a);
+}
+
+/**
+ * Con que periodo nace una campana.
+ *
+ * Las dos fechas que entran aqui no se leen igual, y confundirlas se
+ * come un mes entero en los bordes:
+ *
+ *  - `fecha` (la de inicio) es una FECHA, no un instante. Se guarda a
+ *    mediodia UTC justo para que leerla en bruto de el dia correcto;
+ *    pasarla por la zona de la agencia le quita cinco horas y un
+ *    "1 de mayo" se convierte en abril.
+ *  - "hoy" si es un instante, y ahi manda la zona de la agencia: a las
+ *    20:00 del 31 en Bogota el contenedor ya esta en el dia 1.
+ */
+export function periodoDeImputacion(
+  fecha?: Date | string | null
+): { mes: number; anio: number } {
+  if (fecha) {
+    const f = new Date(fecha);
+    if (!Number.isNaN(f.getTime())) {
+      return { mes: f.getUTCMonth() + 1, anio: f.getUTCFullYear() };
+    }
+  }
+
+  const [anio, mes] = diaEnAgencia(new Date()).split("-");
+  return { mes: Number(mes), anio: Number(anio) };
 }

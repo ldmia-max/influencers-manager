@@ -34,6 +34,7 @@ import {
   calcularTotalCampana,
   VISUALIZACIONES_POR_SEGUIDOR,
   redAdmiteAlcance,
+  periodoLegible,
 } from "@/lib/campaign-utils";
 import { CampaignStatusActions } from "@/components/campaigns/campaign-status-actions";
 import { ApprovalTokensCard } from "@/components/campaigns/approval-tokens-card";
@@ -523,6 +524,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                   Fechas
                 </span>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  {/* El periodo va primero: es con lo que contabilidad
+                      agrupa y paga, y no se deduce de las otras dos. */}
+                  <span className="text-sm">
+                    <span className="text-gray-500">Periodo: </span>
+                    <span className="font-medium">
+                      {periodoLegible(campaign.anio, campaign.mes)}
+                    </span>
+                  </span>
                   <span className="text-sm">
                     <span className="text-gray-500">Inicio: </span>
                     {campaign.startDate

@@ -526,6 +526,25 @@ model Campaign {
   markupPercentage Float     @default(0.43)
   startDate        DateTime?
   endDate          DateTime?
+
+  /// Mes y año a los que se IMPUTA la campaña, que no es lo mismo que
+  /// cuándo se ejecuta.
+  ///
+  /// El presupuesto de mercadeo se cierra por meses, y de ese sobre
+  /// sale lo que se le paga a cada influencer. Una campaña que arranca
+  /// el 28 de octubre y termina el 15 de noviembre se paga con el
+  /// presupuesto de uno de los dos meses, y cuál de ellos no se deduce
+  /// de las fechas: es una decisión. Derivarlo de `startDate` —que es
+  /// lo que hacía /pagos— acertaba por casualidad y no había forma de
+  /// corregirlo.
+  ///
+  /// Obligatorios a propósito: una campaña sin mes desaparece del
+  /// control de gastos justo cuando hay que pagarla. Las que ya
+  /// existían se rellenaron con el mes de su fecha de inicio, o el de
+  /// su creación cuando no tenían.
+  mes  Int
+  anio Int
+
   activationReason String? // Motivo opcional al activar la campaña
   activatedAt      DateTime? // Fecha de activación
 
@@ -561,6 +580,10 @@ model Campaign {
 
   // Briefs que originaron esta campaña (no agrega columna a Campaign)
   briefs CampaignBrief[]
+
+  /// Contabilidad agrupa y filtra por periodo, y la lista de campañas
+  /// ordena por él.
+  @@index([anio, mes])
 }
 
 /// Un contacto del cliente con derecho a revisar una campana.

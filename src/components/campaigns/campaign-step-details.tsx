@@ -19,10 +19,23 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { PriceInput } from "@/components/ui/price-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCampaignWizard } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
+import {
+  MESES_DEL_ANO,
+  aniosSeleccionables,
+  periodoDeImputacion,
+} from "@/lib/campaign-utils";
+import { useRef } from "react";
 
 export function CampaignStepDetails() {
   const { clients, currentStatus } = useCampaignWizard();
@@ -33,6 +46,16 @@ export function CampaignStepDetails() {
   const contactPopoverOpen = useCampaignWizardStore((s) => s.contactPopoverOpen);
   const setContactPopoverOpen = useCampaignWizardStore((s) => s.setContactPopoverOpen);
   const loading = useCampaignWizardStore((s) => s.loading);
+
+  /**
+   * Si alguien ya eligio el periodo a mano.
+   *
+   * Un ref y no estado: no cambia nada de lo que se pinta, solo decide
+   * si la fecha de inicio puede seguir arrastrando el mes. Al abrir una
+   * campana guardada arranca en true, porque el periodo que trae ya es
+   * una decision tomada y mover la fecha de inicio no debe deshacerla.
+   */
+  const periodoTocado = useRef<boolean>(Boolean(formData.id));
 
   const selectedClient = clients.find((c) => c.id === formData.clientId);
 
@@ -298,7 +321,23 @@ export function CampaignStepDetails() {
             <Input
               type="date"
               value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              onChange={(e) => {
+                const startDate = e.target.value;
+                // El periodo sigue a la fecha de inicio mientras nadie
+                // lo haya elegido a mano. En cuanto se toca deja de
+                // moverse: lo contrario seria borrar una decision.
+                if (periodoTocado.current || !startDate) {
+                  setFormData({ ...formData, startDate });
+                  return;
+                }
+                const p = periodoDeImputacion(`${startDate}T12:00:00Z`);
+                setFormData({
+                  ...formData,
+                  startDate,
+                  mes: String(p.mes),
+                  anio: String(p.anio),
+                });
+              }}
               disabled={loading}
             />
           </div>
@@ -311,7 +350,75 @@ export function CampaignStepDetails() {
               disabled={loading}
             />
           </div>
+
+          {/*
+            Mes y año NO son las fechas de ejecución.
+            Son el periodo con cuyo presupuesto se paga la campaña, que
+            es con lo que contabilidad agrupa y cuadra el gasto. Una
+            campaña del 28 de octubre al 15 de noviembre sale del sobre
+            de uno de los dos meses, y eso lo decide mercadeo.
+
+            Se mueven solos con la fecha de inicio hasta que alguien los
+            toca a mano: a partir de ahí mandan ellos, porque cambiar
+            después la fecha de inicio no debe deshacer una decisión
+            deliberada sobre de dónde sale el dinero.
+          */}
+          <div className="space-y-2">
+            <Label>
+              Mes <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.mes}
+              onValueChange={(v) => {
+                periodoTocado.current = true;
+                setFormData({ ...formData, mes: v });
+              }}
+              disabled={loading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                {MESES_DEL_ANO.map((nombre, i) => (
+                  <SelectItem key={nombre} value={String(i + 1)}>
+                    {nombre[0].toUpperCase() + nombre.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              Año <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.anio}
+              onValueChange={(v) => {
+                periodoTocado.current = true;
+                setFormData({ ...formData, anio: v });
+              }}
+              disabled={loading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Año" />
+              </SelectTrigger>
+              <SelectContent>
+                {aniosSeleccionables(Number(formData.anio) || null).map((a) => (
+                  <SelectItem key={a} value={String(a)}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        <p className="text-xs text-gray-500">
+          Mes y año son el periodo con cuyo presupuesto se paga esta campaña —
+          con eso agrupa contabilidad—, y no tienen por qué coincidir con las
+          fechas de inicio y fin.
+        </p>
       </CardContent>
     </Card>
   );

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { CampaignWizardProvider } from "@/contexts/campaign-wizard-context";
 import { useCampaignWizardStore } from "@/stores/campaign-wizard-store";
+import { periodoDeImputacion } from "@/lib/campaign-utils";
 import { useProfileFilters } from "@/hooks/use-profile-filters";
 import { useProfileConfigs } from "@/hooks/use-profile-configs";
 import { CampaignStepProfiles } from "./campaign-step-profiles";
@@ -135,6 +136,11 @@ export function ReemplazarInfluencer({
         budget: String(Math.max(0, Math.round(presupuesto - totalActual))),
         startDate: "",
         endDate: "",
+        // Este modal no crea ni guarda la campana —solo anade un
+        // influencer—, asi que el periodo no viaja a ningun sitio. Va
+        // relleno porque CampaignData lo exige.
+        mes: String(periodoDeImputacion().mes),
+        anio: String(periodoDeImputacion().anio),
       },
       currentStep: 2,
       showFilters: true,

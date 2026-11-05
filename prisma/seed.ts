@@ -930,6 +930,10 @@ async function main() {
           currency: "COP",
           startDate: campaignData.startDate,
           endDate: campaignData.endDate,
+          // Periodo de imputacion: el mes de la fecha de inicio. Es
+          // obligatorio, y sin el la campana no saldria en contabilidad.
+          mes: campaignData.startDate.getUTCMonth() + 1,
+          anio: campaignData.startDate.getUTCFullYear(),
           clientId: client.id,
           clientContactId: client.contactId,
           createdById: adminUser.id,

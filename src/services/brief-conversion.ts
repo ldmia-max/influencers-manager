@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "@/data-access/errors";
-import { MARKUP_PERCENTAGE } from "@/lib/campaign-utils";
+import { MARKUP_PERCENTAGE, periodoDeImputacion } from "@/lib/campaign-utils";
 
 /**
  * Convierte un brief diligenciado en una campana en estado DRAFT.
@@ -81,6 +81,12 @@ export async function convertirBriefACampana(
         currency: brief.moneda,
         startDate: brief.fechaInicio,
         endDate: brief.fechaFinal,
+        // Periodo de imputacion. Se arranca desde la fecha de inicio
+        // que pidio el cliente —y si no puso ninguna, desde hoy—, que
+        // es lo mejor que se puede saber aqui; mercadeo lo ajusta en el
+        // editor si el presupuesto sale de otro mes. Lo que no puede es
+        // quedarse vacio: la campana no aparecería en contabilidad.
+        ...periodoDeImputacion(brief.fechaInicio),
         clientId: client.id,
         clientContactId: contact.id,
         createdById,

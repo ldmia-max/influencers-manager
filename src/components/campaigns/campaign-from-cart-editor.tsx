@@ -6,6 +6,7 @@ import { CampaignEditor } from "./campaign-editor";
 import { useCartStore } from "@/stores/cart-store";
 import type { Client, ProfileWithServices, ProfileConfig } from "@/models/campaign";
 import type { CartItem } from "@/models/cart";
+import { periodoDeImputacion } from "@/lib/campaign-utils";
 
 interface CampaignFromCartEditorProps {
   clients: Client[];
@@ -66,6 +67,11 @@ export function CampaignFromCartEditor({ clients, profiles }: CampaignFromCartEd
     budget: "",
     startDate: "",
     endDate: "",
+    // Periodo de imputacion: arranca en el mes en curso. Es obligatorio
+    // —contabilidad agrupa por el—, asi que nace con valor en vez de
+    // vacio para no convertirlo en un paso mas.
+    mes: String(periodoDeImputacion().mes),
+    anio: String(periodoDeImputacion().anio),
   };
 
   // Si el carrito está vacío, mostrar loading mientras redirige

@@ -34,6 +34,13 @@ export interface CampaignData {
   budget: string;
   startDate: string;
   endDate: string;
+  /**
+   * Periodo de imputacion: el mes y el ano con cuyo presupuesto se paga
+   * la campana. Cadenas, como el resto del formulario, porque salen de
+   * un <Select>; la conversion a numero la hace quien envia.
+   */
+  mes: string;
+  anio: string;
 }
 
 // =============================================================================
@@ -235,6 +242,13 @@ export interface CampaignFormData {
   budget: string;
   startDate: string;
   endDate: string;
+  /**
+   * Periodo de imputacion: el mes y el ano con cuyo presupuesto se paga
+   * la campana. Cadenas, como el resto del formulario, porque salen de
+   * un <Select>; la conversion a numero la hace quien envia.
+   */
+  mes: string;
+  anio: string;
 }
 
 export interface CampaignDetail {

@@ -81,6 +81,8 @@ export default async function EditCampaignPage({ params }: PageProps) {
     endDate: campaign.endDate
       ? campaign.endDate.toISOString().split("T")[0]
       : "",
+    mes: String(campaign.mes),
+    anio: String(campaign.anio),
   };
 
   // Solo quedan fuera del editor los RETIRADOS: esos ya salieron de la

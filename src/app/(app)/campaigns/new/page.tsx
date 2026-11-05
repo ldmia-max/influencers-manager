@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CampaignEditor } from "@/components/campaigns/campaign-editor";
 import { getClientsWithContacts } from "@/data-access/clients";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
+import { periodoDeImputacion } from "@/lib/campaign-utils";
 
 export default async function NewCampaignPage() {
   const session = await auth();
@@ -26,6 +27,11 @@ export default async function NewCampaignPage() {
     budget: "",
     startDate: "",
     endDate: "",
+    // Periodo de imputacion: arranca en el mes en curso. Es obligatorio
+    // —contabilidad agrupa por el—, asi que nace con valor en vez de
+    // vacio para no convertirlo en un paso mas.
+    mes: String(periodoDeImputacion().mes),
+    anio: String(periodoDeImputacion().anio),
   };
 
   return (
