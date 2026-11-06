@@ -148,6 +148,53 @@ export function ManageAccessDialog({
     );
   };
 
+  /**
+   * El boton del enlace, tambien cuando el acceso todavia no existe.
+   *
+   * Antes solo aparecia con el acceso ya creado, asi que en la primera
+   * vez la unica salida VISIBLE era escribirle una contrasena y
+   * decirsela por ahi. Mandar el enlace sin contrasena si funcionaba
+   * —enviar el formulario con la casilla vacia hacia exactamente
+   * esto—, pero habia que adivinarlo, y lo que se adivina no se usa.
+   *
+   * Cuando no hay acceso hace falta crearlo primero: el enlace viaja
+   * al correo GUARDADO, no al que haya escrito en la caja, de modo que
+   * sin cuenta no hay destino al que mandarlo. Se crea sin contrasena,
+   * que es justo el punto: la elige el cliente y no la conoce nadie
+   * mas. La ruta hace upsert, asi que pulsarlo dos veces no rompe nada.
+   */
+  const enviarEnlaceDeAcceso = () => {
+    setValidationError("");
+    setAviso(null);
+
+    if (hayAcceso) {
+      mandarEnlace();
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setValidationError("Escribe el correo al que mandarle el enlace");
+      return;
+    }
+
+    createAccess.mutate(
+      {
+        clientId,
+        contactoId,
+        payload: {
+          email: formData.email.trim(),
+          isActive: formData.isActive,
+        },
+      },
+      {
+        onSuccess: () => {
+          setCreado(true);
+          mandarEnlace();
+        },
+      },
+    );
+  };
+
   const mandarEnlace = () => {
     setValidationError("");
     setAviso(null);
@@ -303,22 +350,30 @@ export function ManageAccessDialog({
               </div>
             )}
 
-            {/* Solo con el acceso ya creado: el enlace va al correo
-                guardado, así que antes de guardarlo no hay destino. */}
-            {hayAcceso && (
+            {/* Siempre, también en el alta. Que solo apareciera con el
+                acceso ya creado dejaba la primera vez con una única
+                salida visible: escribirle tú la contraseña. */}
+            <div className="space-y-1">
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={mandarEnlace}
+                onClick={enviarEnlaceDeAcceso}
                 disabled={loading}
               >
                 <Mail className="mr-2 h-4 w-4" />
-                {enlace.isPending
+                {enlace.isPending || (!hayAcceso && createAccess.isPending)
                   ? "Enviando…"
-                  : "Enviar enlace para elegir contraseña"}
+                  : "Enviar enlace al correo para elegir contraseña"}
               </Button>
-            )}
+              {!hayAcceso && (
+                <p className="text-xs text-gray-500">
+                  Crea el acceso con el correo de arriba y le manda el enlace.
+                  No hace falta que escribas ninguna contraseña: la elige el
+                  cliente y no la conoce nadie más.
+                </p>
+              )}
+            </div>
 
             <div className="flex justify-between gap-2">
               {currentAccess && (
