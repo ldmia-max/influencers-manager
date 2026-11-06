@@ -120,7 +120,44 @@ export function tokenRegeneratedTemplate(params: {
     </p>
     <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;line-height:1.6;">
       Utilice el siguiente enlace para revisar y aprobar los perfiles de la campaña.
-      Los enlaces anteriores han sido reemplazados por este nuevo.
+    </p>
+    ${ctaButton("Revisar Campaña", params.approvalUrl)}
+    <p style="margin:0;font-size:12px;color:#a1a1aa;">
+      Este enlace expira el ${formatDate(params.expiresAt)}.
+    </p>
+  `);
+
+  return { subject, html };
+}
+
+// =============================================================================
+// Template 2b: Reenvío del MISMO enlace (para el cliente)
+// =============================================================================
+
+/**
+ * El mismo enlace otra vez, porque el correo anterior no llegó.
+ *
+ * Va aparte del de "nuevo enlace" porque no es lo mismo y el cliente
+ * tiene que poder distinguirlo: aquí no se ha generado nada, el enlace
+ * es el de siempre y el de antes —si llegó— sigue sirviendo. Decirle
+ * "nuevo enlace" a quien ya tenía uno abierto lo lleva a cerrarlo.
+ */
+export function reenvioRevisionTemplate(params: {
+  contactName: string;
+  campaignName: string;
+  approvalUrl: string;
+  expiresAt: Date;
+}): { subject: string; html: string } {
+  const subject = `Reenvío del enlace de revisión: ${params.campaignName}`;
+  const html = baseLayout(`
+    <h2 style="margin:0 0 16px;font-size:18px;color:#18181b;">Hola ${params.contactName},</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Le reenviamos el enlace para revisar la campaña <strong>${params.campaignName}</strong>,
+      por si el mensaje anterior no llegó a su bandeja.
+    </p>
+    <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Es el mismo enlace de antes: si ya lo había recibido, cualquiera de los
+      dos correos le sirve.
     </p>
     ${ctaButton("Revisar Campaña", params.approvalUrl)}
     <p style="margin:0;font-size:12px;color:#a1a1aa;">

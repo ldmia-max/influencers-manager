@@ -4,6 +4,7 @@ import { sendEmail, type ResultadoEmail } from "./resend";
 import {
   campaignReviewTemplate,
   tokenRegeneratedTemplate,
+  reenvioRevisionTemplate,
   campaignApprovedTemplate,
   campaignRejectedTemplate,
   codigoAprobacionTemplate,
@@ -61,6 +62,30 @@ export async function notifyTokenRegenerated(params: {
   expiresAt: Date;
 }): Promise<ResultadoEmail> {
   const template = tokenRegeneratedTemplate({
+    contactName: params.contactName,
+    campaignName: params.campaignName,
+    approvalUrl: `${getBaseUrl()}/approve/${params.approvalToken}`,
+    expiresAt: params.expiresAt,
+  });
+
+  return sendEmail({ to: params.contactEmail, ...template });
+}
+
+/**
+ * Reenvia el MISMO enlace, para cuando el correo anterior no salio.
+ *
+ * Plantilla propia a proposito: la de "nuevo enlace" le diria al
+ * cliente que se genero uno, y quien ya tuviera el suyo abierto lo
+ * cerraria pensando que ha caducado.
+ */
+export async function notifyReenvioRevision(params: {
+  contactEmail: string;
+  contactName: string;
+  campaignName: string;
+  approvalToken: string;
+  expiresAt: Date;
+}): Promise<ResultadoEmail> {
+  const template = reenvioRevisionTemplate({
     contactName: params.contactName,
     campaignName: params.campaignName,
     approvalUrl: `${getBaseUrl()}/approve/${params.approvalToken}`,

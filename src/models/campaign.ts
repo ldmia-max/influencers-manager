@@ -208,6 +208,14 @@ export interface RegenerateTokenResponse {
    */
   email?: { sent: boolean; reason?: string; error?: string };
   emailRecipient?: string;
+  /**
+   * A quién se le emitió, uno por uno, y si su correo salió.
+   *
+   * La tarjeta lo usa para saber si copiar al portapapeles: con un solo
+   * enlace copiarlo ayuda, con tres copia el de alguien concreto sin
+   * decir de quién, y cada enlace lleva la firma de su persona.
+   */
+  destinatarios?: { email: string; sent: boolean; error?: string }[];
 }
 
 export interface ApprovalToken {

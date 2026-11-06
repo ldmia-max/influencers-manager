@@ -1092,6 +1092,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           campaignId={id}
           tokens={campaign.approvalTokens}
           campaignStatus={campaign.status}
+          contactos={campaign.contacts.map((c) => ({
+            id: c.clientContact.id,
+            nombre: `${c.clientContact.firstName} ${c.clientContact.lastName}`,
+            isActive: c.clientContact.isActive,
+          }))}
           decisiones={campaign.profiles.map((cp) => ({
             influencer: cp.profile.name,
             status: cp.status,

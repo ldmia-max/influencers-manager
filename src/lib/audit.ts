@@ -123,4 +123,9 @@ export const ACCIONES = {
   /// de un influencer en una campana, asi que se registra aqui lo que
   /// deja de existir en la tabla.
   influencerDescartado: "campaign.influencer_discarded",
+  /// Se volvio a mandar por correo un enlace de revision que ya
+  /// existia. Queda registrado porque la pregunta que llega despues es
+  /// siempre "¿se le mandó o no?", y el boton se pulsa justo cuando el
+  /// correo esta fallando y nadie se fia de lo que dice la pantalla.
+  enlaceRevisionReenviado: "campaign.review_link_resent",
 } as const;

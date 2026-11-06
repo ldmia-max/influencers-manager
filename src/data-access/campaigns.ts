@@ -231,7 +231,16 @@ export async function getCampaignDetail(id: string) {
       contacts: {
         select: {
           clientContact: {
-            select: { id: true, firstName: true, lastName: true, email: true },
+            // isActive lo necesita la tarjeta de Revisiones para contar
+            // a quien le falta enlace con el mismo criterio que usa el
+            // servidor al emitirlos: un contacto retirado no cuenta.
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              isActive: true,
+            },
           },
         },
       },
@@ -980,16 +989,44 @@ export async function regenerateApprovalToken(campaignId: string) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
-  const destinatarios = contactosQueAprueban(campaign);
   const base = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "");
 
-  // Los vigentes se invalidan antes de emitir los nuevos. Si no, cada
-  // reenvio dejaria otro enlace vivo de la misma campana y la bandeja
-  // del cliente acabaria con tres, sin saber cual es el bueno.
-  await prisma.campaignApprovalToken.updateMany({
+  /**
+   * Solo se emite para quien NO tiene enlace vigente.
+   *
+   * Antes se caducaban todos y se emitian de cero para todo el mundo, y
+   * eso rompia el caso que de verdad llega: anadir un contacto a una
+   * campana que ya esta en Revision. Al que llevaba una semana con su
+   * enlace —y no habia hecho nada mal— se le moria el suyo para que
+   * entraran los dos nuevos, y si ya lo tenia abierto se quedaba
+   * mirando un enlace muerto.
+   *
+   * Un contacto cuyo enlace ya se USO si vuelve a recibir uno: puede
+   * haber algo nuevo que aprobar (un reemplazo en una campana ACTIVE),
+   * y si no lo hay el portal le dira que no queda nada pendiente, que
+   * es informacion y no un error.
+   *
+   * Para volver a mandar un enlace que ya existe esta
+   * reenviarEnlacesDeRevision(): esto emite, aquello reenvia.
+   */
+  const vigentes = await prisma.campaignApprovalToken.findMany({
     where: { campaignId, usedAt: null, expiresAt: { gt: new Date() } },
-    data: { expiresAt: new Date() },
+    select: { clientContactId: true },
   });
+  const conEnlace = new Set(
+    vigentes.map((t) => t.clientContactId).filter(Boolean) as string[]
+  );
+
+  const destinatarios = contactosQueAprueban(campaign).filter(
+    (c) => !conEnlace.has(c.id)
+  );
+
+  if (destinatarios.length === 0) {
+    throw new ValidationError(
+      "Todos los contactos de la campaña ya tienen un enlace vigente. " +
+        "Si no les llegó el correo, usa «Reenviar a revisión» para volver a mandarles el mismo enlace."
+    );
+  }
 
   const nuevos = await Promise.all(
     destinatarios.map((c) =>
@@ -1019,6 +1056,83 @@ export async function regenerateApprovalToken(campaignId: string) {
     expiresAt,
     destinatarios: nuevos.map((t) => ({
       token: t.token,
+      contactEmail: t.sentToEmail,
+      contactName: t.sentToName ?? t.sentToEmail,
+    })),
+  };
+}
+
+/**
+ * Vuelve a mandar por correo los enlaces que YA existen.
+ *
+ * No emite nada: ni crea tokens, ni caduca los que hay, ni toca la
+ * campana. Es la salida para cuando el correo no sale —Resend caido,
+ * el buzon del cliente lo rebota, el dominio sin verificar— y lo unico
+ * que hace falta es repetir el envio.
+ *
+ * Separarlo de regenerateApprovalToken() es el punto: un reenvio que
+ * emitiera enlaces nuevos invalidaria el que el cliente quiza SI
+ * recibio, y el dia que alguien pulse el boton dos veces por si acaso
+ * dejaria muerto el enlace que estaba a punto de abrirse.
+ *
+ * Devuelve a quien mandar y con que enlace; el correo lo manda la ruta,
+ * que es quien sabe informar de los fallos uno a uno.
+ */
+export async function reenviarEnlacesDeRevision(campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, name: true, status: true },
+  });
+
+  if (!campaign) {
+    throw new NotFoundError("Campaña no encontrada");
+  }
+
+  if (campaign.status !== "REVIEW" && campaign.status !== "ACTIVE") {
+    throw new ValidationError(
+      "Solo se pueden reenviar enlaces de una campaña en revisión o en proceso"
+    );
+  }
+
+  const vigentes = await prisma.campaignApprovalToken.findMany({
+    where: { campaignId, usedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      token: true,
+      expiresAt: true,
+      sentToEmail: true,
+      sentToName: true,
+      clientContactId: true,
+    },
+  });
+
+  /**
+   * Uno por persona, el mas reciente.
+   *
+   * Un contacto puede acumular varios enlaces vivos —se emitio, se
+   * anadio gente, se volvio a emitir— y mandarle dos correos con dos
+   * enlaces distintos es peor que no mandarle ninguno: no sabria cual
+   * abrir y los dos funcionarian.
+   */
+  const porPersona = new Map<string, (typeof vigentes)[number]>();
+  for (const t of vigentes) {
+    const clave = t.clientContactId ?? t.sentToEmail;
+    if (!porPersona.has(clave)) porPersona.set(clave, t);
+  }
+
+  const destinatarios = [...porPersona.values()];
+
+  if (destinatarios.length === 0) {
+    throw new ValidationError(
+      "No hay ningún enlace vigente que reenviar. Genera los enlaces que faltan."
+    );
+  }
+
+  return {
+    campaignName: campaign.name,
+    destinatarios: destinatarios.map((t) => ({
+      token: t.token,
+      expiresAt: t.expiresAt,
       contactEmail: t.sentToEmail,
       contactName: t.sentToName ?? t.sentToEmail,
     })),

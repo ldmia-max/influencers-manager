@@ -103,6 +103,23 @@ export async function regenerateApprovalToken(
   return apiPost<RegenerateTokenResponse>(`/api/campaigns/${campaignId}/regenerate-token`);
 }
 
+/**
+ * Vuelve a mandar los enlaces que ya existen, sin emitir ninguno.
+ *
+ * La salida para cuando el correo no sale. Va a otra ruta que
+ * regenerateApprovalToken a proposito: aquella emite enlaces nuevos, y
+ * usarla como "reenviar" mataria el que el cliente quiza ya tiene.
+ */
+export async function reenviarRevision(
+  campaignId: string
+): Promise<{
+  message: string;
+  email?: { sent: boolean; reason?: string; error?: string };
+  destinatarios: { email: string; sent: boolean; error?: string }[];
+}> {
+  return apiPost(`/api/campaigns/${campaignId}/reenviar-revision`);
+}
+
 // =============================================================================
 // Helper: Build campaign payload from form data
 // =============================================================================

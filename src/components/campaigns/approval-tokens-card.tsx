@@ -14,14 +14,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link2, Copy, Check, Clock, CheckCircle2, XCircle, RefreshCw, Loader2 } from "lucide-react";
-import { regenerateApprovalToken } from "@/services/campaign";
+import {
+  Link2,
+  Copy,
+  Check,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Loader2,
+  Send,
+} from "lucide-react";
+import { regenerateApprovalToken, reenviarRevision } from "@/services/campaign";
 import type { ApprovalToken, DecisionDeRevision } from "@/models/campaign";
 
 interface ApprovalTokensCardProps {
   campaignId: string;
   tokens: ApprovalToken[];
   campaignStatus: string;
+  /**
+   * Quiénes pueden aprobar esta campaña.
+   *
+   * Hace falta para saber a quién le FALTA enlace. Antes la tarjeta
+   * solo miraba si existía alguno vivo, así que añadir contactos a una
+   * campaña ya enviada escondía el botón —había un enlace, el del
+   * primero— y los nuevos se quedaban sin forma de entrar.
+   */
+  contactos?: { id: string; nombre: string; isActive: boolean }[];
   /** Lo que cada contacto del cliente decidió, y cuándo. */
   decisiones?: DecisionDeRevision[];
 }
@@ -30,11 +49,13 @@ export function ApprovalTokensCard({
   campaignId,
   tokens,
   campaignStatus,
+  contactos = [],
   decisiones = [],
 }: ApprovalTokensCardProps) {
   const router = useRouter();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isReenviando, setIsReenviando] = useState(false);
   const [avisoEnvio, setAvisoEnvio] = useState<{ ok: boolean; texto: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +80,24 @@ export function ApprovalTokensCard({
   // propio boton: pegarle al cliente el enlace de otra persona haria
   // que la decision quedase firmada con un nombre que no es el suyo.
   const activeToken = enlacesActivos[0];
+
+  /**
+   * Los contactos que NO tienen enlace vivo.
+   *
+   * Esta es la condición del botón, y no "¿hay algún enlace?". Mientras
+   * lo fuese, bastaba con que a uno le quedara el suyo para que a los
+   * demás no hubiera forma de emitírselo: el caso que llega de verdad
+   * es añadir gente a una campaña que ya está en Revisión.
+   */
+  const sinEnlace = useMemo(
+    () =>
+      contactos.filter(
+        (c) =>
+          c.isActive &&
+          !enlacesActivos.some((t) => t.clientContactId === c.id)
+      ),
+    [contactos, enlacesActivos]
+  );
 
   const baseUrl = typeof window !== "undefined"
     ? window.location.origin
@@ -85,10 +124,21 @@ export function ApprovalTokensCard({
     try {
       const data = await regenerateApprovalToken(campaignId);
 
-      // Copiar automáticamente el nuevo token
-      await navigator.clipboard.writeText(data.approvalUrl);
-      setCopiedToken(data.token.token);
-      setTimeout(() => setCopiedToken(null), 2000);
+      /**
+       * Se copia solo cuando se emitió UNO.
+       *
+       * Cada enlace es de una persona —la decisión queda firmada con su
+       * nombre—, así que copiar uno de tres en silencio invita a
+       * pegárselo a quien no es. Con varios, cada uno tiene su botón de
+       * copiar en la lista de abajo.
+       */
+      const unoSolo = (data.destinatarios?.length ?? 1) === 1;
+
+      if (unoSolo) {
+        await navigator.clipboard.writeText(data.approvalUrl);
+        setCopiedToken(data.token.token);
+        setTimeout(() => setCopiedToken(null), 2000);
+      }
 
       // El enlace se genera aunque el correo falle, asi que hay que decir
       // cual de las dos cosas pasó. Antes siempre ponia "regenerado" y el
@@ -97,13 +147,21 @@ export function ApprovalTokensCard({
         data.email?.sent === false
           ? {
               ok: false,
-              texto: `El enlace está listo y copiado, pero el correo a ${
+              texto: `El enlace está listo${
+                unoSolo ? " y copiado" : ""
+              }, pero el correo a ${
                 data.emailRecipient ?? "el cliente"
-              } no salió (${data.email.error ?? data.email.reason}). Pégaselo tú.`,
+              } no salió (${data.email.error ?? data.email.reason}). ${
+                unoSolo
+                  ? "Pégaselo tú."
+                  : "Copia el de cada uno abajo y pásaselo tú."
+              }`,
             }
           : {
               ok: true,
-              texto: `Enlace enviado a ${data.emailRecipient ?? "el cliente"} y copiado al portapapeles.`,
+              texto: unoSolo
+                ? `Enlace enviado a ${data.emailRecipient ?? "el cliente"} y copiado al portapapeles.`
+                : `Enlaces enviados a ${data.emailRecipient ?? "los contactos"}. Cada uno tiene el suyo en la lista de abajo.`,
             }
       );
 
@@ -113,6 +171,46 @@ export function ApprovalTokensCard({
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  /**
+   * Vuelve a mandar los MISMOS enlaces.
+   *
+   * No recarga la página: no cambia nada que se vea —los enlaces son
+   * los de antes— y recargar se llevaría por delante el único dato que
+   * importa aquí, que es si el correo salió o no.
+   */
+  const handleReenviar = async () => {
+    setIsReenviando(true);
+    setError(null);
+    setAvisoEnvio(null);
+
+    try {
+      const data = await reenviarRevision(campaignId);
+      const fallidos = data.destinatarios.filter((d) => !d.sent);
+
+      setAvisoEnvio(
+        fallidos.length === 0
+          ? {
+              ok: true,
+              texto: `Enlace reenviado a ${data.destinatarios
+                .map((d) => d.email)
+                .join(", ")}.`,
+            }
+          : {
+              ok: false,
+              texto: `El correo a ${fallidos
+                .map((d) => d.email)
+                .join(", ")} tampoco salió (${
+                fallidos[0].error ?? "sin detalle"
+              }). Copia el enlace y pásaselo tú.`,
+            }
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setIsReenviando(false);
     }
   };
 
@@ -199,13 +297,22 @@ export function ApprovalTokensCard({
           </div>
         )}
 
-        {/* Botón para regenerar cuando no hay token activo */}
-        {!activeToken && admiteEnlace && (
+        {/* Emitir enlace para quien no lo tiene. Antes la condición era
+            "no hay ningún enlace vivo", y eso escondía el botón justo
+            cuando hacía falta: al añadir contactos a una campaña ya
+            enviada, el del primero seguía vigente. */}
+        {sinEnlace.length > 0 && admiteEnlace && (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
             <p className="text-sm text-yellow-800">
-              {campaignStatus === "ACTIVE"
-                ? "Genera un enlace para que el cliente apruebe los influencers que añadiste. La campaña sigue en proceso mientras tanto."
-                : "No hay un enlace de aprobación activo. El anterior expiró o ya fue utilizado."}
+              {enlacesActivos.length > 0
+                ? `${
+                    sinEnlace.length === 1
+                      ? `${sinEnlace[0].nombre} todavía no tiene`
+                      : `${sinEnlace.length} contactos todavía no tienen`
+                  } enlace de aprobación. Los enlaces que ya están vigentes no se tocan.`
+                : campaignStatus === "ACTIVE"
+                  ? "Genera un enlace para que el cliente apruebe los influencers que añadiste. La campaña sigue en proceso mientras tanto."
+                  : "No hay un enlace de aprobación activo. El anterior expiró o ya fue utilizado."}
             </p>
             <Button
               onClick={handleRegenerateToken}
@@ -220,9 +327,46 @@ export function ApprovalTokensCard({
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  {campaignStatus === "ACTIVE"
-                    ? "Reenviar para revisión"
-                    : "Regenerar enlace de aprobación"}
+                  {enlacesActivos.length > 0
+                    ? `Generar enlace para ${
+                        sinEnlace.length === 1
+                          ? sinEnlace[0].nombre
+                          : `${sinEnlace.length} contactos`
+                      }`
+                    : campaignStatus === "ACTIVE"
+                      ? "Reenviar para revisión"
+                      : "Regenerar enlace de aprobación"}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Reenviar los MISMOS enlaces, para cuando el correo falla.
+            Separado del de arriba a propósito: aquel emite enlaces
+            nuevos, y usarlo como reenvío mataría el que el cliente
+            quizá ya tiene abierto. */}
+        {enlacesActivos.length > 0 && admiteEnlace && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-gray-50 p-3">
+            <p className="text-xs text-gray-600">
+              ¿No le llegó el correo? Vuelve a enviarle el mismo enlace, sin
+              generar uno nuevo.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReenviar}
+              disabled={isReenviando}
+            >
+              {isReenviando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reenviando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Reenviar a revisión
                 </>
               )}
             </Button>
