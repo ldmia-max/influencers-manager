@@ -14,6 +14,12 @@ import { Check, X } from "lucide-react";
  * que el estado se lee de un vistazo sin tener que recordar el codigo
  * de colores.
  *
+ * `aprobado` admite un tercer valor —null— que significa SIN DECIDIR, y
+ * entonces ninguno de los dos va relleno. Es el estado en el que abre
+ * la revision: antes todo llegaba marcado como aprobado, asi que pulsar
+ * "Aprobar" no cambiaba nada y parecia estropeado, y sobre todo
+ * cualquiera podia aprobar el gasto entero sin leerlo, por inercia.
+ *
  * Vive aparte porque lo usan los tres niveles que el cliente aprueba
  * —el creador, su red y cada formato— y tres copias de esto acabarian
  * comportandose distinto.
@@ -25,7 +31,8 @@ export function AprobarRechazar({
   tamano = "normal",
   etiqueta,
 }: {
-  aprobado: boolean;
+  /** true aprobado, false rechazado, null sin decidir todavia. */
+  aprobado: boolean | null;
   onCambio: (aprobado: boolean) => void;
   disabled?: boolean;
   /** "pequeno" para los formatos, que van anidados y en lista. */
@@ -51,10 +58,10 @@ export function AprobarRechazar({
       <button
         type="button"
         disabled={disabled}
-        aria-pressed={aprobado}
+        aria-pressed={aprobado === true}
         onClick={() => onCambio(true)}
         className={`${base} ${
-          aprobado
+          aprobado === true
             ? "border-green-600 bg-green-600 text-white hover:bg-green-700"
             : "border-gray-300 bg-white text-gray-500 hover:border-green-300 hover:text-green-700"
         }`}
@@ -65,10 +72,10 @@ export function AprobarRechazar({
       <button
         type="button"
         disabled={disabled}
-        aria-pressed={!aprobado}
+        aria-pressed={aprobado === false}
         onClick={() => onCambio(false)}
         className={`${base} ${
-          !aprobado
+          aprobado === false
             ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
             : "border-gray-300 bg-white text-gray-500 hover:border-red-300 hover:text-red-700"
         }`}

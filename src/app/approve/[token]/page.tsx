@@ -98,7 +98,16 @@ interface CampaignData {
 }
 
 interface ApprovalState {
-  profiles: Record<string, { isApproved: boolean; rejectionReason?: string }>;
+  /**
+   * isApproved null = sin decidir. Solo los creadores lo usan: es donde
+   * se exige una respuesta. Sus redes y formatos siguen naciendo
+   * aprobados, porque una vez dicho "si" a un creador lo normal es
+   * quedarse con lo que se le propuso y, como mucho, quitarle algo.
+   */
+  profiles: Record<
+    string,
+    { isApproved: boolean | null; rejectionReason?: string }
+  >;
   platforms: Record<string, { isApproved: boolean; rejectionReason?: string }>;
   services: Record<
     string,
@@ -172,8 +181,14 @@ export default function ApprovePage() {
 
     data.campaign.profiles.forEach(
       (profile: CampaignData["campaign"]["profiles"][0]) => {
+        // Lo que el cliente tiene que contestar abre SIN DECIDIR. Antes
+        // abria en verde, asi que "Aprobar" no cambiaba nada —parecia
+        // roto— y, peor, pulsar "Enviar" sin leer aprobaba el gasto
+        // entero. Lo ya resuelto conserva su respuesta: no se vuelve a
+        // preguntar.
         initialState.profiles[profile.id] = {
-          isApproved: profile.status !== "REJECTED",
+          isApproved:
+            profile.status === "PENDING" ? null : profile.status !== "REJECTED",
         };
 
         profile.platforms.forEach((platform) => {
@@ -227,7 +242,7 @@ export default function ApprovePage() {
           original += total;
 
           const profileApproved =
-            approvalState.profiles[profile.id]?.isApproved ?? true;
+            approvalState.profiles[profile.id]?.isApproved === true;
           const platformApproved =
             approvalState.platforms[platform.id]?.isApproved ?? true;
           const serviceApproved =
@@ -261,7 +276,7 @@ export default function ApprovePage() {
     data.campaign.profiles.forEach((profile) => {
       profiles++;
       const profileApproved =
-        approvalState.profiles[profile.id]?.isApproved ?? true;
+        approvalState.profiles[profile.id]?.isApproved === true;
       if (profileApproved) approvedProfiles++;
 
       profile.platforms.forEach((platform) => {
@@ -440,6 +455,16 @@ export default function ApprovePage() {
   const handleSubmit = () => {
     if (!data) return;
 
+    // La guardia vive aqui y no solo en el boton deshabilitado: sin
+    // ella un creador sin contestar viajaria como REJECTED, que es
+    // retirarlo de la campana por no haber dicho nada.
+    const sinContestar = data.campaign.profiles.some(
+      (p) =>
+        p.status === "PENDING" &&
+        approvalState.profiles[p.id]?.isApproved == null
+    );
+    if (sinContestar) return;
+
     // Solo viaja lo que estaba pendiente. El servidor lo comprueba otra
     // vez por su cuenta —no se fia de esta lista—, pero mandar decisiones
     // sobre lo ya cerrado seria pedirle que las descarte.
@@ -448,9 +473,10 @@ export default function ApprovePage() {
     const finalDecisions = {
       profiles: pendientes.map((profile) => ({
         id: profile.id,
-        status: approvalState.profiles[profile.id]?.isApproved
-          ? "APPROVED" as const
-          : "REJECTED" as const,
+        status:
+          approvalState.profiles[profile.id]?.isApproved === true
+            ? ("APPROVED" as const)
+            : ("REJECTED" as const),
         rejectionReason: approvalState.profiles[profile.id]?.rejectionReason,
       })),
       platforms: pendientes.flatMap((profile) =>
@@ -686,6 +712,12 @@ export default function ApprovePage() {
   const porDecidir = data.campaign.profiles.filter((p) => p.status === "PENDING");
   const yaDecididos = data.campaign.profiles.filter((p) => p.status !== "PENDING");
 
+  // Los que siguen sin respuesta. El resumen lo usa para retener el
+  // envio y decir cuantos faltan.
+  const sinDecidir = porDecidir.filter(
+    (p) => approvalState.profiles[p.id]?.isApproved == null
+  ).length;
+
   // Compute chart data
   const formatCounts = new Map<string, number>();
   const categoryCounts = new Map<string, number>();
@@ -851,7 +883,7 @@ export default function ApprovePage() {
                     []
                   }
                   isApproved={
-                    approvalState.profiles[profile.id]?.isApproved ?? true
+                    approvalState.profiles[profile.id]?.isApproved ?? null
                   }
                   platforms={transformPlatforms(profile.platforms)}
                   onProfileToggle={handleProfileToggle}
@@ -940,6 +972,7 @@ export default function ApprovePage() {
                 onApproveAll={handleApproveAll}
                 onRejectAll={handleRejectAll}
                 onSubmit={handleSubmit}
+                sinDecidir={sinDecidir}
                 isSubmitting={submitMutation.isPending}
               />
             </div>

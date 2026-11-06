@@ -18,7 +18,8 @@ interface ServiceItemProps {
    */
   precio: number;
   currency: string;
-  isApproved: boolean;
+  /** true aprobado, false rechazado, null sin decidir (el creador aun no lo esta). */
+  isApproved: boolean | null;
   clientNotes?: string;
   onToggle: (id: string, isApproved: boolean) => void;
   onNotesChange?: (id: string, notes: string) => void;
@@ -38,12 +39,16 @@ export function ServiceItem({
   disabled = false,
 }: ServiceItemProps) {
   const total = precio * quantity;
+  // Solo el rechazo pinta de rojo y tacha. Sin decidir no es un "no":
+  // tacharlo daria por hecho que se cae, que es justo lo que todavia no
+  // se sabe.
+  const rechazado = isApproved === false;
 
   return (
     <div className="space-y-1">
       <div
         className={`flex items-center justify-between py-2 px-3 rounded-md transition-colors ${
-          isApproved ? "bg-white" : "bg-red-50"
+          rechazado ? "bg-red-50" : "bg-white"
         }`}
       >
         <div className="flex items-center gap-3">
@@ -59,7 +64,7 @@ export function ServiceItem({
               clic para leer el formato lo rechazara sin querer. */}
           <span
             className={`text-sm ${
-              !isApproved ? "line-through text-muted-foreground" : ""
+              rechazado ? "line-through text-muted-foreground" : ""
             }`}
           >
             {serviceName}
@@ -70,13 +75,13 @@ export function ServiceItem({
         </div>
         <span
           className={`text-sm font-medium ${
-            !isApproved ? "line-through text-muted-foreground" : ""
+            rechazado ? "line-through text-muted-foreground" : ""
           }`}
         >
           ${formatNumber(Math.round(total))} {currency}
         </span>
       </div>
-      {isApproved && onNotesChange && (
+      {isApproved === true && onNotesChange && (
         <div className="px-3 pb-1">
           <Input
             placeholder="Describe de qué tratará este formato (opcional)"

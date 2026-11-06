@@ -23,6 +23,8 @@ interface ApprovalSummaryProps {
   servicesCount: number;
   approvedServicesCount: number;
   totalReach?: number;
+  /** Creadores que el cliente todavia no ha contestado. */
+  sinDecidir?: number;
   onApproveAll: () => void;
   onRejectAll: () => void;
   onSubmit: () => void;
@@ -45,6 +47,7 @@ export function ApprovalSummary({
   servicesCount,
   approvedServicesCount,
   totalReach = 0,
+  sinDecidir = 0,
   onApproveAll,
   onRejectAll,
   onSubmit,
@@ -52,6 +55,10 @@ export function ApprovalSummary({
   disabled = false,
 }: ApprovalSummaryProps) {
   const hasChanges = removedTotal > 0;
+  // Mientras falte alguien por contestar, lo no aprobado no son
+  // "items removidos": es lo que aun no se ha mirado. Llamarlo
+  // removido le contaria al cliente un rechazo que no ha hecho.
+  const faltanRespuestas = sinDecidir > 0;
   const [currentTime] = useState(() => Date.now());
   const daysUntilExpiry = Math.ceil(
     (expiresAt.getTime() - currentTime) / (1000 * 60 * 60 * 24)
@@ -120,8 +127,12 @@ export function ApprovalSummary({
             <span>${formatNumber(Math.round(originalTotal))} {currency}</span>
           </div>
           {hasChanges && (
-            <div className="flex justify-between text-sm text-red-600">
-              <span>Items removidos</span>
+            <div
+              className={`flex justify-between text-sm ${
+                faltanRespuestas ? "text-muted-foreground" : "text-red-600"
+              }`}
+            >
+              <span>{faltanRespuestas ? "Sin aprobar" : "Items removidos"}</span>
               <span>-${formatNumber(Math.round(removedTotal))} {currency}</span>
             </div>
           )}
@@ -158,12 +169,20 @@ export function ApprovalSummary({
           </Button>
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex-col items-stretch gap-2">
+        {faltanRespuestas && (
+          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {sinDecidir === 1
+              ? "Falta 1 influencer por aprobar o rechazar."
+              : `Faltan ${sinDecidir} influencers por aprobar o rechazar.`}{" "}
+            Decídelos para poder enviar la revisión.
+          </p>
+        )}
         <Button
           className="w-full"
           size="lg"
           onClick={onSubmit}
-          disabled={disabled || isSubmitting}
+          disabled={disabled || isSubmitting || faltanRespuestas}
         >
           {isSubmitting ? (
             <>

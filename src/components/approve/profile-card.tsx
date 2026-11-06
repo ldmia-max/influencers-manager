@@ -27,7 +27,8 @@ interface ProfileCardProps {
   country?: string;
   city?: string;
   categories?: string[];
-  isApproved: boolean;
+  /** true aprobado, false rechazado, null sin decidir todavia. */
+  isApproved: boolean | null;
   platforms: PlatformData[];
   onProfileToggle: (id: string, isApproved: boolean) => void;
   onPlatformToggle: (platformId: string, isApproved: boolean) => void;
@@ -60,6 +61,17 @@ export function ProfileCard({
 }: ProfileCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // Tres estados, no dos. Rojo solo para el rechazo; sin decidir se
+  // marca en ambar, porque es trabajo que le queda al cliente y tiene
+  // que verse de lejos cuando la campana lleva ocho creadores.
+  const rechazado = isApproved === false;
+  const aprobado = isApproved === true;
+  const sinDecidir = isApproved === null;
+
+  /** La red hereda del creador mientras este no este aprobado. */
+  const estadoDeLaRed = (propio: boolean): boolean | null =>
+    sinDecidir ? null : rechazado ? false : propio;
+
   // Calculate total for this profile
   const totalApproved = platforms.reduce((profileSum, platform) => {
     if (!platform.isApproved) return profileSum;
@@ -77,12 +89,16 @@ export function ProfileCard({
   return (
     <Card
       className={`overflow-hidden transition-colors ${
-        isApproved ? "" : "border-red-200 bg-red-50/30"
+        rechazado
+          ? "border-red-200 bg-red-50/30"
+          : sinDecidir
+            ? "border-amber-300"
+            : ""
       }`}
     >
       <CardHeader
         className={`cursor-pointer py-4 ${
-          isApproved ? "" : "bg-red-100/30"
+          rechazado ? "bg-red-100/30" : sinDecidir ? "bg-amber-50/50" : ""
         }`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -90,7 +106,7 @@ export function ProfileCard({
           <div className="flex items-center gap-4">
             <div
               className={`relative flex h-12 w-12 items-center justify-center rounded-full overflow-hidden ${
-                isApproved ? "bg-primary/10" : "bg-red-100"
+                rechazado ? "bg-red-100" : "bg-primary/10"
               }`}
             >
               {profilePicUrl ? (
@@ -104,7 +120,7 @@ export function ProfileCard({
               ) : (
                 <User
                   className={`h-6 w-6 ${
-                    isApproved ? "text-primary" : "text-red-400"
+                    rechazado ? "text-red-400" : "text-primary"
                   }`}
                 />
               )}
@@ -119,7 +135,7 @@ export function ProfileCard({
                 />
                 <h3
                   className={`font-semibold ${
-                    !isApproved ? "text-muted-foreground" : ""
+                    rechazado ? "text-muted-foreground" : ""
                   }`}
                 >
                   {profileName}
@@ -127,6 +143,14 @@ export function ProfileCard({
                 <Badge variant="secondary" className="text-xs">
                   {profileTypeLabels[profileType] || profileType}
                 </Badge>
+                {sinDecidir && (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-300 bg-amber-50 text-xs font-normal text-amber-700"
+                  >
+                    Sin decidir
+                  </Badge>
+                )}
               </div>
               {location && (
                 <p className="text-sm text-muted-foreground mt-1">{location}</p>
@@ -147,7 +171,7 @@ export function ProfileCard({
               <p className="text-xs text-muted-foreground">Subtotal</p>
               <p
                 className={`font-semibold ${
-                  !isApproved ? "line-through text-muted-foreground" : ""
+                  rechazado ? "line-through text-muted-foreground" : ""
                 }`}
               >
                 ${formatNumber(Math.round(totalApproved))}
@@ -173,11 +197,11 @@ export function ProfileCard({
                 username={platform.username}
                 followers={platform.followers}
                 services={platform.services}
-                isApproved={isApproved && platform.isApproved}
+                isApproved={estadoDeLaRed(platform.isApproved)}
                 onPlatformToggle={onPlatformToggle}
                 onServiceToggle={onServiceToggle}
                 onServiceNotesChange={onServiceNotesChange}
-                disabled={disabled || !isApproved}
+                disabled={disabled || !aprobado}
               />
             ))}
           </div>

@@ -50,7 +50,6 @@ export function ApprovalCharts({ formats, categories, genders, departments }: Ap
   const hasCategories = categories.length > 0;
   const hasGenders = genders.length > 0;
   const hasDepartments = departments.length > 0;
-  console.log(departments)
 
   if (!hasFormats && !hasCategories && !hasGenders && !hasDepartments) return null;
 

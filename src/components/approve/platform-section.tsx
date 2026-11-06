@@ -27,7 +27,8 @@ interface PlatformSectionProps {
   username: string;
   followers?: number;
   services: ServiceData[];
-  isApproved: boolean;
+  /** true aprobada, false rechazada, null sin decidir (el creador aun no lo esta). */
+  isApproved: boolean | null;
   onPlatformToggle: (id: string, isApproved: boolean) => void;
   onServiceToggle: (serviceId: string, isApproved: boolean) => void;
   onServiceNotesChange?: (serviceId: string, notes: string) => void;
@@ -49,6 +50,20 @@ export function PlatformSection({
   const { data: reachRanges = [] } = useReachRanges();
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // Solo el rechazo pinta de rojo. Sin decidir se queda neutra: dar por
+  // caida una red que el cliente todavia no ha mirado seria contarle
+  // una decision que no ha tomado.
+  const rechazada = isApproved === false;
+  const aprobada = isApproved === true;
+
+  /**
+   * Como se ve cada formato. Hereda del nivel de arriba: si la red esta
+   * sin decidir, sus formatos tampoco lo estan; si esta rechazada, caen
+   * con ella; y solo cuando esta aprobada manda lo que diga el formato.
+   */
+  const estadoDelFormato = (propio: boolean): boolean | null =>
+    isApproved === null ? null : rechazada ? false : propio;
+
   const approvedServices = services.filter((s) => s.isApproved);
   const totalApproved = approvedServices.reduce((sum, s) => {
     return sum + s.precio * s.quantity;
@@ -59,13 +74,13 @@ export function PlatformSection({
   return (
     <div
       className={`border rounded-lg overflow-hidden transition-colors ${
-        isApproved ? "border-border" : "border-red-200 bg-red-50/50"
+        rechazada ? "border-red-200 bg-red-50/50" : "border-border"
       }`}
     >
       {/* Platform Header */}
       <div
         className={`flex items-center justify-between p-4 cursor-pointer ${
-          isApproved ? "bg-muted/50" : "bg-red-100/50"
+          rechazada ? "bg-red-100/50" : "bg-muted/50"
         }`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -79,7 +94,7 @@ export function PlatformSection({
             />
             <span
               className={`font-medium ${
-                !isApproved ? "text-muted-foreground" : ""
+                rechazada ? "text-muted-foreground" : ""
               }`}
             >
               {platformName}
@@ -118,7 +133,7 @@ export function PlatformSection({
         <div className="flex items-center gap-4">
           <span
             className={`text-sm font-medium ${
-              !isApproved ? "line-through text-muted-foreground" : ""
+              rechazada ? "line-through text-muted-foreground" : ""
             }`}
           >
             ${formatNumber(Math.round(totalApproved))}
@@ -142,11 +157,11 @@ export function PlatformSection({
               quantity={service.quantity}
               precio={service.precio}
               currency={service.currency}
-              isApproved={isApproved && service.isApproved}
+              isApproved={estadoDelFormato(service.isApproved)}
               clientNotes={service.clientNotes}
               onToggle={onServiceToggle}
               onNotesChange={onServiceNotesChange}
-              disabled={disabled || !isApproved}
+              disabled={disabled || !aprobada}
             />
           ))}
         </div>
