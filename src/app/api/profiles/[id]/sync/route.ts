@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { syncSocialAccountMetrics } from "@/lib/apify";
+import { configDeRed } from "@/lib/redes";
 import {
   getProfileWithSocialAccounts,
   updateSocialAccountMetrics,
@@ -27,14 +28,11 @@ export async function POST(
     // Sincronizar cada cuenta social
     for (const account of profile.socialAccounts) {
       try {
-        const platformName = account.platform.name.toLowerCase();
-
-        if (platformName === "instagram" ||
-          platformName === "tiktok" ||
-          platformName === "youtube" ||
-          platformName === "kick") {
+        // Si esta red se sincroniza o no lo dice su ficha en
+        // lib/redes, no una lista repetida en esta ruta.
+        if (configDeRed(account.platform.name)?.actorDePerfil) {
           const metrics = await syncSocialAccountMetrics(
-            platformName as "instagram" | "tiktok" | "youtube" | "kick",
+            account.platform.name,
             account.username
           );
 

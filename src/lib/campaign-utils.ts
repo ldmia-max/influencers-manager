@@ -1,5 +1,6 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { diaEnAgencia } from "./fechas-agencia";
+import { REDES, REDES_SOPORTADAS, configDeRed } from "./redes";
 
 /**
  * Visualizaciones que se estiman por cada seguidor contratado.
@@ -328,7 +329,7 @@ export function calculateSelectionTotal(profiles: ProfileSelection[]): {
  * TikTok y YouTube estuvieron fuera por desconocimiento, no por
  * decision: se dio por hecho que solo Instagram la publicaba y sus
  * filas pintaban una raya. Kick sigue fuera; si resulta que tambien la
- * da, se anade aqui y no hay nada mas que tocar.
+ * da, se marca en su ficha de `./redes` y no hay nada mas que tocar.
  *
  * El nombre importa tanto como la lista. Quien copia la cifra la esta
  * buscando en el panel del creador, donde "alcance" no aparece por
@@ -344,21 +345,17 @@ export function calculateSelectionTotal(profiles: ProfileSelection[]): {
  *
  * No incluye los reposteos, que siguen siendo cosa de Instagram: eso si
  * es una decision de la agencia y no cambia.
+ *
+ * La lista ya no se escribe aqui: sale del campo `alcance` de cada
+ * ficha en `./redes`, que es donde vive todo lo demas que el codigo
+ * sabe de una red.
  */
-const ALCANCE_POR_RED: Record<string, string | null> = {
-  // Instagram no necesita traduccion: alli se llama igual.
-  instagram: null,
-  tiktok: "Total espectadores",
-  youtube: "Espectadores únicos",
-  // Facebook tampoco: en Meta Business Suite la fila se llama "Alcance".
-  facebook: null,
-};
-
-export const REDES_CON_ALCANCE = Object.keys(ALCANCE_POR_RED);
+export const REDES_CON_ALCANCE = REDES_SOPORTADAS.filter(
+  (r) => REDES[r].alcance !== null
+);
 
 export function redAdmiteAlcance(plataforma: string | null | undefined): boolean {
-  if (!plataforma) return false;
-  return plataforma.trim().toLowerCase() in ALCANCE_POR_RED;
+  return configDeRed(plataforma)?.alcance != null;
 }
 
 /**
@@ -370,8 +367,7 @@ export function redAdmiteAlcance(plataforma: string | null | undefined): boolean
 export function nombreDelAlcanceEn(
   plataforma: string | null | undefined
 ): string | null {
-  if (!plataforma) return null;
-  return ALCANCE_POR_RED[plataforma.trim().toLowerCase()] ?? null;
+  return configDeRed(plataforma)?.alcance?.nombre ?? null;
 }
 
 // =============================================================================

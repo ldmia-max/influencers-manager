@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCreatePlatform } from "@/hooks/mutations/use-admin-mutations";
@@ -7,6 +8,7 @@ import { createPlatformSchema, type CreatePlatformPayload } from "@/lib/schemas/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SoporteDeRed } from "@/components/admin/soporte-de-red";
 
 export function CreatePlatformForm() {
   const createMutation = useCreatePlatform();
@@ -16,9 +18,20 @@ export function CreatePlatformForm() {
     defaultValues: { displayName: "", name: "" },
   });
 
+  // Se mira mientras se escribe, no al guardar: enterarse de lo que la
+  // red no va a poder hacer DESPUES de crearla no sirve de nada.
+  //
+  // Con estado propio y no con form.watch(): watch() devuelve una
+  // funcion que el compilador de React no puede memoizar, y por una
+  // etiqueta no merece la pena dejar el formulario entero sin memoizar.
+  const [slug, setSlug] = useState("");
+
   function onSubmit(data: CreatePlatformPayload) {
     createMutation.mutate(data, {
-      onSuccess: () => form.reset(),
+      onSuccess: () => {
+        form.reset();
+        setSlug("");
+      },
     });
   }
 
@@ -50,7 +63,9 @@ export function CreatePlatformForm() {
         <Input
           id="name"
           placeholder="Ej: youtube"
-          {...form.register("name")}
+          {...form.register("name", {
+            onChange: (e) => setSlug(e.target.value.trim().toLowerCase()),
+          })}
         />
         {form.formState.errors.name ? (
           <p className="text-xs text-red-500">{form.formState.errors.name.message}</p>
@@ -58,6 +73,7 @@ export function CreatePlatformForm() {
           <p className="text-xs text-gray-500">Solo letras minúsculas, números y guion bajo</p>
         )}
       </div>
+      {slug.length > 0 && <SoporteDeRed nombre={slug} conDetalle />}
       <Button type="submit" className="w-full" disabled={createMutation.isPending}>
         {createMutation.isPending ? "Creando..." : "Crear Plataforma"}
       </Button>

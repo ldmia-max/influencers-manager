@@ -13,6 +13,7 @@ import { CreatePlatformForm } from "@/components/forms/create-platform-form";
 import { TogglePlatformButton } from "@/components/admin/toggle-platform-button";
 import { EditPlatformDialog } from "@/components/admin/edit-platform-dialog";
 import { DeletePlatformButton } from "@/components/admin/delete-platform-button";
+import { SoporteDeRed } from "@/components/admin/soporte-de-red";
 
 export default async function PlatformsPage() {
   const platforms = await getAllPlatformsWithCounts();
@@ -45,6 +46,7 @@ export default async function PlatformsPage() {
                   <TableHead>Identificador</TableHead>
                   <TableHead>Cuentas</TableHead>
                   <TableHead>Formatos</TableHead>
+                  <TableHead>Soporte</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -60,6 +62,9 @@ export default async function PlatformsPage() {
                     </TableCell>
                     <TableCell>{platform._count.accounts}</TableCell>
                     <TableCell>{platform._count.serviceTypes}</TableCell>
+                    <TableCell className="align-top">
+                      <SoporteDeRed nombre={platform.name} />
+                    </TableCell>
                     <TableCell>
                       <Badge variant={platform.isActive ? "default" : "secondary"}>
                         {platform.isActive ? "Activa" : "Inactiva"}

@@ -5,6 +5,12 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { directorioUploads, RUTA_PUBLICA_UPLOADS } from "./uploads";
 import { esIdDeCanalYouTube, normalizarUsuarioSocial } from "./social-handles";
+import {
+  REDES,
+  REDES_BUSCABLES,
+  type RedBuscable,
+  type RedSincronizable,
+} from "./redes";
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN,
@@ -119,7 +125,7 @@ export async function getInstagramProfile(
   username: string
 ): Promise<InstagramProfileData | null> {
   try {
-    const run = await client.actor("apify/instagram-profile-scraper").call({
+    const run = await client.actor(REDES.instagram.actorDePerfil).call({
       usernames: [username],
     });
 
@@ -159,7 +165,7 @@ export async function getTikTokProfile(
   username: string
 ): Promise<TikTokProfileData | null> {
   try {
-    const run = await client.actor("clockworks/tiktok-profile-scraper").call({
+    const run = await client.actor(REDES.tiktok.actorDePerfil).call({
       profiles: [username],
       resultsPerPage: 1,
     });
@@ -227,7 +233,7 @@ export async function getYouTubeProfile(
       ? `https://www.youtube.com/channel/${limpio}`
       : `https://www.youtube.com/@${limpio}`;
 
-    const run = await client.actor("streamers/youtube-channel-scraper").call({
+    const run = await client.actor(REDES.youtube.actorDePerfil).call({
       startUrls: [{ url }],
       maxResults: YOUTUBE_VIDEOS_PARA_MEDIA,
       maxResultsShorts: 0,
@@ -291,7 +297,7 @@ export async function getKickProfile(
     const limpio = normalizarUsuarioSocial("kick", slug);
     if (!limpio) return null;
 
-    const run = await client.actor("aitooolsmax/kick-data-scraper").call({
+    const run = await client.actor(REDES.kick.actorDePerfil).call({
       mode: "channels",
       channelSlugs: [limpio],
       maxItems: 1,
@@ -324,11 +330,37 @@ export async function getKickProfile(
   }
 }
 
-export async function syncSocialAccountMetrics(
-  platform: "instagram" | "tiktok" | "youtube" | "kick",
-  username: string
-) {
-  if (platform === "instagram") {
+/** Lo que una lectura de perfil puede traer; todo opcional por red. */
+export interface MetricasDeCuenta {
+  fullName?: string | null;
+  biography?: string | null;
+  verified?: boolean;
+  profilePicUrl?: string | null;
+  profileUrl?: string | null;
+  followers?: number | null;
+  following?: number | null;
+  posts?: number | null;
+  engagementRate?: number | null;
+  avgLikes?: number | null;
+  avgViews?: number | null;
+}
+
+/**
+ * Como se lee el perfil de cada red que tiene actor.
+ *
+ * Es un `Record` sobre `RedSincronizable` y no una cadena de `if`
+ * precisamente por esto: `RedSincronizable` sale de que la ficha de la
+ * red traiga `actorDePerfil`, asi que ponerle actor a una red nueva
+ * deja este objeto sin una clave y **el compilador lo dice**. Antes
+ * eran cuatro comparaciones escritas a mano y una red que no estuviera
+ * en ellas no daba error: se quedaba sin seguidores, sin foto y sin
+ * metricas, en silencio.
+ */
+const LECTORES_DE_PERFIL: Record<
+  RedSincronizable,
+  (username: string) => Promise<MetricasDeCuenta | null>
+> = {
+  instagram: async (username) => {
     const data = await getInstagramProfile(username);
     if (!data) return null;
 
@@ -342,9 +374,9 @@ export async function syncSocialAccountMetrics(
       posts: data.postsCount,
       engagementRate: data.engagementRate,
     };
-  }
+  },
 
-  if (platform === "tiktok") {
+  tiktok: async (username) => {
     const data = await getTikTokProfile(username);
     if (!data) return null;
 
@@ -358,9 +390,9 @@ export async function syncSocialAccountMetrics(
       posts: data.videoCount,
       avgLikes: data.heartCount,
     };
-  }
+  },
 
-  if (platform === "youtube") {
+  youtube: async (username) => {
     const data = await getYouTubeProfile(username);
     if (!data) return null;
 
@@ -378,9 +410,9 @@ export async function syncSocialAccountMetrics(
       // engagement inventado lo dejaria comparandose de tu a tu con el
       // de Instagram, que si es real.
     };
-  }
+  },
 
-  if (platform === "kick") {
+  kick: async (username) => {
     const data = await getKickProfile(username);
     if (!data) return null;
 
@@ -394,14 +426,32 @@ export async function syncSocialAccountMetrics(
       // Kick no publica numero de emisiones ni visualizaciones
       // agregadas, asi que posts, avgViews y engagement quedan vacios.
     };
-  }
+  },
+};
 
-  return null;
+/**
+ * Lee el perfil de una cuenta, o null si esa red no se sincroniza.
+ *
+ * Acepta el `SocialPlatform.name` tal cual: quien llama ya no tiene que
+ * saberse la lista de redes con actor —ese era el otro sitio donde
+ * estaba escrita— y una red sin actor devuelve null, que es lo que es.
+ */
+export async function syncSocialAccountMetrics(
+  platform: string,
+  username: string
+): Promise<MetricasDeCuenta | null> {
+  const lector =
+    LECTORES_DE_PERFIL[platform.trim().toLowerCase() as RedSincronizable];
+  return lector ? lector(username) : null;
 }
 
-/** Plataformas en las que se puede DESCUBRIR cuentas, no solo consultarlas. */
-export const PLATAFORMAS_BUSCABLES = ["tiktok", "instagram", "youtube"] as const;
-export type PlataformaBuscable = (typeof PLATAFORMAS_BUSCABLES)[number];
+/**
+ * Plataformas en las que se puede DESCUBRIR cuentas, no solo
+ * consultarlas. Sale de que la ficha de la red traiga actor de
+ * busqueda; Kick tiene lector de perfil y no tiene esto.
+ */
+export const PLATAFORMAS_BUSCABLES = REDES_BUSCABLES;
+export type PlataformaBuscable = RedBuscable;
 
 export function esPlataformaBuscable(valor: string): valor is PlataformaBuscable {
   return (PLATAFORMAS_BUSCABLES as readonly string[]).includes(valor);
@@ -477,7 +527,7 @@ async function buscarEnTikTok(
   consultas: string[],
   maxPorConsulta: number
 ): Promise<Prospecto[]> {
-  const run = await client.actor("clockworks/tiktok-user-search-scraper").call({
+  const run = await client.actor(REDES.tiktok.actorDeBusqueda).call({
     searchQueries: consultas,
     maxProfilesPerQuery: maxPorConsulta,
   });
@@ -526,7 +576,7 @@ async function buscarEnInstagram(
 ): Promise<Prospecto[]> {
   const tandas = await Promise.all(
     consultas.map(async (consulta) => {
-      const run = await client.actor("apify/instagram-search-scraper").call({
+      const run = await client.actor(REDES.instagram.actorDeBusqueda).call({
         search: consulta,
         searchType: "user",
         searchLimit: maxPorConsulta,
@@ -582,7 +632,7 @@ async function buscarEnYouTube(
   consultas: string[],
   maxPorConsulta: number
 ): Promise<Prospecto[]> {
-  const run = await client.actor("streamers/youtube-scraper").call({
+  const run = await client.actor(REDES.youtube.actorDeBusqueda).call({
     searchQueries: consultas,
     maxResults: maxPorConsulta,
     maxResultsShorts: 0,
@@ -705,7 +755,7 @@ export async function obtenerMetricasDePublicaciones(
 
   try {
     if (plataforma === "tiktok") {
-      const run = await client.actor("clockworks/tiktok-video-scraper").call({
+      const run = await client.actor(REDES.tiktok.actorDePublicaciones).call({
         postURLs: limpias,
         shouldDownloadVideos: false,
         shouldDownloadCovers: false,
@@ -729,7 +779,7 @@ export async function obtenerMetricasDePublicaciones(
     }
 
     if (plataforma === "instagram") {
-      const run = await client.actor("apify/instagram-scraper").call({
+      const run = await client.actor(REDES.instagram.actorDePublicaciones).call({
         directUrls: limpias,
         resultsType: "posts",
         resultsLimit: limpias.length,
@@ -755,7 +805,7 @@ export async function obtenerMetricasDePublicaciones(
     }
 
     if (plataforma === "youtube") {
-      const run = await client.actor("streamers/youtube-scraper").call({
+      const run = await client.actor(REDES.youtube.actorDePublicaciones).call({
         startUrls: limpias.map((url) => ({ url })),
         maxResults: limpias.length,
         maxResultsShorts: 0,

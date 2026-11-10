@@ -63,20 +63,16 @@ export async function POST(req: Request) {
     // Sincronizar datos de Apify para cada cuenta social
     for (const account of profile.socialAccounts) {
       try {
-        const platformName = account.platform.name.toLowerCase();
+        // Que redes se sincronizan lo decide su ficha en lib/redes:
+        // una sin actor devuelve null y aqui no pasa nada. La lista
+        // estaba escrita a mano tambien en este punto.
+        const metrics = await syncSocialAccountMetrics(
+          account.platform.name,
+          account.username
+        );
 
-        if (platformName === "instagram" ||
-          platformName === "tiktok" ||
-          platformName === "youtube" ||
-          platformName === "kick") {
-          const metrics = await syncSocialAccountMetrics(
-            platformName as "instagram" | "tiktok" | "youtube" | "kick",
-            account.username
-          );
-
-          if (metrics) {
-            await updateSocialAccountMetrics(account.id, metrics);
-          }
+        if (metrics) {
+          await updateSocialAccountMetrics(account.id, metrics);
         }
       } catch (error) {
         console.error(

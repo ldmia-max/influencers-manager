@@ -32,8 +32,14 @@ export async function getActivePlatforms() {
 }
 
 export async function createPlatform(name: string, displayName: string) {
+  // El identificador se guarda en minusculas, asi que hay que buscarlo
+  // en minusculas. Comprobando el texto tal cual, crear «Twitch»
+  // despues de «twitch» no encontraba nada y reventaba contra la
+  // restriccion de la base en vez de dar este mensaje.
+  const identificador = name.trim().toLowerCase();
+
   const existing = await prisma.socialPlatform.findUnique({
-    where: { name },
+    where: { name: identificador },
   });
 
   if (existing) {
@@ -42,7 +48,7 @@ export async function createPlatform(name: string, displayName: string) {
 
   const resultado = await prisma.socialPlatform.create({
     data: {
-      name: name.toLowerCase(),
+      name: identificador,
       displayName,
     },
   });
