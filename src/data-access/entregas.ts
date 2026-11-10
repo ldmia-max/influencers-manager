@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, NotFoundError } from "./errors";
 import { unidadesEsperadas } from "@/lib/entregas";
-import { limpiarUrlPublicacion } from "@/lib/social-handles";
+import {
+  limpiarUrlPublicacion,
+  redDeUrl,
+  redesAdmitidas,
+} from "@/lib/social-handles";
 import { redAdmiteAlcance } from "@/lib/campaign-utils";
 import type { OrigenRetiro } from "@prisma/client";
 
@@ -13,26 +17,17 @@ import type { OrigenRetiro } from "@prisma/client";
  * registro en lugar de un autor externo.
  */
 
-/** Formatos que la aplicacion sabe leer al refrescar metricas. */
-const ANFITRIONES_VALIDOS = [
-  "instagram.com",
-  "www.instagram.com",
-  "tiktok.com",
-  "www.tiktok.com",
-  "vm.tiktok.com",
-  "youtube.com",
-  "www.youtube.com",
-  "youtu.be",
-  "kick.com",
-  "www.kick.com",
-];
-
 /**
  * Comprueba que el link es una URL de una red conocida.
  *
  * No se acepta cualquier texto porque de estos links salen las metricas:
  * uno mal pegado se descubriria semanas despues, al ver que esa entrega
  * es la unica sin datos.
+ *
+ * Los dominios validos salen de `redDeUrl` y no de una copia local.
+ * Habia una, y cuando se dio de alta Facebook desde Administracion esta
+ * lista no se entero: la red existia, sus formatos tambien, y pegar un
+ * enlace suyo respondia que no era una red reconocida.
  */
 function validarUrl(valor: string): string {
   const limpia = valor.trim();
@@ -51,9 +46,9 @@ function validarUrl(valor: string): string {
     throw new ValidationError("El link debe ser una dirección web (https://)");
   }
 
-  if (!ANFITRIONES_VALIDOS.includes(url.hostname.toLowerCase())) {
+  if (!redDeUrl(url.toString())) {
     throw new ValidationError(
-      `«${url.hostname}» no es una red reconocida. Se admiten links de Instagram, TikTok, YouTube y Kick.`
+      `«${url.hostname}» no es una red reconocida. Se admiten links de ${redesAdmitidas()}.`
     );
   }
 

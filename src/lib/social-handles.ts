@@ -23,6 +23,81 @@ export function esIdDeCanalYouTube(valor: string): boolean {
 }
 
 /**
+ * Los dominios de cada red, en UN solo sitio.
+ *
+ * Antes esta misma lista estaba escrita tres veces —aqui, en el
+ * validador de entregas y en la expresion que recorta el dominio al
+ * normalizar un usuario—, y anadir una red desde Administracion no
+ * tocaba ninguna de las tres. Facebook se dio de alta en produccion con
+ * sus formatos y pegar un enlace suyo seguia respondiendo «no es una
+ * red reconocida»: la plataforma existia en la base de datos y el
+ * codigo no sabia nada de ella.
+ *
+ * Todo lo que mira el dominio de un enlace sale de aqui. Para sumar una
+ * red hacen falta sus anfitriones en este mapa y su nombre visible en
+ * NOMBRE_VISIBLE; el resto —el aviso de red equivocada, el mensaje de
+ * error al pegar un link, el recorte del dominio— se ajusta solo.
+ */
+const RED_DEL_ANFITRION: Record<string, string> = {
+  "instagram.com": "instagram",
+  "www.instagram.com": "instagram",
+  "tiktok.com": "tiktok",
+  "www.tiktok.com": "tiktok",
+  "vm.tiktok.com": "tiktok",
+  "youtube.com": "youtube",
+  "www.youtube.com": "youtube",
+  "youtu.be": "youtube",
+  "kick.com": "kick",
+  "www.kick.com": "kick",
+  "facebook.com": "facebook",
+  "www.facebook.com": "facebook",
+  "web.facebook.com": "facebook",
+  "m.facebook.com": "facebook",
+  "fb.com": "facebook",
+  "fb.watch": "facebook",
+};
+
+/** Como se escribe cada red cuando se la nombra en pantalla. */
+const NOMBRE_VISIBLE: Record<string, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  kick: "Kick",
+  facebook: "Facebook",
+};
+
+/**
+ * «Instagram, TikTok, YouTube, Kick y Facebook», para los mensajes.
+ *
+ * Se arma de la propia lista en vez de escribirse a mano: la frase que
+ * habia enumeraba cuatro redes y era justo lo que leia alguien cuya red
+ * si estaba dada de alta.
+ */
+export function redesAdmitidas(): string {
+  const nombres = [...new Set(Object.values(RED_DEL_ANFITRION))].map(
+    (r) => NOMBRE_VISIBLE[r] ?? r
+  );
+  if (nombres.length < 2) return nombres.join("");
+  return `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+}
+
+/** El anfitrion sin el subdominio que solo dice desde que aparato se copio. */
+function anfitrionBase(hostname: string): string {
+  return hostname.toLowerCase().replace(/^(www|m|web)\./, "");
+}
+
+const DOMINIOS = Object.keys(RED_DEL_ANFITRION)
+  .sort((a, b) => b.length - a.length)
+  .map((h) => h.replace(/\./g, "\\."))
+  .join("|");
+
+/** Para recortar el dominio de una URL pegada. */
+const QUITAR_DOMINIO = new RegExp(`^(${DOMINIOS})/?`, "i");
+
+/** Para distinguir un identificador suelto de una direccion web. */
+const PARECE_DOMINIO = new RegExp(`(${DOMINIOS})`, "i");
+
+/**
  * Extrae el identificador a partir de lo que sea que hayan escrito.
  *
  * Acepta el identificador suelto, con arroba, la URL completa, sin
@@ -42,19 +117,29 @@ export function normalizarUsuarioSocial(
   const red = plataforma.trim().toLowerCase();
 
   // Sin barras ni puntos de dominio: ya es un identificador suelto.
-  if (!bruto.includes("/") && !/\b(instagram|tiktok|youtube|kick)\.com/i.test(bruto)) {
+  if (!bruto.includes("/") && !PARECE_DOMINIO.test(bruto)) {
     return bruto.replace(/^@/, "");
   }
 
-  // Se descarta el protocolo, el dominio, los parametros y el ancla,
-  // y queda la ruta en segmentos.
+  // Se descarta el protocolo y el dominio, y queda la ruta en segmentos.
+  // La consulta se guarda aparte porque en Facebook el identificador
+  // puede venir ahi: /profile.php?id=100000000000000.
   const sinProtocolo = bruto.replace(/^[a-z]+:\/\//i, "");
-  const sinDominio = sinProtocolo.replace(
-    /^(www\.|m\.)?(instagram|tiktok|youtube|kick)\.com\/?/i,
-    ""
-  );
-  const ruta = sinDominio.split(/[?#]/)[0];
+  const sinDominio = sinProtocolo.replace(QUITAR_DOMINIO, "");
+  const [ruta, consulta = ""] = sinDominio.split(/[?#]/);
   const partes = ruta.split("/").filter(Boolean);
+
+  if (red === "facebook") {
+    // Un perfil de Facebook se nombra de tres formas y las tres se
+    // pegan tal cual desde el navegador: la bonita /mipagina, la
+    // numerica /profile.php?id=100… —la que tiene cualquiera que no
+    // haya elegido nombre de usuario— y /people/Nombre-Visible/100….
+    const porConsulta = new URLSearchParams(consulta).get("id");
+    const primero = partes[0]?.toLowerCase();
+    if (primero === "profile.php") return porConsulta ?? "";
+    if (primero === "people") return partes[2] ?? partes[1] ?? "";
+    return partes[0]?.replace(/^@/, "") ?? bruto.replace(/^@/, "");
+  }
 
   if (partes.length === 0) return bruto.replace(/^@/, "");
 
@@ -86,6 +171,14 @@ export function urlDelPerfil(plataforma: string, usuario: string): string | null
   if (red === "instagram") return `https://www.instagram.com/${u}`;
   if (red === "tiktok") return `https://www.tiktok.com/@${u}`;
   if (red === "kick") return `https://kick.com/${u}`;
+  if (red === "facebook") {
+    // Un identificador todo numeros es un id de perfil, y esos solo
+    // abren por /profile.php?id=; facebook.com/100000000000000 no lleva
+    // a ninguna parte.
+    return /^\d+$/.test(u)
+      ? `https://www.facebook.com/profile.php?id=${u}`
+      : `https://www.facebook.com/${u}`;
+  }
   if (red === "youtube") {
     return esIdDeCanalYouTube(u)
       ? `https://www.youtube.com/channel/${u}`
@@ -117,7 +210,7 @@ export function idDePublicacion(url: string): string | null {
     return null;
   }
 
-  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const host = anfitrionBase(u.hostname);
   const partes = u.pathname.split("/").filter(Boolean);
 
   if (host === "instagram.com") {
@@ -155,9 +248,17 @@ export function idDePublicacion(url: string): string | null {
  * de quien copio el enlace: `stkn` es un token de la sesion de Instagram
  * de esa persona y no pinta nada en la base de datos.
  *
- * En YouTube el parametro `v` SI identifica el video, asi que ahi se
- * conserva y se descarta el resto.
+ * Pero no toda la consulta sobra: en YouTube `v` ES el video, y en
+ * Facebook el enlace de un video (/watch/?v=...) o de una entrada
+ * (/story.php?story_fbid=...&id=...) vive entero en la consulta.
+ * Vaciarla dejaria guardado un «facebook.com/watch/» que no lleva a
+ * ninguna publicacion, y el cliente se encontraria con eso.
  */
+const PARAMETROS_QUE_IDENTIFICAN: Record<string, string[]> = {
+  "youtube.com": ["v"],
+  "facebook.com": ["v", "story_fbid", "id"],
+};
+
 export function limpiarUrlPublicacion(url: string): string {
   let u: URL;
   try {
@@ -166,12 +267,14 @@ export function limpiarUrlPublicacion(url: string): string {
     return url;
   }
 
-  const host = u.hostname.toLowerCase().replace(/^www\./, "");
-  const v = host === "youtube.com" ? u.searchParams.get("v") : null;
+  const conservar = PARAMETROS_QUE_IDENTIFICAN[anfitrionBase(u.hostname)] ?? [];
+  const guardados = conservar
+    .map((nombre) => [nombre, u.searchParams.get(nombre)] as const)
+    .filter((par): par is readonly [string, string] => par[1] !== null);
 
   u.search = "";
   u.hash = "";
-  if (v) u.searchParams.set("v", v);
+  for (const [nombre, valor] of guardados) u.searchParams.set(nombre, valor);
 
   return u.toString();
 }
@@ -182,23 +285,11 @@ export function limpiarUrlPublicacion(url: string): string {
  * Devuelve el `name` de SocialPlatform en minusculas, o null si el
  * dominio no es de ninguna red conocida —o si ni siquiera es una URL—.
  *
- * Vive aqui y no en apify.ts porque la usa tambien el navegador, para
- * avisar cuando el link pegado no es de la red elegida, y apify.ts
- * arrastra `server-only` a traves de uploads.ts.
+ * Lee RED_DEL_ANFITRION, arriba. Vive aqui y no en apify.ts porque la
+ * usa tambien el navegador, para avisar cuando el link pegado no es de
+ * la red elegida, y apify.ts arrastra `server-only` a traves de
+ * uploads.ts.
  */
-const RED_DEL_ANFITRION: Record<string, string> = {
-  "instagram.com": "instagram",
-  "www.instagram.com": "instagram",
-  "tiktok.com": "tiktok",
-  "www.tiktok.com": "tiktok",
-  "vm.tiktok.com": "tiktok",
-  "youtube.com": "youtube",
-  "www.youtube.com": "youtube",
-  "youtu.be": "youtube",
-  "kick.com": "kick",
-  "www.kick.com": "kick",
-};
-
 export function redDeUrl(valor: string): string | null {
   try {
     return RED_DEL_ANFITRION[new URL(valor.trim()).hostname.toLowerCase()] ?? null;

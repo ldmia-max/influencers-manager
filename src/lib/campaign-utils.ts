@@ -350,6 +350,8 @@ const ALCANCE_POR_RED: Record<string, string | null> = {
   instagram: null,
   tiktok: "Total espectadores",
   youtube: "Espectadores únicos",
+  // Facebook tampoco: en Meta Business Suite la fila se llama "Alcance".
+  facebook: null,
 };
 
 export const REDES_CON_ALCANCE = Object.keys(ALCANCE_POR_RED);

@@ -382,10 +382,19 @@ Catch `ValidationError` → 400 and `NotFoundError` → 404. Dynamic params are 
 
 ### Adding a new platform
 
-Data-driven; no schema change needed:
-1. Add to the `platforms` array in `prisma/seed.ts`
-2. Add its `ServiceType` entries in the same seed (`BOTH` in `profileTypes` is the seed's convention, not a functional requirement — see above)
-3. Add an actor + normalizer branch in `src/lib/apify.ts` and to the `platformName === ...` checks in `POST /api/profiles` and `/api/profiles/[id]/sync`
+**The rows are data; the links are not.** A `SocialPlatform` and its `ServiceType`s can be created from Administración with no deploy — that is how Facebook arrived — and the app will let you pick the network, price its formats and contract them. What it will *not* do is accept a link, because every piece of link handling reads a hardcoded host list. Facebook was live in production, with its formats, and pasting one of its URLs answered *«no es una red reconocida»*; the network existed in the database and the code had never heard of it.
+
+**That list now lives in exactly one place: `RED_DEL_ANFITRION` in `src/lib/social-handles.ts`**, with a display name in `NOMBRE_VISIBLE` beside it. There used to be three copies — that map, `ANFITRIONES_VALIDOS` in `src/data-access/entregas.ts`, and the `(instagram|tiktok|youtube|kick)\.com` regex inside `normalizarUsuarioSocial` — plus a hand-written error sentence that enumerated four networks. `entregas.ts` now calls `redDeUrl()`, the two regexes are built from the map's keys, and the sentence comes from `redesAdmitidas()`. Adding the hosts and the display name is what makes a pasted link work.
+
+The rest, in the order it bites:
+
+1. **Hosts + display name** in `RED_DEL_ANFITRION` / `NOMBRE_VISIBLE` (`src/lib/social-handles.ts`). Include every subdomain people actually paste — `www.`, `m.`, `web.`, and the short domains (`fb.watch`, `youtu.be`). `anfitrionBase()` folds `www|m|web` away everywhere else.
+2. **A branch in `normalizarUsuarioSocial` and `urlDelPerfil`** only if the profile URL is not plain `dominio/handle`. Facebook needed one: a profile is `/mipagina`, `/profile.php?id=100…` (anyone who never chose a username) or `/people/Nombre/100…`, so the query string is parsed, and `urlDelPerfil` rebuilds the `profile.php?id=` form when the stored value is all digits — `facebook.com/100…` goes nowhere.
+3. **`PARAMETROS_QUE_IDENTIFICAN`** if the post link lives in the query string. `limpiarUrlPublicacion` empties the query to strip Instagram's `stkn`, and for Facebook that would turn `/watch/?v=123` into `/watch/` — a stored link that reaches no publication, which is what the client would open.
+4. **`idDePublicacion`** if there will be metrics: without it readings are matched by URL string, which is the silent-data-loss path described above.
+5. **An actor + normalizer branch in `src/lib/apify.ts`**, and the `platformName === …` checks in `POST /api/profiles` and `/api/profiles/[id]/sync`. **Dispatch is by lowercased name and an unknown network is skipped in silence** — no error, just a profile whose followers, picture and metrics never arrive. **Facebook is in that state today**: links work, scraping does not.
+6. **`ALCANCE_POR_RED`** in `src/lib/campaign-utils.ts` if the network reports reach to the author (Facebook does, and calls it "Alcance", so it maps to `null` — no translation needed).
+7. The seed's `platforms` array and its `ServiceType` entries, for fresh databases (`BOTH` in `profileTypes` is the seed's convention, not a functional requirement — see above). Remember `prisma/seed.ts` invalidates no cache tag, so a seeded network keeps showing the old list until the server restarts.
 
 ### Prisma singleton
 
