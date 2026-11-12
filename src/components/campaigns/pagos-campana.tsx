@@ -156,7 +156,7 @@ export function PagosCampana({
                     <th className="px-2 py-1 text-right font-medium">A reservar</th>
                     <th className="px-2 py-1 font-medium">Documentos</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
-                    <th className="px-2 py-1 text-center font-medium">Días</th>
+                    <th className="px-2 py-1 text-center font-medium">Vence en</th>
                     <th className="px-2 py-1 font-medium">Estado</th>
                     {puedeEditar && <th className="w-16 px-2 py-1" />}
                   </tr>

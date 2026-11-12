@@ -45,12 +45,12 @@ export function Dinero({
 }
 
 /**
- * El vencimiento: dias transcurridos desde la cuenta de cobro, de 1 en
- * 1 hasta 60, como en la hoja.
+ * El vencimiento: los dias que faltan para cumplir los 60 desde la
+ * cuenta de cobro. Cuenta hacia abajo; la hoja contaba hacia arriba y
+ * obligaba a restar de cabeza.
  *
- * Rojo desde el dia 50 y hasta que se pague, que es la regla que
- * llevaban a mano —y se les escapaban filas: tenian marcados el 51, 63,
- * 64, 66 y 72, pero no el 65, el 71 ni el 73.
+ * Rojo desde que quedan 10 y hasta que se pague, que es la regla que
+ * llevaban a mano —y se les escapaban filas.
  */
 export function Vencimiento({
   dias,
@@ -65,25 +65,27 @@ export function Vencimiento({
 }) {
   if (dias === null) return <span className="text-gray-300">—</span>;
 
-  if (pagado) {
-    return <span className="tabular-nums text-gray-500">{dias}</span>;
-  }
+  // Pagado, la cuenta atras ya no dice nada.
+  if (pagado) return <span className="text-gray-300">—</span>;
+
+  const restantes = DIAS_DE_PLAZO - dias;
+  const texto = vencido
+    ? `Vencida hace ${-restantes} ${-restantes === 1 ? "día" : "días"}`
+    : restantes === 0
+      ? "Vence hoy"
+      : `${restantes} ${restantes === 1 ? "día" : "días"}`;
+
   if (avisar) {
     return (
-      <span
-        className="flex items-center gap-1 font-semibold tabular-nums text-red-600"
-        title={
-          vencido
-            ? `Pasaron ${dias - DIAS_DE_PLAZO} días del plazo`
-            : `Quedan ${DIAS_DE_PLAZO - dias} días para pagar`
-        }
-      >
+      <span className="flex items-center gap-1 whitespace-nowrap font-semibold tabular-nums text-red-600">
         {vencido && <AlertTriangle className="h-3 w-3 shrink-0" />}
-        {dias}
+        {texto}
       </span>
     );
   }
-  return <span className="tabular-nums text-gray-700">{dias}</span>;
+  return (
+    <span className="whitespace-nowrap tabular-nums text-gray-700">{texto}</span>
+  );
 }
 
 export function EstadoBadge({

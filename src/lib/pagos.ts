@@ -226,10 +226,10 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
 
 export interface Plazo {
   /**
-   * Dias transcurridos desde la cuenta de cobro, de 1 en 1 hasta 60.
+   * Dias transcurridos desde la cuenta de cobro.
    *
-   * Cuenta hacia arriba, como en la hoja: el equipo lee "va por 51" y
-   * sabe que le quedan nueve. Lo comprobe contra sus 17 filas.
+   * Lo que se pinta son los que faltan (`Vencimiento` resta de los 60);
+   * este se queda para el aviso y para ordenar la tabla.
    */
   dias: number;
   /** El dia en que se cumplen los 60, "YYYY-MM-DD". */

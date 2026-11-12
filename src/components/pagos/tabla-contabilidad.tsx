@@ -39,7 +39,7 @@ const COLUMNAS = [
   { etiqueta: "Reteiva", alineacion: "right" },
   { etiqueta: "Valor a pagar", alineacion: "right" },
   { etiqueta: "Cuenta de cobro", alineacion: "left" },
-  { etiqueta: "Venc.", alineacion: "center" },
+  { etiqueta: "Vence en", alineacion: "center" },
   { etiqueta: "Documento", alineacion: "left" },
   { etiqueta: "Fecha de doc.", alineacion: "left" },
   { etiqueta: "Pagado", alineacion: "right" },
