@@ -778,6 +778,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                         <div className="flex items-center gap-3">
                           <div>
                             <h3 className="font-medium">{cp.profile.name}</h3>
+                            {cp.profile.city && (
+                              <p className="text-xs text-gray-500">
+                                {cp.profile.city.name}
+                              </p>
+                            )}
                             <Badge variant="secondary" className="mt-1">
                               {cp.profile.type === "INFLUENCER"
                                 ? "Influencer"

@@ -40,7 +40,7 @@ export interface PerfilCliente {
   status: string;
   participacion: string;
   rejectionReason: string | null;
-  profile: { id: string; name: string };
+  profile: { id: string; name: string; city: { name: string } | null };
   platforms: {
     id: string;
     status: string;
@@ -179,7 +179,12 @@ export function PerfilesCampanaCliente({
             }`}
           >
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <h3 className="font-medium text-gray-900">{cp.profile.name}</h3>
+              <div>
+                <h3 className="font-medium text-gray-900">{cp.profile.name}</h3>
+                {cp.profile.city && (
+                  <p className="text-xs text-gray-500">{cp.profile.city.name}</p>
+                )}
+              </div>
               <div className="flex flex-col items-end gap-2">
                 {/* El importe de un retirado ya no cuenta para la
                     campana, asi que decirlo como "total" induciria a

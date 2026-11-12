@@ -273,6 +273,7 @@ export async function getCampaignDetail(id: string) {
               type: true,
               gender: { select: { displayName: true } },
               department: { select: { name: true } },
+              city: { select: { name: true } },
               // Todas sus redes, no solo las contratadas en esta
               // campana: una pieza puede publicarse en una cuenta que el
               // creador tiene y que aqui no se contrato.
@@ -1329,7 +1330,9 @@ export async function getCampaignResultsForClient(
           // El motivo del rechazo lo escribio el propio cliente:
           // devolverselo es recordarle lo que dijo, no filtrar nada.
           rejectionReason: true,
-          profile: { select: { id: true, name: true } },
+          profile: {
+            select: { id: true, name: true, city: { select: { name: true } } },
+          },
           platforms: {
             select: {
               id: true,
