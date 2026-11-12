@@ -874,7 +874,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                         const reachPercent = getReachPercentage(followers, reachRanges);
 
                         return (
-                          <div key={cpp.id} className="ml-4 mb-4">
+                          <div key={cpp.id} className="mb-4">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 {getPlatformIcon(cpp.socialAccount.platform.name)}
