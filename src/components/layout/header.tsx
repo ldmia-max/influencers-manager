@@ -122,7 +122,7 @@ export function Header({ user }: HeaderProps) {
               className="h-10 w-auto"
               priority
             />
-            <span className="hidden sm:inline text-lg font-semibold text-gray-700">LDM People&apos;s</span>
+            <span className="hidden sm:inline text-lg font-semibold text-gray-700">Influencers Manager</span>
           </Link>
         </div>
         <div className="flex items-center gap-2">

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LDM People's | Los de Marketing",
+  title: "Influencers Manager | Los de Marketing",
   description: "Plataforma de gestión de influencers y creadores UGC",
 };
 

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { UserRole } from "@prisma/client";
 import { puede, type Recurso, type Rol } from "@/lib/permissions";
 
@@ -56,57 +63,70 @@ export function esRutaActiva(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function Sidebar({ role }: SidebarProps) {
+const claseOpcion = (activa: boolean) =>
+  cn(
+    "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    activa
+      ? "bg-marca text-white"
+      : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
+  );
+
+/**
+ * El menu en una franja bajo la cabecera, en lugar de la columna lateral.
+ *
+ * La columna se comia 16rem de ancho en cada pagina, y las tablas
+ * anchas —la de pagos sobre todo— no cabian y obligaban a desplazarse
+ * de lado. Si en una pantalla mediana las opciones no caben, se desplaza
+ * la franja, no la pagina. En movil sigue el menu de la hamburguesa.
+ */
+export function MenuSuperior({ role }: SidebarProps) {
   const pathname = usePathname();
+  const enAdmin = adminNavItems.some((i) => esRutaActiva(pathname, i.href));
 
   return (
-    <aside className="hidden md:block w-64 min-h-[calc(100vh-73px)] bg-white border-r border-gray-200">
-      <nav className="p-4 space-y-2">
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Menu
-          </h3>
-          {navDe(role).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                esRutaActiva(pathname, item.href)
-                  ? "bg-marca text-white"
-                  : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <NavIcon name={item.icon} />
-              {item.label}
-            </Link>
-          ))}
-        </div>
+    <nav className="hidden border-b border-gray-200 bg-white md:block">
+      <div className="flex items-center gap-1 overflow-x-auto px-4 py-2 md:px-6">
+        {navDe(role).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={claseOpcion(esRutaActiva(pathname, item.href))}
+          >
+            <NavIcon name={item.icon} />
+            {item.label}
+          </Link>
+        ))}
 
         {role === "ADMIN" && (
-          <div className="pt-4 border-t border-gray-200">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Administración
-            </h3>
-            {adminNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  esRutaActiva(pathname, item.href)
-                    ? "bg-marca text-white"
-                    : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <NavIcon name={item.icon} />
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          <>
+            <span className="mx-2 h-6 w-px shrink-0 bg-gray-200" />
+            <DropdownMenu>
+              <DropdownMenuTrigger className={claseOpcion(enAdmin)}>
+                <NavIcon name="user-cog" />
+                Administración
+                <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                {adminNavItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2",
+                        esRutaActiva(pathname, item.href) && "font-semibold text-marca"
+                      )}
+                    >
+                      <NavIcon name={item.icon} />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
-      </nav>
-    </aside>
+      </div>
+    </nav>
   );
 }
 

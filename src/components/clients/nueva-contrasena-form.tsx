@@ -44,7 +44,7 @@ function Cabecera({ titulo, descripcion }: { titulo: string; descripcion: string
           priority
         />
         <span className="text-lg font-semibold text-gray-700">
-          LDM People&apos;s
+          Influencers Manager
         </span>
       </div>
       <div>

@@ -70,7 +70,7 @@ export default function LoginPage() {
               className="h-14 w-auto"
               priority
             />
-            <span className="text-lg font-semibold text-gray-700">LDM People&apos;s</span>
+            <span className="text-lg font-semibold text-gray-700">Influencers Manager</span>
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">
