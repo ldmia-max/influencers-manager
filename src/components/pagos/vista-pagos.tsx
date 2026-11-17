@@ -202,7 +202,6 @@ function PestanaCampanas({
         <TablaCampanas
           grupos={porMesDesc(grupos)}
           conMes
-          conUtilidad
           {...permisos}
         />
       </CardContent>
@@ -271,7 +270,6 @@ function PestanaMeses({
               <TablaCampanas
                 grupos={campanas}
                 conMes={false}
-                conUtilidad={false}
                 {...permisos}
               />
             </CardContent>
@@ -285,12 +283,10 @@ function PestanaMeses({
 function TablaCampanas({
   grupos,
   conMes,
-  conUtilidad,
   ...permisos
 }: {
   grupos: GrupoDeCampana[];
   conMes: boolean;
-  conUtilidad: boolean;
 } & Permisos) {
   const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
   const alternar = (id: string) =>
@@ -308,7 +304,6 @@ function TablaCampanas({
     "Consumido",
     "Disponible",
     "A pagar a influencers",
-    ...(conUtilidad ? ["Utilidad"] : []),
     "Falta pagar",
     ...(conMes ? ["Mes"] : []),
     "Pagados",
@@ -318,7 +313,6 @@ function TablaCampanas({
     "Consumido",
     "Disponible",
     "A pagar a influencers",
-    "Utilidad",
     "Falta pagar",
   ]);
 
@@ -398,17 +392,6 @@ function TablaCampanas({
                       <Dinero valor={g.aPagar} />
                     )}
                   </td>
-                  {conUtilidad && (
-                    <td
-                      className={`px-2 py-2.5 text-right font-semibold tabular-nums ${
-                        g.utilidad >= 0 ? "text-green-700" : "text-red-600"
-                      }`}
-                      title="Lo que se queda la agencia. No sale de la agencia."
-                    >
-                      {g.utilidad < 0 ? "−" : ""}$
-                      {formatNumber(Math.round(Math.abs(g.utilidad)))}
-                    </td>
-                  )}
                   <td className="px-2 py-2.5 text-right tabular-nums">
                     <span
                       className={
