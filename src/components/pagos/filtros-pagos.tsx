@@ -40,7 +40,10 @@ export function FiltrosPagos({
     router.push(`/pagos?${siguiente.toString()}`);
   };
 
-  const hayFiltros = [...params.keys()].length > 0;
+  // La pestana viaja en la misma URL pero no es un filtro: ni enciende
+  // "Limpiar" ni se pierde al limpiar.
+  const hayFiltros = [...params.keys()].some((k) => k !== "vista");
+  const vista = params.get("vista");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -127,7 +130,7 @@ export function FiltrosPagos({
           size="sm"
           variant="ghost"
           className="h-8 text-xs text-gray-500"
-          onClick={() => router.push("/pagos")}
+          onClick={() => router.push(vista ? `/pagos?vista=${vista}` : "/pagos")}
         >
           <X className="mr-1 h-3.5 w-3.5" />
           Limpiar

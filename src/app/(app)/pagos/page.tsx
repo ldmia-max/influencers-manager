@@ -9,9 +9,10 @@ import {
   presupuestosDeCampanas,
 } from "@/data-access/pagos";
 import { formatNumber } from "@/lib/format";
+import { periodoDeCampana, periodoDeImputacion } from "@/lib/campaign-utils";
 import type { EstadoPago } from "@/lib/pagos";
 import { FiltrosPagos } from "@/components/pagos/filtros-pagos";
-import { TablaContabilidad } from "@/components/pagos/tabla-contabilidad";
+import { VistaPagos } from "@/components/pagos/vista-pagos";
 
 /**
  * Control de pagos, de todas las campanas.
@@ -29,8 +30,11 @@ export default async function PagosPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  // grid-cols-1 y no un div sin mas: la tabla de pagos mide 104rem y, en
+  // el <main> flexible, empujaba la pagina entera hacia la derecha en vez
+  // de desplazarse dentro de su tarjeta.
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 gap-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pagos</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -58,6 +62,7 @@ async function Listado({
 
   const filtros = await searchParams;
   const puedeRegistrar = puede(rol, "pagos", "borrar");
+  const puedeEditarDocumentos = puede(rol, "pagos", "actualizar");
 
   const pagos = await listarPagos({
     clientId: filtros.cliente,
@@ -93,29 +98,39 @@ async function Listado({
   const saldo = pagos.reduce((s, p) => s + p.saldo, 0);
   const porVencer = pagos.filter((p) => p.avisar && p.estado !== "PAGADO").length;
 
+  const hoy = periodoDeImputacion();
+
   return (
-    <div className="space-y-4">
-      <FiltrosPagos clientes={clientes} meses={meses} />
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-        <span className="text-gray-500">
-          {pagos.length} pago{pagos.length === 1 ? "" : "s"} en {grupos.length}{" "}
-          campaña{grupos.length === 1 ? "" : "s"}
-        </span>
-        <span className="text-gray-500">
-          Falta pagar:{" "}
-          <span className="font-semibold text-gray-900">
-            ${formatNumber(Math.round(saldo))}
-          </span>
-        </span>
-        {porVencer > 0 && (
-          <span className="font-medium text-red-600">
-            {porVencer} con el plazo encima
-          </span>
-        )}
-      </div>
-
-      <TablaContabilidad grupos={grupos} puedeRegistrar={puedeRegistrar} />
+    <div className="grid grid-cols-1 gap-4">
+      <VistaPagos
+        pagos={pagos}
+        grupos={grupos}
+        mesActual={periodoDeCampana(hoy.anio, hoy.mes)}
+        puedeRegistrar={puedeRegistrar}
+        puedeEditarDocumentos={puedeEditarDocumentos}
+        cabecera={
+          <>
+            <FiltrosPagos clientes={clientes} meses={meses} />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <span className="text-gray-500">
+                {pagos.length} pago{pagos.length === 1 ? "" : "s"} en {grupos.length}{" "}
+                campaña{grupos.length === 1 ? "" : "s"}
+              </span>
+              <span className="text-gray-500">
+                Falta pagar:{" "}
+                <span className="font-semibold text-gray-900">
+                  ${formatNumber(Math.round(saldo))}
+                </span>
+              </span>
+              {porVencer > 0 && (
+                <span className="font-medium text-orange-600">
+                  {porVencer} vencido{porVencer === 1 ? "" : "s"} o con 10 días o menos
+                </span>
+              )}
+            </div>
+          </>
+        }
+      />
 
       <p className="text-[11px] text-gray-500">
         El precio es lo pactado con el influencer, sin el 43% que se le carga

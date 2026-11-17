@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,22 +13,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
-import { mesLegible } from "@/lib/pagos";
-import type { GrupoDeCampana, PagoVista } from "@/data-access/pagos";
+import { calcularImpuestos, type TipoPersona } from "@/lib/pagos";
+import type { PagoVista } from "@/data-access/pagos";
 import { apiDelete, apiPatch, apiPost } from "@/services/api";
-import {
-  Adjunto,
-  Dinero,
-  EstadoBadge,
-  Otros,
-  Vencimiento,
-} from "@/components/pagos/piezas";
+import { Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
+import { PanelDocumentos } from "@/components/pagos/panel-documentos";
 
 const SIN_TIPO = "__sin__";
 
 /** Las columnas de la hoja de contabilidad, en su orden. */
 const COLUMNAS = [
   { etiqueta: "Nombre", alineacion: "left" },
+  { etiqueta: "Campaña", alineacion: "left" },
   { etiqueta: "Nombre completo", alineacion: "left" },
   { etiqueta: "Cómo factura", alineacion: "left" },
   { etiqueta: "Precio", alineacion: "right" },
@@ -44,159 +39,88 @@ const COLUMNAS = [
   { etiqueta: "Fecha de doc.", alineacion: "left" },
   { etiqueta: "Pagado", alineacion: "right" },
   { etiqueta: "Saldo", alineacion: "right" },
-  { etiqueta: "Documentos", alineacion: "left" },
+  { etiqueta: "Documentos", alineacion: "center" },
   { etiqueta: "Estado", alineacion: "left" },
 ] as const;
 
 /**
- * El cuadro de contabilidad: una tarjeta por campana, con las mismas
- * columnas de su hoja de calculo y su fila de totales.
+ * Las filas de pago, con las mismas columnas de la hoja de contabilidad.
  *
  * Se parece al Excel a proposito. El equipo lleva anios leyendo ese
  * cuadro y lo que se gana aqui —que los impuestos no se puedan olvidar,
- * que el aviso de los 50 dias no se escape, que el saldo cuadre solo—
- * no vale nada si ademas hay que aprender a leerlo de nuevo.
+ * que el vencimiento no se escape, que el saldo cuadre solo— no vale
+ * nada si ademas hay que aprender a leerlo de nuevo.
+ *
+ * La usan las tres pestanas de /pagos. `conCampana` anade la columna de
+ * la campana, que hace falta en la lista suelta de influencers —uno
+ * puede estar en varias— y sobra dentro de una campana desplegada.
+ *
+ * Todas las filas en blanco: el color lo lleva el dato que importa —el
+ * vencimiento, el contador de documentos, el estado—, no la fila.
  */
-export function TablaContabilidad({
-  grupos,
+export function TablaPagos({
+  pagos,
   puedeRegistrar,
+  puedeEditarDocumentos,
+  conCampana = false,
+  conTotales = true,
 }: {
-  grupos: GrupoDeCampana[];
+  pagos: PagoVista[];
   puedeRegistrar: boolean;
+  puedeEditarDocumentos: boolean;
+  conCampana?: boolean;
+  conTotales?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
-
-  if (grupos.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-gray-500">
-          No hay pagos con esos filtros.
-        </CardContent>
-      </Card>
-    );
-  }
+  const columnas = COLUMNAS.filter(
+    (c) => conCampana || c.etiqueta !== "Campaña",
+  );
+  const ancho = columnas.length + (puedeRegistrar ? 1 : 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
-
-      {grupos.map((g) => (
-        <Card key={g.campanaId}>
-          <CardHeader className="space-y-2 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-base">
-                <Link
-                  href={`/campaigns/${g.campanaId}`}
-                  prefetch={false}
-                  className="hover:underline"
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[104rem] bg-white text-xs">
+          <thead>
+            <tr className="text-gray-500">
+              {columnas.map((c) => (
+                <th
+                  key={c.etiqueta}
+                  className={`px-2 py-1 font-medium text-${c.alineacion}`}
                 >
-                  {g.campana}
-                </Link>
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  {g.cliente}
-                </span>
-              </CardTitle>
-              {g.mes && (
-                <span className="text-xs capitalize text-gray-500">
-                  {mesLegible(g.mes)}
-                </span>
-              )}
-            </div>
-
-            {/* El control que hacen hoy: lo que hay que girar contra el
-                presupuesto de la campana. Lo consumido va con el 43%
-                —es lo que ve el cliente—; el pago, sin el. La utilidad
-                es interna y no sale de la agencia. */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500">
-              <span>
-                Presupuesto <Dinero valor={g.presupuesto} destacado />
-              </span>
-              <span title="Lo contratado al precio que ve el cliente, con el margen incluido">
-                Consumido <Dinero valor={g.consumido} destacado />
-              </span>
-              <span title="Lo que queda libre del presupuesto">
-                Disponible <Dinero valor={g.disponible} destacado />
-              </span>
-              <span title="Lo que de verdad hay que girarles, con sus impuestos y ajustes">
-                A pagar a influencers <Dinero valor={g.aPagar} destacado />
-              </span>
-              <span title="Lo que se queda la agencia. No sale de la agencia.">
-                Utilidad{" "}
-                <span
-                  className={
-                    g.utilidad >= 0
-                      ? "font-semibold text-green-700"
-                      : "font-semibold text-red-600"
-                  }
-                >
-                  {g.utilidad < 0 ? "−" : ""}$
-                  {formatNumber(Math.round(Math.abs(g.utilidad)))}
-                </span>
-              </span>
-              <span title="Lo que esta campaña todavía pide para terminar de pagar">
-                Falta pagar{" "}
-                <span
-                  className={
-                    g.saldo === 0
-                      ? "font-semibold text-green-700"
-                      : "font-semibold text-gray-900"
-                  }
-                >
-                  ${formatNumber(Math.round(g.saldo))}
-                </span>
-              </span>
-            </div>
-
-            {/* No deberia pasar nunca: el presupuesto cubre base + 43% y
-                el pago es como mucho base + 19%. Si pasa, algo se
-                contrato fuera de cuenta y hay que verlo. */}
-            {g.excedido && (
-              <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
-                {`Lo que hay que pagar a los influencers ($${formatNumber(
-                  Math.round(g.aPagar)
-                )}) no es menor que el presupuesto de la campaña ($${formatNumber(
-                  Math.round(g.presupuesto)
-                )}). Revísalo con mercadeo antes de girar.`}
-              </p>
-            )}
-          </CardHeader>
-
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[104rem] text-xs">
-                <thead>
-                  <tr className="text-gray-500">
-                    {COLUMNAS.map((c) => (
-                      <th
-                        key={c.etiqueta}
-                        className={`px-2 py-1 font-medium text-${c.alineacion}`}
-                      >
-                        {c.etiqueta}
-                      </th>
-                    ))}
-                    {puedeRegistrar && <th className="w-10 px-2 py-1" />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.pagos.map((p) => (
-                    <Fila
-                      key={p.campaignProfileId}
-                      pago={p}
-                      puedeRegistrar={puedeRegistrar}
-                      onError={setError}
-                    />
-                  ))}
-                </tbody>
-                <Totales pagos={g.pagos} puedeRegistrar={puedeRegistrar} />
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                  {c.etiqueta}
+                </th>
+              ))}
+              {puedeRegistrar && <th className="w-10 px-2 py-1" />}
+            </tr>
+          </thead>
+          <tbody>
+            {pagos.map((p) => (
+              <Fila
+                key={p.campaignProfileId}
+                pago={p}
+                puedeRegistrar={puedeRegistrar}
+                puedeEditarDocumentos={puedeEditarDocumentos}
+                conCampana={conCampana}
+                ancho={ancho}
+                onError={setError}
+              />
+            ))}
+          </tbody>
+          {conTotales && (
+            <Totales
+              pagos={pagos}
+              puedeRegistrar={puedeRegistrar}
+              conCampana={conCampana}
+            />
+          )}
+        </table>
+      </div>
     </div>
   );
 }
@@ -204,11 +128,14 @@ export function TablaContabilidad({
 function Totales({
   pagos,
   puedeRegistrar,
+  conCampana,
 }: {
   pagos: PagoVista[];
   puedeRegistrar: boolean;
+  conCampana: boolean;
 }) {
-  const sumar = (f: (p: PagoVista) => number) => pagos.reduce((s, p) => s + f(p), 0);
+  const sumar = (f: (p: PagoVista) => number) =>
+    pagos.reduce((s, p) => s + f(p), 0);
   // El signo va a mano: formatNumber borra todo lo que no sea digito.
   const celda = (v: number) => (
     <td className="px-2 py-2 text-right tabular-nums">
@@ -219,7 +146,7 @@ function Totales({
   return (
     <tfoot>
       <tr className="border-t-2 border-gray-300 font-semibold text-gray-900">
-        <td className="px-2 py-2" colSpan={3}>
+        <td className="px-2 py-2" colSpan={conCampana ? 4 : 3}>
           Total
         </td>
         {celda(sumar((p) => p.base))}
@@ -244,10 +171,16 @@ function Totales({
 function Fila({
   pago: p,
   puedeRegistrar,
+  puedeEditarDocumentos,
+  conCampana,
+  ancho,
   onError,
 }: {
   pago: PagoVista;
   puedeRegistrar: boolean;
+  puedeEditarDocumentos: boolean;
+  conCampana: boolean;
+  ancho: number;
   onError: (e: string | null) => void;
 }) {
   const [editando, setEditando] = useState(false);
@@ -261,6 +194,9 @@ function Fila({
     ajuste: "",
     motivoAjuste: "",
     loPagaElCliente: false,
+    fechaPago: "",
+    valorPagado: "",
+    valorTocado: false,
   });
   const [abono, setAbono] = useState({ fecha: "", valor: "", observacion: "" });
 
@@ -287,22 +223,70 @@ function Fila({
       ajuste: p.ajuste ? String(p.ajuste) : "",
       motivoAjuste: p.motivoAjuste ?? "",
       loPagaElCliente: p.loPagaElCliente,
+      fechaPago: "",
+      valorPagado: "",
+      valorTocado: false,
     });
     setEditando(true);
   };
+
+  // Lo que falta girar con lo que dice el formulario ahora mismo: el
+  // valor a pagar del tipo elegido, mas o menos el ajuste, menos lo ya
+  // pagado. Sin tipo no hay cifra: el IVA y la retencion dependen de el.
+  const ajusteBorrador = Number(borrador.ajuste.trim() || 0);
+  const debidoBorrador =
+    borrador.tipo === SIN_TIPO || !Number.isFinite(ajusteBorrador)
+      ? null
+      : Math.max(
+          Math.round(
+            calcularImpuestos(p.base, borrador.tipo as TipoPersona)
+              .valorAPagar +
+              ajusteBorrador -
+              p.abonado,
+          ),
+          0,
+        );
+  // Mientras nadie lo escriba a mano, el valor sigue al calculo: cambiar
+  // el tipo o el ajuste lo recalcula.
+  const valorPagado = borrador.valorTocado
+    ? borrador.valorPagado
+    : borrador.fechaPago && debidoBorrador
+      ? String(debidoBorrador)
+      : "";
+  const valorPagadoNum = Number(valorPagado.trim() || 0);
+  const errorPago =
+    !borrador.fechaPago && !valorPagado.trim()
+      ? null
+      : debidoBorrador === null
+        ? "Elige cómo factura para calcular el valor a pagar."
+        : !borrador.fechaPago
+          ? "Falta la fecha de pago."
+          : !Number.isFinite(valorPagadoNum) || valorPagadoNum <= 0
+            ? "El valor pagado debe ser mayor que cero."
+            : valorPagadoNum > debidoBorrador
+              ? `No puede superar lo que falta por pagar ($${formatNumber(debidoBorrador)}).`
+              : null;
 
   const i = p.impuestos;
 
   return (
     <>
-      <tr
-        className={`border-t border-gray-200/70 align-top text-gray-600 ${
-          pagado ? "bg-sky-50" : "odd:bg-marca/5"
-        }`}
-      >
+      <tr className="border-t border-gray-200/70 bg-white align-top text-gray-600">
         <td className="px-2 py-2">
           <p className="font-medium text-gray-900">{p.influencer}</p>
         </td>
+        {conCampana && (
+          <td className="px-2 py-2">
+            <Link
+              href={`/campaigns/${p.campanaId}`}
+              prefetch={false}
+              className="font-medium text-gray-900 hover:underline"
+            >
+              {p.campana}
+            </Link>
+            <p className="text-[11px] text-gray-400">{p.cliente}</p>
+          </td>
+        )}
         <td className="px-2 py-2">
           {p.nombreCompleto ? (
             <p className="text-gray-900">{p.nombreCompleto}</p>
@@ -337,7 +321,11 @@ function Fila({
           <Dinero valor={p.base} destacado />
         </td>
         <td className="px-2 py-2 text-right tabular-nums">
-          {i ? <Dinero valor={i.iva} /> : <span className="text-gray-300">—</span>}
+          {i ? (
+            <Dinero valor={i.iva} />
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
         </td>
         <td className="px-2 py-2 text-right tabular-nums">
           {i ? (
@@ -376,12 +364,7 @@ function Fila({
           )}
         </td>
         <td className="px-2 py-2 text-center">
-          <Vencimiento
-            dias={p.dias}
-            avisar={p.avisar}
-            vencido={p.vencido}
-            pagado={pagado}
-          />
+          <Vencimiento dias={p.dias} pagado={pagado} />
         </td>
         <td className="px-2 py-2">
           {p.documento || <span className="text-gray-400">—</span>}
@@ -400,7 +383,7 @@ function Fila({
             <p className="text-[11px] text-gray-400">
               {p.abonos.length} abono{p.abonos.length === 1 ? "" : "s"} ·{" "}
               {new Date(p.abonos[p.abonos.length - 1].fecha).toLocaleDateString(
-                "es-CO"
+                "es-CO",
               )}
             </p>
           )}
@@ -422,27 +405,8 @@ function Fila({
           )}
         </td>
 
-        <td className="space-y-1 px-2 py-2">
-          <Adjunto
-            url={p.cuentaCobroUrl}
-            nombre={p.cuentaCobroNombre}
-            etiqueta="cuenta de cobro"
-          />
-          <Adjunto
-            url={p.certificadoUrl}
-            nombre={p.certificadoNombre}
-            etiqueta="certificado"
-          />
-          <Adjunto url={p.rutUrl} nombre={p.rutNombre} etiqueta="RUT" />
-          <Adjunto
-            url={p.contratoUrl}
-            nombre={p.contratoNombre}
-            etiqueta="contrato"
-          />
-          <Adjunto url={p.arlUrl} nombre={p.arlNombre} etiqueta="ARL" />
-          {/* Aqui solo se miran: quitarlos es de mercadeo, que es quien
-              los subio y sabe que son. */}
-          <Otros documentos={p.otros} />
+        <td className="px-2 py-2 text-center">
+          <PanelDocumentos pago={p} puedeEditar={puedeEditarDocumentos} />
         </td>
         <td className="px-2 py-2">
           <EstadoBadge estado={p.estado} loPagaElCliente={p.loPagaElCliente} />
@@ -451,29 +415,40 @@ function Fila({
         {puedeRegistrar && (
           <td className="px-2 py-2">
             <div className="flex items-center gap-1">
-              <button
+              <Button
                 type="button"
-                title="Registrar"
-                className="text-gray-400 hover:text-violet-700"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
                 onClick={abrir}
               >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Anotar un pago"
-                className="text-gray-400 hover:text-violet-700"
-                onClick={() => {
-                  setAbono({
-                    fecha: new Date().toISOString().slice(0, 10),
-                    valor: String(Math.round(p.saldo)),
-                    observacion: "",
-                  });
-                  setAbonando(true);
-                }}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
+                <Pencil className="mr-1 h-3 w-3" />
+                Registrar
+              </Button>
+              {!pagado && !p.loPagaElCliente && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={!p.tipoPersona}
+                  title={
+                    p.tipoPersona
+                      ? "Anotar lo que se le giró"
+                      : "Primero registra cómo factura: de eso sale el valor a pagar"
+                  }
+                  onClick={() => {
+                    setAbono({
+                      fecha: new Date().toISOString().slice(0, 10),
+                      valor: String(Math.round(p.saldo)),
+                      observacion: "",
+                    });
+                    setAbonando(true);
+                  }}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Pagar
+                </Button>
+              )}
             </div>
           </td>
         )}
@@ -481,8 +456,8 @@ function Fila({
 
       {/* Los abonos anotados, bajo su fila */}
       {p.abonos.length > 0 && (
-        <tr className={pagado ? "bg-sky-50" : "odd:bg-marca/5"}>
-          <td className="px-2 pb-2 text-[11px] text-gray-500" colSpan={18}>
+        <tr className="bg-white">
+          <td className="px-2 pb-2 text-[11px] text-gray-500" colSpan={ancho}>
             {p.abonos.map((a) => (
               <span key={a.id} className="mr-4 inline-flex items-center gap-1">
                 {new Date(a.fecha).toLocaleDateString("es-CO")} · $
@@ -496,7 +471,9 @@ function Fila({
                     className="text-gray-400 hover:text-red-600"
                     onClick={() =>
                       correr(() =>
-                        apiDelete(`/api/pagos/${p.campaignProfileId}/abonos/${a.id}`)
+                        apiDelete(
+                          `/api/pagos/${p.campaignProfileId}/abonos/${a.id}`,
+                        ),
                       )
                     }
                   >
@@ -512,7 +489,7 @@ function Fila({
       {/* Registrar: documento, fecha, tipo y ajuste */}
       {editando && (
         <tr className="bg-white">
-          <td className="px-2 py-3" colSpan={18}>
+          <td className="px-2 py-3" colSpan={ancho}>
             <div className="flex flex-wrap items-end gap-3">
               <Campo etiqueta="Documento (DIAN)">
                 <Input
@@ -530,7 +507,10 @@ function Fila({
                   type="date"
                   value={borrador.fechaDocumento}
                   onChange={(e) =>
-                    setBorrador((b) => ({ ...b, fechaDocumento: e.target.value }))
+                    setBorrador((b) => ({
+                      ...b,
+                      fechaDocumento: e.target.value,
+                    }))
                   }
                   className="h-7 w-36 text-xs"
                 />
@@ -540,7 +520,10 @@ function Fila({
                   type="date"
                   value={borrador.fechaCuentaCobro}
                   onChange={(e) =>
-                    setBorrador((b) => ({ ...b, fechaCuentaCobro: e.target.value }))
+                    setBorrador((b) => ({
+                      ...b,
+                      fechaCuentaCobro: e.target.value,
+                    }))
                   }
                   className="h-7 w-36 text-xs"
                 />
@@ -595,27 +578,99 @@ function Fila({
                 />
                 Lo paga el cliente
               </label>
+            </div>
 
+            {/* El pago, en el mismo gesto que el registro: el valor sale
+                solo del tipo y del ajuste, y se puede corregir a mano
+                para un pago parcial. */}
+            {!pagado && !borrador.loPagaElCliente && (
+              <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
+                <Campo etiqueta="Fecha de pago">
+                  <Input
+                    type="date"
+                    value={borrador.fechaPago}
+                    onChange={(e) =>
+                      setBorrador((b) => ({ ...b, fechaPago: e.target.value }))
+                    }
+                    className="h-7 w-36 text-xs"
+                  />
+                </Campo>
+                <Campo etiqueta="Valor pagado">
+                  <Input
+                    inputMode="numeric"
+                    placeholder={debidoBorrador ? String(debidoBorrador) : "0"}
+                    value={valorPagado}
+                    onChange={(e) =>
+                      setBorrador((b) => ({
+                        ...b,
+                        valorPagado: e.target.value.replace(/\D/g, ""),
+                        valorTocado: true,
+                      }))
+                    }
+                    className="h-7 w-32 text-xs"
+                  />
+                </Campo>
+                <p className="pb-1.5 text-[11px] text-gray-500">
+                  {debidoBorrador === null
+                    ? "Elige cómo factura para calcular el valor."
+                    : `Falta por pagar: $${formatNumber(debidoBorrador)} (${
+                        borrador.tipo === "NATURAL"
+                          ? "natural: sin IVA, 10% de retención"
+                          : "jurídica: IVA 19%, 11% de retención"
+                      }${
+                        ajusteBorrador
+                          ? `, ajuste ${ajusteBorrador > 0 ? "+" : "−"}$${formatNumber(Math.abs(ajusteBorrador))}`
+                          : ""
+                      }${p.abonado ? `, ya pagado $${formatNumber(Math.round(p.abonado))}` : ""})`}
+                </p>
+                {errorPago && (
+                  <p className="pb-1.5 text-[11px] font-medium text-red-600">
+                    {errorPago}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-end gap-3">
               <div className="flex items-center gap-1 pb-1">
                 <Button
                   size="sm"
                   className="h-7 text-xs"
-                  disabled={guardando}
+                  disabled={guardando || !!errorPago}
                   onClick={() =>
-                    correr(() =>
-                      apiPatch(`/api/pagos/${p.campaignProfileId}/registro`, {
-                        documento: borrador.documento.trim() || null,
-                        fechaDocumento: borrador.fechaDocumento || null,
-                        fechaCuentaCobro: borrador.fechaCuentaCobro || null,
-                        tipoPersona:
-                          borrador.tipo === SIN_TIPO ? null : borrador.tipo,
-                        ajuste: borrador.ajuste.trim()
-                          ? Number(borrador.ajuste)
-                          : null,
-                        motivoAjuste: borrador.motivoAjuste.trim() || null,
-                        loPagaElCliente: borrador.loPagaElCliente,
-                      })
-                    )
+                    correr(async () => {
+                      await apiPatch(
+                        `/api/pagos/${p.campaignProfileId}/registro`,
+                        {
+                          documento: borrador.documento.trim() || null,
+                          fechaDocumento: borrador.fechaDocumento || null,
+                          fechaCuentaCobro: borrador.fechaCuentaCobro || null,
+                          tipoPersona:
+                            borrador.tipo === SIN_TIPO ? null : borrador.tipo,
+                          ajuste: borrador.ajuste.trim()
+                            ? Number(borrador.ajuste)
+                            : null,
+                          motivoAjuste: borrador.motivoAjuste.trim() || null,
+                          loPagaElCliente: borrador.loPagaElCliente,
+                        },
+                      );
+                      // Despues del registro: el servidor mide el saldo
+                      // con el tipo y el ajuste recien guardados.
+                      if (
+                        borrador.fechaPago &&
+                        valorPagadoNum > 0 &&
+                        !borrador.loPagaElCliente
+                      ) {
+                        await apiPost(
+                          `/api/pagos/${p.campaignProfileId}/abonos`,
+                          {
+                            fecha: borrador.fechaPago,
+                            valor: valorPagadoNum,
+                            observacion: null,
+                          },
+                        );
+                      }
+                    })
                   }
                 >
                   {guardando ? (
@@ -643,13 +698,15 @@ function Fila({
       {/* Anotar un pago */}
       {abonando && (
         <tr className="bg-white">
-          <td className="px-2 py-3" colSpan={18}>
+          <td className="px-2 py-3" colSpan={ancho}>
             <div className="flex flex-wrap items-end gap-3">
               <Campo etiqueta="Fecha de pago">
                 <Input
                   type="date"
                   value={abono.fecha}
-                  onChange={(e) => setAbono((a) => ({ ...a, fecha: e.target.value }))}
+                  onChange={(e) =>
+                    setAbono((a) => ({ ...a, fecha: e.target.value }))
+                  }
                   className="h-7 w-36 text-xs"
                 />
               </Campo>
@@ -657,7 +714,9 @@ function Fila({
                 <Input
                   inputMode="numeric"
                   value={abono.valor}
-                  onChange={(e) => setAbono((a) => ({ ...a, valor: e.target.value }))}
+                  onChange={(e) =>
+                    setAbono((a) => ({ ...a, valor: e.target.value }))
+                  }
                   className="h-7 w-32 text-xs"
                 />
               </Campo>
@@ -682,7 +741,7 @@ function Fila({
                         fecha: abono.fecha,
                         valor: Number(abono.valor),
                         observacion: abono.observacion.trim() || null,
-                      })
+                      }),
                     )
                   }
                 >

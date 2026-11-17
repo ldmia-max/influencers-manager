@@ -737,6 +737,21 @@ export async function registrarAbono(
     );
   }
 
+  // Lo que se gira depende de como factura: sin el tipo no se sabe ni el
+  // IVA ni la retencion, asi que cualquier cifra seria inventada. Y no se
+  // paga mas de lo que se debe: el saldo ya incluye el ajuste.
+  const actual = await obtenerPago(campaignProfileId);
+  if (!actual.tipoPersona) {
+    throw new ValidationError(
+      "Antes de anotar el pago confirma cómo factura (natural o jurídica): de eso salen el IVA y la retención."
+    );
+  }
+  if (datos.valor > actual.saldo + 0.5) {
+    throw new ValidationError(
+      `El valor supera lo que falta por pagar ($${Math.round(actual.saldo).toLocaleString("es-CO")}).`
+    );
+  }
+
   await prisma.abonoPago.create({
     data: {
       pagoId: pago.id,

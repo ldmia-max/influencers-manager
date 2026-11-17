@@ -353,8 +353,6 @@ export function PagosCampana({
                       <td className="px-2 py-2 text-center">
                         <Vencimiento
                           dias={p.dias}
-                          avisar={p.avisar}
-                          vencido={p.vencido}
                           pagado={p.estado === "PAGADO"}
                         />
                       </td>

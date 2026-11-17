@@ -45,22 +45,19 @@ export function Dinero({
 }
 
 /**
- * El vencimiento: los dias que faltan para cumplir los 60 desde la
- * cuenta de cobro. Cuenta hacia abajo; la hoja contaba hacia arriba y
- * obligaba a restar de cabeza.
+ * Los dias que faltan para cumplir los 60 desde la cuenta de cobro.
+ * Cuenta hacia abajo; la hoja contaba hacia arriba y obligaba a restar
+ * de cabeza.
  *
- * Rojo desde que quedan 10 y hasta que se pague, que es la regla que
- * llevaban a mano —y se les escapaban filas.
+ * Verde con mas de 10, naranja con 10 o menos, rojo con 1 o menos, y
+ * pasado el plazo rojo y en negativo: "-3 días" son los que lleva
+ * vencida.
  */
 export function Vencimiento({
   dias,
-  avisar,
-  vencido,
   pagado,
 }: {
   dias: number | null;
-  avisar: boolean;
-  vencido: boolean;
   pagado: boolean;
 }) {
   if (dias === null) return <span className="text-gray-300">—</span>;
@@ -69,22 +66,28 @@ export function Vencimiento({
   if (pagado) return <span className="text-gray-300">—</span>;
 
   const restantes = DIAS_DE_PLAZO - dias;
-  const texto = vencido
-    ? `Vencida hace ${-restantes} ${-restantes === 1 ? "día" : "días"}`
-    : restantes === 0
+  const texto =
+    restantes === 0
       ? "Vence hoy"
-      : `${restantes} ${restantes === 1 ? "día" : "días"}`;
+      : `${restantes < 0 ? "−" : ""}${Math.abs(restantes)} ${
+          Math.abs(restantes) === 1 ? "día" : "días"
+        }`;
 
-  if (avisar) {
-    return (
-      <span className="flex items-center gap-1 whitespace-nowrap font-semibold tabular-nums text-red-600">
-        {vencido && <AlertTriangle className="h-3 w-3 shrink-0" />}
-        {texto}
-      </span>
-    );
-  }
+  const color =
+    restantes <= 1
+      ? "font-semibold text-red-600"
+      : restantes <= 10
+        ? "font-semibold text-orange-600"
+        : "text-green-700";
+
   return (
-    <span className="whitespace-nowrap tabular-nums text-gray-700">{texto}</span>
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap tabular-nums ${color}`}
+      title={restantes < 0 ? `Vencida hace ${-restantes} días` : undefined}
+    >
+      {restantes < 0 && <AlertTriangle className="h-3 w-3 shrink-0" />}
+      {texto}
+    </span>
   );
 }
 
