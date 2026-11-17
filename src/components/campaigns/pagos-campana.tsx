@@ -14,14 +14,9 @@ import {
 import { formatNumber } from "@/lib/format";
 import { ETIQUETA_TIPO_PERSONA } from "@/lib/pagos";
 import type { PagoVista } from "@/data-access/pagos";
-import { apiDelete, apiPatch, apiPost } from "@/services/api";
-import {
-  Adjunto,
-  Dinero,
-  EstadoBadge,
-  Otros,
-  Vencimiento,
-} from "@/components/pagos/piezas";
+import { apiPatch } from "@/services/api";
+import { Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
+import { PanelDocumentos } from "@/components/pagos/panel-documentos";
 
 const SIN_TIPO = "__sin__";
 
@@ -52,24 +47,6 @@ export function PagosCampana({
   });
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  /**
-   * Los papeles sueltos van por su propia ruta: se suman y se quitan de
-   * uno en uno, no se reemplazan como los huecos con etiqueta.
-   *
-   * Recarga la pagina igual que `guardar`, y por lo mismo: el estado
-   * del pago es calculado y router.refresh() no repinta en produccion.
-   */
-  const enviar = async (url: string, metodo: "POST" | "DELETE", datos?: unknown) => {
-    setError(null);
-    try {
-      if (metodo === "POST") await apiPost(url, datos);
-      else await apiDelete(url);
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Algo falló");
-    }
-  };
 
   const guardar = async (id: string, datos: Record<string, unknown>) => {
     setOcupado(id);
@@ -154,7 +131,7 @@ export function PagosCampana({
                       Precio base
                     </th>
                     <th className="px-2 py-1 text-right font-medium">A reservar</th>
-                    <th className="px-2 py-1 font-medium">Documentos</th>
+                    <th className="px-2 py-1 text-center font-medium">Documentos</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
                     <th className="px-2 py-1 text-center font-medium">Vence en</th>
                     <th className="px-2 py-1 font-medium">Estado</th>
@@ -231,85 +208,8 @@ export function PagosCampana({
                           <p className="text-[11px] text-gray-400">peor caso</p>
                         )}
                       </td>
-                      <td className="space-y-1 px-2 py-2">
-                        <Adjunto
-                          url={p.cuentaCobroUrl}
-                          nombre={p.cuentaCobroNombre}
-                          etiqueta="cuenta de cobro"
-                          puedeSubir={puedeEditar}
-                          onSubido={(doc) =>
-                            guardar(p.campaignProfileId, { cuentaCobro: doc })
-                          }
-                        />
-                        <Adjunto
-                          url={p.certificadoUrl}
-                          nombre={p.certificadoNombre}
-                          etiqueta="certificado"
-                          puedeSubir={puedeEditar}
-                          onSubido={(doc) =>
-                            guardar(p.campaignProfileId, { certificado: doc })
-                          }
-                        />
-                        {p.tipoVerificado && !p.rutUrl ? (
-                          <p className="text-[11px] text-gray-400">
-                            RUT ya verificado
-                          </p>
-                        ) : (
-                          <Adjunto
-                            url={p.rutUrl}
-                            nombre={p.rutNombre}
-                            etiqueta="RUT"
-                            puedeSubir={puedeEditar}
-                            onSubido={(doc) =>
-                              guardar(p.campaignProfileId, { rut: doc })
-                            }
-                          />
-                        )}
-                        {/* El contrato es el tercer imprescindible:
-                            sin el, el pago se queda en "Faltan
-                            documentos" por mucha cuenta de cobro que
-                            haya. */}
-                        <Adjunto
-                          url={p.contratoUrl}
-                          nombre={p.contratoNombre}
-                          etiqueta="contrato"
-                          puedeSubir={puedeEditar}
-                          onSubido={(doc) =>
-                            guardar(p.campaignProfileId, { contrato: doc })
-                          }
-                        />
-                        {/* La ARL se ofrece siempre aunque se le pida
-                            sobre todo a quien factura como juridica: el
-                            tipo de persona lo fija contabilidad mas
-                            tarde, asi que esconderla hasta entonces
-                            significaba que mercadeo —que es quien tiene
-                            el papel— casi nunca llegaba a ver el hueco. */}
-                        <Adjunto
-                          url={p.arlUrl}
-                          nombre={p.arlNombre}
-                          etiqueta="ARL"
-                          puedeSubir={puedeEditar}
-                          onSubido={(doc) =>
-                            guardar(p.campaignProfileId, { arl: doc })
-                          }
-                        />
-                        <Otros
-                          documentos={p.otros}
-                          puedeEditar={puedeEditar}
-                          onAnadir={(doc) =>
-                            enviar(
-                              `/api/pagos/${p.campaignProfileId}/documentos/otros`,
-                              "POST",
-                              doc
-                            )
-                          }
-                          onQuitar={(id) =>
-                            enviar(
-                              `/api/pagos/${p.campaignProfileId}/documentos/otros/${id}`,
-                              "DELETE"
-                            )
-                          }
-                        />
+                      <td className="px-2 py-2 text-center">
+                        <PanelDocumentos pago={p} puedeEditar={puedeEditar} />
                       </td>
                       <td className="px-2 py-2">
                         {editando === p.campaignProfileId ? (
