@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
+import { User } from "lucide-react";
 import {
   COOKIE_SESION_CLIENTE,
   verificarSesionCliente,
@@ -40,7 +40,7 @@ async function Armazon({ children }: { children: React.ReactNode }) {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-blue-100 p-2">
-            <Building2 className="h-5 w-5 text-blue-600" />
+            <User className="h-5 w-5 text-blue-600" />
           </div>
           <div className="min-w-0">
             <p className="truncate font-semibold text-gray-900">
