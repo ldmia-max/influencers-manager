@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { CampaignProfileStatus } from "@prisma/client";
+import { CampaignProfileStatus, Prisma } from "@prisma/client";
 import { ValidationError, NotFoundError } from "./errors";
 import { calculateMarkupPrice } from "@/lib/campaign-utils";
 import {
@@ -403,53 +403,12 @@ export async function submitApproval(
       data: { usedAt: now },
     });
 
-    // La respuesta del cliente decide la etapa.
-    //
-    // Si aprobo aunque sea a UNO, la campana pasa a En proceso: ese
-    // trabajo esta contratado y puede empezar hoy. Frenarlo todo por los
-    // que no aprobo costaba dias de nada.
-    //
-    // Si no aprobo a nadie, vuelve a Abierta. Dejarla en marcha sin un
-    // solo influencer contratado no describe nada real, y ademas Abierta
-    // es el unico estado editable: es justo donde el equipo tiene que
-    // estar para rehacer la propuesta.
-    const aprobados = perfiles.filter((p) => p.status === "APPROVED").length;
-    const arranca = aprobados > 0;
-
-    if (arranca) {
-      // A los rechazados se les retira en el acto. Sin esto seguirian
-      // contando en el total —el cliente no los aprobo, pero su
-      // participacion seguia siendo ACTIVO— y bloquearian el cierre para
-      // siempre: la comprobacion de entregas cuenta los formatos de todo
-      // perfil activo, y nadie va a publicar los suyos.
-      const motivos = new Map(
-        perfiles.map((p) => [p.id, p.rejectionReason || null])
-      );
-      for (const perfil of perfiles) {
-        if (perfil.status !== "REJECTED") continue;
-        await tx.campaignProfile.update({
-          where: { id: perfil.id },
-          data: {
-            participacion: "RETIRADO",
-            origenRetiro: "CLIENTE",
-            motivoRetiro: motivos.get(perfil.id) ?? null,
-            retiradoEn: now,
-          },
-        });
-      }
-    }
-    // Si vuelve a Abierta NO se retira a nadie: alli la campana se
-    // reedita, y el equipo necesita ver a los rechazados con sus precios
-    // para decidir a quien cambia. Retirarlos abriria el editor vacio.
-
-    // Una campana ya en marcha no cambia de etapa: el cliente puede estar
-    // respondiendo por un reemplazo mientras el resto sigue publicando.
-    if (approvalToken!.campaign.status !== "ACTIVE") {
-      await tx.campaign.update({
-        where: { id: approvalToken!.campaignId },
-        data: { status: arranca ? "ACTIVE" : "DRAFT" },
-      });
-    }
+    await aplicarRespuestaDelCliente(
+      tx,
+      approvalToken!.campaignId,
+      approvalToken!.campaign.status,
+      now
+    );
   });
 
   const summary = {
@@ -480,6 +439,254 @@ export async function submitApproval(
         .filter((p) => p.status === "REJECTED")
         .map((p) => p.id),
     },
+  };
+}
+
+/**
+ * Lo que sigue a una respuesta del cliente, venga del portal o de la
+ * agencia decidiendo por el.
+ *
+ * Si queda aunque sea UN aprobado en la campana, pasa a En proceso: ese
+ * trabajo esta contratado y puede empezar hoy. Se cuentan los aprobados
+ * de toda la campana y no solo los de esta tanda: la agencia puede haber
+ * aprobado a uno y el cliente rechazado al resto, y con la cuenta por
+ * tanda esa campana volvia a Abierta con alguien contratado dentro.
+ *
+ * Si no queda ninguno, vuelve a Abierta. Dejarla en marcha sin un solo
+ * influencer contratado no describe nada real, y Abierta es el unico
+ * estado donde el equipo puede rehacer la propuesta. Alli NO se retira a
+ * nadie: el equipo necesita ver a los rechazados con sus precios para
+ * decidir a quien cambia.
+ *
+ * Camino de En proceso, a los rechazados se les retira. Sin esto
+ * seguirian contando en el total y bloquearian el cierre para siempre:
+ * la comprobacion de entregas cuenta los formatos de todo perfil activo,
+ * y nadie va a publicar los suyos. Con la campana ya en marcha tambien:
+ * un reemplazo rechazado no puede quedarse dentro.
+ *
+ * Una campana ya en marcha no cambia de etapa: puede haber reemplazos
+ * en juego mientras el resto sigue publicando.
+ */
+async function aplicarRespuestaDelCliente(
+  tx: Prisma.TransactionClient,
+  campaignId: string,
+  estadoActual: string,
+  ahora: Date
+): Promise<string> {
+  const aprobados = await tx.campaignProfile.count({
+    where: { campaignId, status: "APPROVED", participacion: "ACTIVO" },
+  });
+  const enMarcha = estadoActual === "ACTIVE" || aprobados > 0;
+
+  if (enMarcha) {
+    const rechazados = await tx.campaignProfile.findMany({
+      where: { campaignId, status: "REJECTED", participacion: "ACTIVO" },
+      select: { id: true, rejectionReason: true },
+    });
+    for (const r of rechazados) {
+      await tx.campaignProfile.update({
+        where: { id: r.id },
+        data: {
+          participacion: "RETIRADO",
+          origenRetiro: "CLIENTE",
+          motivoRetiro: r.rejectionReason ?? null,
+          retiradoEn: ahora,
+        },
+      });
+    }
+  }
+
+  if (estadoActual === "ACTIVE") return estadoActual;
+  const nuevo = enMarcha ? "ACTIVE" : "DRAFT";
+  await tx.campaign.update({ where: { id: campaignId }, data: { status: nuevo } });
+  return nuevo;
+}
+
+// =====================================================================
+// La agencia decide por el cliente
+// =====================================================================
+
+/**
+ * Lo comun a decidir un formato o un influencer en nombre del cliente:
+ * la campana tiene que estar esperando una respuesta, y el influencer
+ * pertenecer a ESA campana, seguir pendiente y seguir dentro.
+ *
+ * Lo que el cliente ya contesto no se toca desde aqui: su respuesta es
+ * un hecho. Para eso estan "Deshacer rechazo" y retirar.
+ */
+function exigirDecidible(perfil: {
+  status: string;
+  participacion: string;
+  campaign: { status: string };
+}) {
+  if (!ESTADOS_QUE_ADMITEN_APROBACION.includes(perfil.campaign.status)) {
+    throw new ValidationError(
+      "Solo se decide por el cliente con la campaña en Revisión o En proceso."
+    );
+  }
+  if (perfil.participacion !== "ACTIVO") {
+    throw new ValidationError("Este influencer ya fue retirado de la campaña.");
+  }
+  if (perfil.status !== "PENDING") {
+    throw new ValidationError("Este influencer ya tiene respuesta del cliente.");
+  }
+}
+
+/**
+ * Aprueba o rechaza UN formato de un influencer pendiente, en nombre del
+ * cliente.
+ *
+ * Se guarda en el acto, sin esperar a decidir al influencer: es lo que
+ * deja marcar los formatos uno a uno antes de aprobarlo. Solo mientras
+ * siga pendiente; una vez decidido, sus formatos son lo que se acordo.
+ */
+export async function decidirFormatoPorElCliente(
+  campaignId: string,
+  servicioId: string,
+  datos: { aprobado: boolean; motivo?: string | null }
+) {
+  const servicio = await prisma.campaignService.findUnique({
+    where: { id: servicioId },
+    select: {
+      id: true,
+      esCombo: true,
+      profileService: { select: { serviceType: { select: { displayName: true } } } },
+      campaignProfilePlatform: {
+        select: {
+          campaignProfile: {
+            select: {
+              id: true,
+              campaignId: true,
+              status: true,
+              participacion: true,
+              profile: { select: { id: true, name: true } },
+              campaign: { select: { id: true, name: true, status: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  const perfil = servicio?.campaignProfilePlatform.campaignProfile;
+  // Un formato de otra campana se trata como inexistente: el id solo no
+  // basta para escribir en ella.
+  if (!servicio || !perfil || perfil.campaignId !== campaignId) {
+    throw new NotFoundError("Formato no encontrado en la campaña");
+  }
+  exigirDecidible(perfil);
+
+  await prisma.campaignService.update({
+    where: { id: servicioId },
+    data: {
+      isApproved: datos.aprobado,
+      rejectionReason: datos.aprobado ? null : datos.motivo?.trim() || null,
+      reviewedAt: new Date(),
+    },
+  });
+
+  return {
+    id: servicio.id,
+    formato: servicio.esCombo
+      ? "Combo"
+      : (servicio.profileService?.serviceType.displayName ?? "Formato"),
+    influencer: perfil.profile,
+    campana: perfil.campaign,
+  };
+}
+
+/**
+ * Aprueba o rechaza a un influencer pendiente en nombre del cliente.
+ *
+ * Hace lo mismo que el portal con ese influencer, y por eso comparte con
+ * el `aplicarRespuestaDelCliente`: cuando en una campana en Revision ya
+ * no queda nadie pendiente, la etapa avanza igual que si hubiera
+ * contestado el cliente. Mientras quede alguien, la campana sigue en
+ * Revision y el cliente puede contestar el resto con su enlace.
+ *
+ * `revisadoPorId` queda vacio a proposito: lo decidio la agencia, y
+ * poner al contacto principal seria inventarle una firma. Quien fue
+ * queda en la auditoria.
+ *
+ * Aprobar exige al menos un formato aprobado: aprobar a alguien sin nada
+ * que hacer es un rechazo con otro nombre. Cada red queda aprobada si le
+ * queda algun formato aprobado, rechazada si no.
+ */
+export async function decidirInfluencerPorElCliente(
+  campaignId: string,
+  campaignProfileId: string,
+  datos: { aprobado: boolean; motivo?: string | null }
+) {
+  const perfil = await prisma.campaignProfile.findUnique({
+    where: { id: campaignProfileId },
+    select: {
+      id: true,
+      campaignId: true,
+      status: true,
+      participacion: true,
+      profile: { select: { id: true, name: true } },
+      campaign: { select: { id: true, name: true, status: true } },
+      platforms: {
+        select: { id: true, services: { select: { isApproved: true } } },
+      },
+    },
+  });
+  if (!perfil || perfil.campaignId !== campaignId) {
+    throw new NotFoundError("Influencer no encontrado en la campaña");
+  }
+  exigirDecidible(perfil);
+
+  const motivo = datos.motivo?.trim() || null;
+  if (!datos.aprobado && !motivo) {
+    throw new ValidationError("Escribe el motivo del rechazo.");
+  }
+  if (
+    datos.aprobado &&
+    !perfil.platforms.some((pl) => pl.services.some((s) => s.isApproved))
+  ) {
+    throw new ValidationError(
+      "Todos sus formatos están rechazados: apruébale al menos uno o rechaza al influencer."
+    );
+  }
+
+  const ahora = new Date();
+  const estadoFinal = await prisma.$transaction(async (tx) => {
+    await tx.campaignProfile.update({
+      where: { id: campaignProfileId },
+      data: {
+        status: datos.aprobado ? "APPROVED" : "REJECTED",
+        rejectionReason: datos.aprobado ? null : motivo,
+        reviewedAt: ahora,
+        revisadoPorId: null,
+      },
+    });
+
+    for (const pl of perfil.platforms) {
+      const conAlgo = pl.services.some((s) => s.isApproved);
+      await tx.campaignProfilePlatform.update({
+        where: { id: pl.id },
+        data: {
+          status: datos.aprobado && conAlgo ? "APPROVED" : "REJECTED",
+          reviewedAt: ahora,
+        },
+      });
+    }
+
+    // En Revision la etapa solo se mueve cuando ya no queda nadie por
+    // contestar; con la campana en marcha se aplica en el acto, que es lo
+    // que retira a un reemplazo rechazado.
+    if (perfil.campaign.status === "REVIEW") {
+      const quedan = await tx.campaignProfile.count({
+        where: { campaignId, status: "PENDING", participacion: "ACTIVO" },
+      });
+      if (quedan > 0) return "REVIEW";
+    }
+    return aplicarRespuestaDelCliente(tx, campaignId, perfil.campaign.status, ahora);
+  });
+
+  return {
+    id: perfil.id,
+    influencer: perfil.profile,
+    campana: { ...perfil.campaign, estadoFinal },
   };
 }
 

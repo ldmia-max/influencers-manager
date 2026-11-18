@@ -4,6 +4,7 @@
 
 import type { CampaignStatus } from "@prisma/client";
 import { apiPost, apiPut, apiPatch } from "./api";
+import type { DecisionPorElCliente } from "@/lib/schemas/approval";
 import type {
   CreateCampaignPayload,
   UpdateCampaignPayload,
@@ -139,4 +140,12 @@ export function buildCampaignPayload(formData: CampaignFormData): CreateCampaign
     mes: parseInt(formData.mes, 10),
     anio: parseInt(formData.anio, 10),
   };
+}
+
+/** La agencia aprueba o rechaza, por el cliente, a un influencer o un formato. */
+export function decidirPorElCliente(campaignId: string, datos: DecisionPorElCliente) {
+  return apiPost<{ id: string; campana?: { status: string; estadoFinal: string } }>(
+    `/api/campaigns/${campaignId}/decision-cliente`,
+    datos
+  );
 }

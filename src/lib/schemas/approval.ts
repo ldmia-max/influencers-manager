@@ -34,3 +34,25 @@ export const submitApprovalBodySchema = z.object({
 });
 
 export type SubmitApprovalBody = z.infer<typeof submitApprovalBodySchema>;
+
+/**
+ * La agencia decide por el cliente desde Perfiles y formatos: un
+ * influencer entero o uno de sus formatos. El motivo solo se exige al
+ * rechazar a un influencer; eso lo comprueba la capa de datos.
+ */
+export const decisionPorElClienteSchema = z.discriminatedUnion("tipo", [
+  z.object({
+    tipo: z.literal("influencer"),
+    campaignProfileId: z.string().min(1),
+    aprobado: z.boolean(),
+    motivo: z.string().max(1000).nullish(),
+  }),
+  z.object({
+    tipo: z.literal("formato"),
+    servicioId: z.string().min(1),
+    aprobado: z.boolean(),
+    motivo: z.string().max(1000).nullish(),
+  }),
+]);
+
+export type DecisionPorElCliente = z.infer<typeof decisionPorElClienteSchema>;

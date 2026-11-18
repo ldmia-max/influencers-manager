@@ -115,6 +115,10 @@ export const ACCIONES = {
   abonoEliminado: "pago.abono_eliminado",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
+  /// Rechazar en nombre del cliente, y decidir un formato suyo. Misma
+  /// razon: es una respuesta que el cliente no dio con su enlace.
+  influencerRechazadoPorAgencia: "campaign.influencer_rejected_by_agency",
+  formatoDecididoPorAgencia: "campaign.service_decided_by_agency",
   /// Repreciar un formato ya contratado. Es dinero acordado que
   /// cambia despues de acordarse: el cliente lo aprobo a un importe y
   /// pasa a otro, y contabilidad le pagara al influencer por el nuevo.

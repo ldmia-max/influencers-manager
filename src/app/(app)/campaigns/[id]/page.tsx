@@ -1,6 +1,10 @@
 import { auth } from "@/lib/auth";
 import { getCampaignDetail } from "@/data-access/campaigns";
 import { IdentidadInfluencer } from "@/components/campaigns/identidad-influencer";
+import {
+  DecidirInfluencer,
+  DecidirFormato,
+} from "@/components/campaigns/decidir-por-el-cliente";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -412,6 +416,17 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     campaign.status !== "COMPLETED" &&
     campaign.status !== "CANCELLED";
 
+  // Decidir por el cliente: mientras la campana espera una respuesta
+  // —Revision, o En proceso con un reemplazo pendiente—. Contabilidad
+  // solo lee campanas, asi que no le salen los botones. El servidor lo
+  // vuelve a comprobar todo.
+  const puedeDecidirPorCliente =
+    puede(rol, "campanas", "actualizar") &&
+    (campaign.status === "REVIEW" || campaign.status === "ACTIVE");
+  const pendientesPorDecidir = campaign.profiles.filter(
+    (cp) => cp.status === "PENDING" && cp.participacion === "ACTIVO"
+  ).length;
+
   const puedeAnadirInfluencers =
     campaign.status === "ACTIVE" ||
     campaign.status === "DRAFT" ||
@@ -738,6 +753,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                 <div className="space-y-6">
                   {campaign.profiles.map((cp) => {
                     const retirado = cp.participacion === "RETIRADO";
+                    const decidible =
+                      puedeDecidirPorCliente &&
+                      !retirado &&
+                      cp.status === "PENDING";
 
                     // Lo que cuesta este creador entero: todos sus formatos
                     // de todas sus redes, al precio que ve el cliente. Con el
@@ -823,6 +842,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                                 {PROFILE_STATUS_LABELS[cp.status]}
                               </Badge>
                             )
+                          )}
+                          {decidible && (
+                            <DecidirInfluencer
+                              campaignId={id}
+                              perfilId={cp.id}
+                              nombre={cp.profile.name}
+                              esElUltimo={pendientesPorDecidir === 1}
+                              enRevision={campaign.status === "REVIEW"}
+                            />
                           )}
                           {/* Retirar solo con la campaña en marcha: antes
                               de activarla los cambios se hacen en el
@@ -912,6 +940,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                                   <TableHead className="text-right">
                                     Subtotal
                                   </TableHead>
+                                  {decidible && (
+                                    <TableHead className="text-center">
+                                      Decisión del cliente
+                                    </TableHead>
+                                  )}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -981,6 +1014,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                                       <TableCell className="text-right font-medium">
                                         ${formatNumber(subtotal.toFixed(0))}
                                       </TableCell>
+                                      {decidible && (
+                                        <TableCell className="text-center">
+                                          <DecidirFormato
+                                            campaignId={id}
+                                            servicioId={cs.id}
+                                            aprobadoInicial={cs.isApproved}
+                                          />
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   );
                                 })}
