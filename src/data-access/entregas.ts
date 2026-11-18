@@ -1019,6 +1019,11 @@ export async function devolverInfluencerRechazado(campaignProfileId: string) {
       status: "PENDING",
       rejectionReason: null,
       reviewedAt: null,
+      // Vuelve a estar sin decidir: ni firma del cliente ni de la
+      // agencia, o Revisiones nombraria a alguien por una decision que
+      // ya no existe.
+      revisadoPorId: null,
+      decididoPorAgenciaId: null,
       // El rechazo del cliente lo habia retirado al activar la campana.
       participacion: "ACTIVO",
       origenRetiro: null,

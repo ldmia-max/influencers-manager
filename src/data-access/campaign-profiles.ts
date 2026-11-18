@@ -652,7 +652,11 @@ export async function agregarInfluencerACampana(
  * desde la ruta: se esta aprobando en nombre del cliente un gasto que el
  * no ha visto, y meses despues hay que poder reconstruir quien lo hizo.
  */
-export async function aprobarInfluencerDeCampana(campaignProfileId: string) {
+export async function aprobarInfluencerDeCampana(
+  campaignProfileId: string,
+  /** Quien de la agencia lo aprueba: sale en Revisiones. */
+  usuarioId: string
+) {
   const perfil = await prisma.campaignProfile.findUnique({
     where: { id: campaignProfileId },
     select: {
@@ -672,7 +676,13 @@ export async function aprobarInfluencerDeCampana(campaignProfileId: string) {
   await prisma.$transaction([
     prisma.campaignProfile.update({
       where: { id: campaignProfileId },
-      data: { status: "APPROVED", reviewedAt: ahora, rejectionReason: null },
+      data: {
+        status: "APPROVED",
+        reviewedAt: ahora,
+        rejectionReason: null,
+        revisadoPorId: null,
+        decididoPorAgenciaId: usuarioId,
+      },
     }),
     prisma.campaignProfilePlatform.updateMany({
       where: { campaignProfileId },

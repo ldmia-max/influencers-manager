@@ -58,7 +58,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       return NextResponse.json(r);
     }
 
-    const r = await decidirInfluencerPorElCliente(id, body.campaignProfileId, body);
+    const r = await decidirInfluencerPorElCliente(
+      id,
+      body.campaignProfileId,
+      body,
+      sesion.userId
+    );
     await auditar({
       action: body.aprobado
         ? ACCIONES.influencerAprobadoPorAgencia

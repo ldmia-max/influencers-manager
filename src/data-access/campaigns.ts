@@ -266,6 +266,8 @@ export async function getCampaignDetail(id: string) {
           revisadoPor: {
             select: { id: true, firstName: true, lastName: true, email: true },
           },
+          // Quien de la agencia decidio en nombre del cliente.
+          decididoPorAgencia: { select: { id: true, name: true, email: true } },
           profile: {
             select: {
               id: true,

@@ -471,11 +471,20 @@ export function ApprovalTokensCard({
                               {d.quienEmail}
                             </p>
                           </div>
+                        ) : d.agencia ? (
+                          // Lo anoto alguien de la agencia por el
+                          // cliente: se dice asi, para que no se lea
+                          // como una firma del cliente.
+                          <div>
+                            <p className="font-medium">{d.agencia}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Agencia, en nombre del cliente
+                            </p>
+                          </div>
                         ) : (
                           // Lo decidido antes de que se registrara
-                          // quien, y lo que aprueba la propia agencia.
-                          // Poner aqui al contacto principal seria
-                          // inventarse una firma.
+                          // quien. Poner aqui al contacto principal
+                          // seria inventarse una firma.
                           <span className="text-muted-foreground">
                             {d.reviewedAt ? "Sin registrar" : "—"}
                           </span>

@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     if (sesion instanceof NextResponse) return sesion;
 
     const { perfilId } = await params;
-    const resultado = await aprobarInfluencerDeCampana(perfilId);
+    const resultado = await aprobarInfluencerDeCampana(perfilId, sesion.userId);
 
     await auditar({
       action: ACCIONES.influencerAprobadoPorAgencia,

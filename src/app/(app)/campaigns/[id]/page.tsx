@@ -1155,6 +1155,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
               ? `${cp.revisadoPor.firstName} ${cp.revisadoPor.lastName}`
               : null,
             quienEmail: cp.revisadoPor?.email ?? null,
+            agencia: cp.decididoPorAgencia
+              ? (cp.decididoPorAgencia.name ?? cp.decididoPorAgencia.email)
+              : null,
             motivo: cp.rejectionReason,
           }))}
         />

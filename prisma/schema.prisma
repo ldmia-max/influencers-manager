@@ -74,6 +74,9 @@ model User {
 
   /// Abonos a influencers que ha registrado esta persona.
   abonosRegistrados AbonoPago[]
+
+  /// Influencers que aprobo o rechazo en nombre del cliente.
+  decisionesPorAgencia CampaignProfile[] @relation("DecisionesPorAgencia")
 }
 
 // ============ GENEROS ============
@@ -354,11 +357,11 @@ model Client {
   createdById String
 
   // Relaciones
-  contacts   ClientContact[]
+  contacts    ClientContact[]
   /// Los accesos al portal de esta empresa: uno por contacto, no uno
   /// por empresa. Ver el comentario de ClientUser.
   clientUsers ClientUser[]
-  campaigns  Campaign[]
+  campaigns   Campaign[]
 }
 
 model ClientContact {
@@ -662,6 +665,14 @@ model CampaignProfile {
   /// propia agencia.
   revisadoPor   ClientContact? @relation(fields: [revisadoPorId], references: [id], onDelete: SetNull)
   revisadoPorId String?
+
+  /// Quien de la agencia lo decidio en nombre del cliente: los botones
+  /// de Perfiles y formatos y el "Aprobar" de sustituciones. Va aparte
+  /// de `revisadoPor` porque no es una firma del cliente, y ponerla ahi
+  /// seria inventarsela. Null cuando decidio el cliente o antes de que
+  /// existiera el campo.
+  decididoPorAgencia   User?   @relation("DecisionesPorAgencia", fields: [decididoPorAgenciaId], references: [id], onDelete: SetNull)
+  decididoPorAgenciaId String?
 
   // Relaciones
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)

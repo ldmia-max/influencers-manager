@@ -238,6 +238,12 @@ export interface DecisionDeRevision {
   reviewedAt: Date | string | null;
   quien: string | null;
   quienEmail: string | null;
+  /**
+   * Quien de la agencia lo decidio en nombre del cliente. Null cuando
+   * contesto el propio cliente, o en lo decidido antes de existir el
+   * campo.
+   */
+  agencia?: string | null;
   motivo: string | null;
 }
 

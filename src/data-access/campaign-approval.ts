@@ -371,6 +371,7 @@ export async function submitApproval(
           rejectionReason: profile.rejectionReason || null,
           reviewedAt: now,
           revisadoPorId: quienDecide,
+          decididoPorAgenciaId: null,
         },
       });
     }
@@ -604,8 +605,9 @@ export async function decidirFormatoPorElCliente(
  * Revision y el cliente puede contestar el resto con su enlace.
  *
  * `revisadoPorId` queda vacio a proposito: lo decidio la agencia, y
- * poner al contacto principal seria inventarle una firma. Quien fue
- * queda en la auditoria.
+ * poner al contacto principal seria inventarle una firma. Quien fue va
+ * en `decididoPorAgenciaId`, que es lo que lee Revisiones, y en la
+ * auditoria.
  *
  * Aprobar exige al menos un formato aprobado: aprobar a alguien sin nada
  * que hacer es un rechazo con otro nombre. Cada red queda aprobada si le
@@ -614,7 +616,8 @@ export async function decidirFormatoPorElCliente(
 export async function decidirInfluencerPorElCliente(
   campaignId: string,
   campaignProfileId: string,
-  datos: { aprobado: boolean; motivo?: string | null }
+  datos: { aprobado: boolean; motivo?: string | null },
+  usuarioId: string
 ) {
   const perfil = await prisma.campaignProfile.findUnique({
     where: { id: campaignProfileId },
@@ -657,6 +660,7 @@ export async function decidirInfluencerPorElCliente(
         rejectionReason: datos.aprobado ? null : motivo,
         reviewedAt: ahora,
         revisadoPorId: null,
+        decididoPorAgenciaId: usuarioId,
       },
     });
 
