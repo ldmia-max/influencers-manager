@@ -43,6 +43,7 @@ interface CampaignData {
     profiles: Array<{
       id: string;
       status: string;
+      participacion: string;
       profile: {
         id: string;
         name: string;
@@ -718,6 +719,45 @@ export default function ApprovePage() {
     (p) => approvalState.profiles[p.id]?.isApproved == null
   ).length;
 
+  /**
+   * Quienes forman la campana: la franja de arriba y las graficas.
+   *
+   * Solo los aprobados. Antes eran todos los vinculados, rechazados y
+   * retirados incluidos, y las graficas de categorias, generos y
+   * departamentos describian una campana que no es la que se contrata.
+   *
+   * "Aprobado" son dos cosas a la vez: lo que ya consta aprobado en la
+   * base de datos (y sigue contratado), y lo que el cliente esta
+   * aprobando ahora mismo en esta visita. Sin lo segundo, en la primera
+   * revision —donde todo esta PENDING— la franja estaria vacia hasta
+   * enviar; con ello se va llenando a medida que decide, y las graficas
+   * le ensenan la campana que esta a punto de aprobar.
+   */
+  const estaAprobado = (cp: (typeof data.campaign.profiles)[number]) =>
+    cp.participacion !== "RETIRADO" &&
+    (cp.status === "APPROVED" ||
+      (cp.status === "PENDING" &&
+        approvalState.profiles[cp.id]?.isApproved === true));
+  const aprobados = data.campaign.profiles.filter(estaAprobado);
+
+  // Lo que se pinta de cada aprobado es lo que se contrata de el: sus
+  // redes y formatos aprobados. De un pendiente, lo marcado en esta
+  // visita; de uno ya aprobado, lo que consta.
+  const redAprobada = (
+    cp: (typeof aprobados)[number],
+    plat: (typeof aprobados)[number]["platforms"][number],
+  ) =>
+    cp.status === "PENDING"
+      ? (approvalState.platforms[plat.id]?.isApproved ?? true)
+      : plat.status !== "REJECTED";
+  const formatoAprobado = (
+    cp: (typeof aprobados)[number],
+    s: (typeof aprobados)[number]["platforms"][number]["services"][number],
+  ) =>
+    cp.status === "PENDING"
+      ? (approvalState.services[s.id]?.isApproved ?? s.isApproved)
+      : s.isApproved;
+
   // Compute chart data
   const formatCounts = new Map<string, number>();
   const categoryCounts = new Map<string, number>();
@@ -726,7 +766,7 @@ export default function ApprovePage() {
   let totalReach = 0;
   const accountsSeen = new Set<string>();
 
-  data.campaign.profiles.forEach((cp) => {
+  aprobados.forEach((cp) => {
     const p = cp.profile;
     if (p.gender) {
       genderCounts.set(
@@ -748,7 +788,9 @@ export default function ApprovePage() {
     });
 
     cp.platforms.forEach((plat) => {
+      if (!redAprobada(cp, plat)) return;
       plat.services.forEach((s) => {
+        if (!formatoAprobado(cp, s)) return;
         const fname = s.esCombo
           ? "Combo"
           : s.profileService!.serviceType.displayName;
@@ -791,10 +833,19 @@ export default function ApprovePage() {
           <CardContent className="py-4">
             <div className="space-y-3">
               <span className="text-sm font-medium text-muted-foreground">
-                {data.campaign.profiles.length} Influencers
+                {aprobados.length} Influencer
+                {aprobados.length !== 1 ? "s" : ""} aprobado
+                {aprobados.length !== 1 ? "s" : ""}
               </span>
+              {aprobados.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Todavía no hay influencers aprobados. A medida que los
+                  apruebes aparecerán aquí, junto con sus categorías, géneros y
+                  departamentos.
+                </p>
+              )}
               <div className="flex flex-wrap gap-3 p-1">
-                {data.campaign.profiles.map((cp) => {
+                {aprobados.map((cp) => {
                   const picUrl = cp.platforms[0]?.socialAccount.profilePicUrl;
                   const initials = cp.profile.name
                     .split(" ")

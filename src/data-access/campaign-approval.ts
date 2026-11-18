@@ -84,6 +84,9 @@ export async function getApprovalData(token: string) {
             select: {
               id: true,
               status: true,
+              // La franja y las graficas de arriba solo cuentan a quien
+              // sigue contratado: un retirado aprobado ya no esta.
+              participacion: true,
               profile: {
                 select: {
                   id: true,
