@@ -1085,6 +1085,14 @@ model PagoInfluencer {
   /// fecha de documento difiere —31/8 contra 1/9— cuentan desde esta.
   fechaCuentaCobro DateTime?
 
+  /// Cuando se aviso por ultima vez a contabilidad de que los papeles
+  /// estan y se puede pagar.
+  ///
+  /// Solo la ultima: el boton se puede pulsar de nuevo —el correo puede
+  /// no llegar— y cada envio la pisa. El historial de envios, con quien
+  /// pulso, queda en la auditoria. Solo se escribe si el correo salio.
+  avisoPagoEnviadoEn DateTime?
+
   // --- Lo que anota contabilidad ---
 
   /// Con que tipo se calculo ESTE pago.

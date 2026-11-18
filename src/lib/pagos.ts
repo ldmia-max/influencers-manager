@@ -218,10 +218,26 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
   // El contrato se sumo despues, asi que los pagos antiguos que lo
   // tenian todo menos ese papel volvieron a "Faltan documentos". Es lo
   // correcto: eran pagos sin contrato y nadie lo estaba viendo.
-  if (pago.cuentaCobroUrl && pago.certificadoUrl && pago.contratoUrl) {
+  if (documentosObligatoriosCompletos(pago)) {
     return "DOCUMENTOS_RECIBIDOS";
   }
   return "PENDIENTE_DOCUMENTOS";
+}
+
+/**
+ * Si estan los tres papeles sin los que no se paga: cuenta de cobro,
+ * certificado bancario y contrato.
+ *
+ * Una sola regla para el estado del pago y para el boton que avisa a
+ * contabilidad: si fueran dos, un dia se podria avisar de un pago que la
+ * tabla sigue marcando como "Faltan documentos".
+ */
+export function documentosObligatoriosCompletos(pago: {
+  cuentaCobroUrl: string | null;
+  certificadoUrl: string | null;
+  contratoUrl: string | null;
+}): boolean {
+  return !!(pago.cuentaCobroUrl && pago.certificadoUrl && pago.contratoUrl);
 }
 
 export interface Plazo {

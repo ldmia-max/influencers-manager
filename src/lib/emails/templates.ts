@@ -496,3 +496,82 @@ export function enlaceContrasenaPortalTemplate(params: {
 
   return { subject, html };
 }
+
+// =============================================================================
+// Template 8: Aviso a contabilidad de que un pago tiene sus papeles
+// =============================================================================
+
+/** Los nombres vienen de formularios: que un `<` no rompa el correo. */
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * "Ya estan los documentos de X, se puede pagar".
+ *
+ * Va a un buzon de la agencia, no al cliente: por eso puede llevar el
+ * precio base, que es lo que se le paga al creador. Lista los papeles
+ * por su nombre de archivo para que quien lo lea sepa que va a
+ * encontrar antes de abrir la aplicacion.
+ */
+export function avisoDePagoTemplate(params: {
+  influencer: string;
+  nombreCompleto: string | null;
+  documentoIdentidad: string | null;
+  campana: string;
+  cliente: string;
+  periodo: string;
+  base: number;
+  fechaCuentaCobro: string | null;
+  documentos: { etiqueta: string; nombre: string | null }[];
+  enviadoPor: string;
+  url: string;
+}): { subject: string; html: string } {
+  const subject = `Documentos completos: ${params.influencer} · ${params.campana}`;
+  const e = escaparHtml;
+  const fila = (etiqueta: string, valor: string) => `<tr>
+    <td style="padding:6px 12px 6px 0;font-size:13px;color:#71717a;white-space:nowrap;vertical-align:top;">${etiqueta}</td>
+    <td style="padding:6px 0;font-size:13px;color:#18181b;">${valor}</td>
+  </tr>`;
+
+  const titular = params.nombreCompleto
+    ? `${e(params.nombreCompleto)}${params.documentoIdentidad ? ` · ${e(params.documentoIdentidad)}` : ""}`
+    : `<span style="color:#a1a1aa;">sin registrar</span>`;
+
+  const html = baseLayout(`
+    <h2 style="margin:0 0 16px;font-size:18px;color:#18181b;">Se puede proceder con el pago</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Ya están subidos los documentos obligatorios de
+      <strong>${e(params.influencer)}</strong> en la campaña
+      <strong>${e(params.campana)}</strong>.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      ${fila("Influencer", e(params.influencer))}
+      ${fila("A nombre de", titular)}
+      ${fila("Campaña", e(params.campana))}
+      ${fila("Cliente", e(params.cliente))}
+      ${fila("Periodo", e(params.periodo))}
+      ${fila("Precio base", `$${Math.round(params.base).toLocaleString("es-CO")}`)}
+      ${fila(
+        "Cuenta de cobro",
+        params.fechaCuentaCobro
+          ? new Date(params.fechaCuentaCobro).toLocaleDateString("es-CO", { timeZone: "UTC" })
+          : `<span style="color:#a1a1aa;">sin fecha</span>`
+      )}
+    </table>
+    <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#18181b;">Documentos</p>
+    <ul style="margin:0 0 8px;padding-left:18px;font-size:13px;color:#3f3f46;line-height:1.7;">
+      ${params.documentos
+        .map((d) => `<li>${e(d.etiqueta)}: ${d.nombre ? e(d.nombre) : "subido"}</li>`)
+        .join("")}
+    </ul>
+    ${ctaButton("Ver pagos", params.url)}
+    <p style="margin:0;font-size:12px;color:#71717a;">Aviso enviado por ${e(params.enviadoPor)}.</p>
+  `);
+
+  return { subject, html };
+}

@@ -7,6 +7,7 @@ import {
 } from "@/lib/campaign-utils";
 import {
   calcularImpuestos,
+  documentosObligatoriosCompletos,
   estadoDePago,
   hipotesis,
   plazoDePago,
@@ -88,6 +89,7 @@ const SELECCION = {
         orderBy: { subidoEn: "asc" },
       },
       fechaCuentaCobro: true,
+      avisoPagoEnviadoEn: true,
       tipoPersona: true,
       documento: true,
       fechaDocumento: true,
@@ -184,6 +186,8 @@ export interface PagoVista {
   otros: { id: string; url: string; nombre: string }[];
 
   fechaCuentaCobro: string | null;
+  /** Ultima vez que se aviso a contabilidad de que se puede pagar. */
+  avisoPagoEnviadoEn: string | null;
   documento: string | null;
   fechaDocumento: string | null;
   observaciones: string | null;
@@ -328,6 +332,9 @@ function aVista(cp: Fila): PagoVista {
     otros: pago?.otros ?? [],
 
     fechaCuentaCobro: fecha ? fecha.toISOString() : null,
+    avisoPagoEnviadoEn: pago?.avisoPagoEnviadoEn
+      ? pago.avisoPagoEnviadoEn.toISOString()
+      : null,
     documento: pago?.documento ?? null,
     fechaDocumento: pago?.fechaDocumento
       ? pago.fechaDocumento.toISOString()
@@ -461,6 +468,41 @@ export async function obtenerPago(campaignProfileId: string): Promise<PagoVista>
   });
   if (!cp) throw new NotFoundError("Influencer no encontrado en la campaña");
   return aVista(cp);
+}
+
+/**
+ * El pago, si esta listo para avisar a contabilidad.
+ *
+ * Lo comprueba el servidor aunque el boton ya salga apagado: un aviso
+ * de "se puede pagar" sin cuenta de cobro, certificado o contrato manda
+ * a contabilidad a buscar papeles que no existen.
+ */
+export async function pagoListoParaAvisar(
+  campaignProfileId: string
+): Promise<PagoVista> {
+  const pago = await obtenerPago(campaignProfileId);
+  if (!documentosObligatoriosCompletos(pago)) {
+    throw new ValidationError(
+      "Faltan documentos obligatorios: hacen falta la cuenta de cobro, el certificado bancario y el contrato."
+    );
+  }
+  return pago;
+}
+
+/**
+ * Anota que el aviso salio. Se llama solo despues de que el correo se
+ * haya enviado: al reves, una caida del proveedor dejaria una fecha de
+ * un aviso que nadie recibio.
+ */
+export async function marcarAvisoDePagoEnviado(
+  campaignProfileId: string
+): Promise<Date> {
+  const ahora = new Date();
+  await prisma.pagoInfluencer.update({
+    where: { campaignProfileId },
+    data: { avisoPagoEnviadoEn: ahora },
+  });
+  return ahora;
 }
 
 /** El registro existe solo cuando alguien aporta el primer dato. */

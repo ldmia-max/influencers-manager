@@ -1088,6 +1088,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
             puedeEditar={
               campaign.status === "ACTIVE" && puede(rol, "pagos", "actualizar")
             }
+            puedeAvisar={puede(rol, "pagos", "actualizar")}
           />
         ),
       });

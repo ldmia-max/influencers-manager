@@ -113,6 +113,9 @@ export const ACCIONES = {
   /// Dinero que sale: un abono a un influencer, y deshacerlo.
   abonoRegistrado: "pago.abono_registrado",
   abonoEliminado: "pago.abono_eliminado",
+  /// Aviso a contabilidad de que los papeles estan y se puede pagar. La
+  /// tabla solo guarda el ultimo; aqui queda cada envio y quien pulso.
+  avisoDePagoEnviado: "pago.aviso_enviado",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
   /// Rechazar en nombre del cliente, y decidir un formato suyo. Misma

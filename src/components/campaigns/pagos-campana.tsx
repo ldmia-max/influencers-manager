@@ -12,11 +12,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
-import { ETIQUETA_TIPO_PERSONA } from "@/lib/pagos";
+import {
+  ETIQUETA_TIPO_PERSONA,
+  documentosObligatoriosCompletos,
+} from "@/lib/pagos";
 import type { PagoVista } from "@/data-access/pagos";
-import { apiPatch } from "@/services/api";
+import { apiPatch, apiPost } from "@/services/api";
 import { Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
 import { PanelDocumentos } from "@/components/pagos/panel-documentos";
+import {
+  BotonAvisoDePago,
+  FechaAvisoDePago,
+} from "@/components/pagos/aviso-de-pago";
 
 const SIN_TIPO = "__sin__";
 
@@ -35,9 +42,16 @@ const SIN_TIPO = "__sin__";
 export function PagosCampana({
   pagos,
   puedeEditar,
+  puedeAvisar = puedeEditar,
 }: {
   pagos: PagoVista[];
   puedeEditar: boolean;
+  /**
+   * Avisar a contabilidad no edita nada del pago, asi que no espera a
+   * que la campana este En proceso: los papeles suelen completarse
+   * despues de cerrarla.
+   */
+  puedeAvisar?: boolean;
 }) {
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState({
@@ -47,6 +61,32 @@ export function PagosCampana({
   });
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Los avisos enviados en esta visita, pintados por el propio
+   * componente: `router.refresh()` no repinta en produccion, y recargar
+   * la pagina entera por una fecha seria desproporcionado.
+   */
+  const [avisos, setAvisos] = useState<Record<string, string>>({});
+  const [avisando, setAvisando] = useState<string | null>(null);
+  const [avisoOk, setAvisoOk] = useState<string | null>(null);
+
+  const avisar = async (p: PagoVista) => {
+    setAvisando(p.campaignProfileId);
+    setError(null);
+    setAvisoOk(null);
+    try {
+      const r = await apiPost<{ avisoPagoEnviadoEn: string }>(
+        `/api/pagos/${p.campaignProfileId}/aviso`,
+        {}
+      );
+      setAvisos((a) => ({ ...a, [p.campaignProfileId]: r.avisoPagoEnviadoEn }));
+      setAvisoOk(`Aviso enviado: ya se puede pagar a ${p.influencer}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo enviar el aviso");
+    } finally {
+      setAvisando(null);
+    }
+  };
 
   const guardar = async (id: string, datos: Record<string, unknown>) => {
     setOcupado(id);
@@ -98,6 +138,11 @@ export function PagosCampana({
             {error}
           </div>
         )}
+        {avisoOk && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {avisoOk}
+          </div>
+        )}
 
         {pagos.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-500">
@@ -121,7 +166,7 @@ export function PagosCampana({
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[68rem] text-xs">
+              <table className="w-full min-w-[76rem] text-xs">
                 <thead>
                   <tr className="text-left text-gray-500">
                     <th className="px-2 py-1 font-medium">Influencer</th>
@@ -132,6 +177,8 @@ export function PagosCampana({
                     </th>
                     <th className="px-2 py-1 text-right font-medium">A reservar</th>
                     <th className="px-2 py-1 text-center font-medium">Documentos</th>
+                    <th className="px-2 py-1 text-center font-medium">Enviar</th>
+                    <th className="px-2 py-1 font-medium">Envió</th>
                     <th className="px-2 py-1 font-medium">Cuenta de cobro</th>
                     <th className="px-2 py-1 text-center font-medium">Vence en</th>
                     <th className="px-2 py-1 font-medium">Estado</th>
@@ -210,6 +257,22 @@ export function PagosCampana({
                       </td>
                       <td className="px-2 py-2 text-center">
                         <PanelDocumentos pago={p} puedeEditar={puedeEditar} />
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <BotonAvisoDePago
+                          completo={documentosObligatoriosCompletos(p)}
+                          puedeAvisar={puedeAvisar}
+                          enviando={avisando === p.campaignProfileId}
+                          yaEnviado={
+                            !!(avisos[p.campaignProfileId] ?? p.avisoPagoEnviadoEn)
+                          }
+                          onEnviar={() => avisar(p)}
+                        />
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <FechaAvisoDePago
+                          fecha={avisos[p.campaignProfileId] ?? p.avisoPagoEnviadoEn}
+                        />
                       </td>
                       <td className="px-2 py-2">
                         {editando === p.campaignProfileId ? (
@@ -337,7 +400,7 @@ export function PagosCampana({
                     <td className="px-2 py-2 text-right tabular-nums">
                       ${formatNumber(Math.round(reserva))}
                     </td>
-                    <td className="px-2 py-2" colSpan={puedeEditar ? 5 : 4} />
+                    <td className="px-2 py-2" colSpan={puedeEditar ? 7 : 6} />
                   </tr>
                 </tfoot>
               </table>
