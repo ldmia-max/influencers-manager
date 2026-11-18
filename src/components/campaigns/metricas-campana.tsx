@@ -24,6 +24,7 @@ import {
   Share2,
   Target,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -480,6 +481,21 @@ export function MetricasCampana({
     const engagement =
       alcanceTotal > 0 ? (interaccionesDelAlcance / alcanceTotal) * 100 : null;
 
+    /**
+     * El alcance sumado: solo lo que alguien anoto a mano.
+     *
+     * No entra en SERIES porque no viene de las capturas —ningun scraper
+     * lo lee, cada red se lo ensena solo al autor—, asi que no tiene
+     * curva de evolucion. Y no cae a las vistas como el denominador del
+     * engagement: aqui la casilla dice "alcance", y mezclarle vistas
+     * seria sumar dos cosas distintas bajo un mismo nombre.
+     */
+    const conAlcance = actuales.filter((c) => c.alcance !== null);
+    const alcance = {
+      valor: conAlcance.reduce((suma, c) => suma + (c.alcance ?? 0), 0),
+      cobertura: conAlcance.length,
+    };
+
     // Evolucion: total de la campana por dia, con la ultima captura de
     // cada entrega hasta ese dia.
     const dias = [...new Set(capturasDeLaVista.map((c) => dia(c.capturadoEn)))].sort();
@@ -680,6 +696,7 @@ export function MetricasCampana({
     return {
       totales,
       engagement,
+      alcance,
       piezasConAlcance,
       evolucion,
       porInfluencer: [...porInfluencer.values()]
@@ -894,6 +911,27 @@ export function MetricasCampana({
                     )}
                   </div>
                 ))}
+
+              {/* Sin ningun alcance anotado no se pinta: un 0 se leeria
+                  como "no llego a nadie", y lo que pasa es que nadie lo
+                  ha escrito todavia. */}
+              {datos.alcance.cobertura > 0 && (
+                <div className="rounded-lg bg-marca p-3 text-white">
+                  <div className="flex items-center gap-1.5 text-xs text-white/80">
+                    <Users className="h-3.5 w-3.5" />
+                    Alcance
+                  </div>
+                  <p className="mt-1 text-xl font-semibold">
+                    {formatNumber(datos.alcance.valor)}
+                  </p>
+                  {datos.alcance.cobertura < datos.publicaciones && (
+                    <p className="text-[11px] text-white/70">
+                      de {datos.alcance.cobertura} de {datos.publicaciones}{" "}
+                      publicaciones
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* El progreso contra lo estimado.
