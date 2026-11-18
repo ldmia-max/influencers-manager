@@ -24,74 +24,42 @@ const NAV = [
   { href: "/client-dashboard/revisiones", label: "Revisiones", icon: "file-text" },
 ];
 
-export function PortalSidebar() {
-  const pathname = usePathname();
-
+/**
+ * "/client-dashboard" es prefijo de todo lo demas, asi que por segmento
+ * completo marcaria tambien Campañas estando en Revisiones. La raiz se
+ * compara exacta; dentro de una campana (/client-dashboard/<id>) sigue
+ * marcada Campañas, que es de donde se entro.
+ */
+function estaActiva(pathname: string, href: string): boolean {
+  if (href !== "/client-dashboard") return esRutaActiva(pathname, href);
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-gray-200 bg-white md:block">
-      <nav className="space-y-1 p-4">
-        {NAV.map((item) => {
-          // "/client-dashboard" es prefijo de todo lo demas, asi que por
-          // segmento completo marcaria tambien Campañas estando en
-          // Revisiones. La raiz se compara exacta; dentro de una campana
-          // (/client-dashboard/<id>) sigue marcada Campañas, que es de
-          // donde se entro.
-          const activa =
-            item.href === "/client-dashboard"
-              ? pathname === item.href ||
-                (pathname.startsWith("/client-dashboard/") &&
-                  !pathname.startsWith("/client-dashboard/revisiones"))
-              : esRutaActiva(pathname, item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                activa
-                  ? "bg-marca text-white"
-                  : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <NavIcon name={item.icon} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+    pathname === href ||
+    (pathname.startsWith("/client-dashboard/") &&
+      !pathname.startsWith("/client-dashboard/revisiones"))
   );
 }
 
 /**
- * El mismo menu en horizontal, para pantallas estrechas.
+ * Menu en una franja bajo la cabecera, como el del personal, para que
+ * las tablas anchas tengan toda la pantalla.
  *
- * El del personal simplemente desaparece por debajo de md y dentro de
- * la app se navega por otras vias. Aqui no hay otras vias: son dos
- * opciones y son toda la aplicacion, asi que esconderlas en el movil
- * dejaria al cliente sin forma de llegar a Revisiones.
+ * A diferencia del personal, se muestra tambien en el movil: alli no hay
+ * menu de hamburguesa, y estas dos opciones son toda la aplicacion —
+ * esconderlas dejaria al cliente sin forma de llegar a Revisiones.
  */
-export function PortalNavMovil() {
+export function PortalMenuSuperior() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-2 border-b border-gray-200 bg-white px-4 py-2 md:hidden">
-      {NAV.map((item) => {
-        const activa =
-          item.href === "/client-dashboard"
-            ? pathname === item.href ||
-              (pathname.startsWith("/client-dashboard/") &&
-                !pathname.startsWith("/client-dashboard/revisiones"))
-            : esRutaActiva(pathname, item.href);
-
-        return (
+    <nav className="border-b border-gray-200 bg-white">
+      <div className="flex items-center gap-1 overflow-x-auto px-4 py-2 sm:px-6">
+        {NAV.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              activa
+              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              estaActiva(pathname, item.href)
                 ? "bg-marca text-white"
                 : "text-gray-600 hover:bg-accent hover:text-accent-foreground"
             )}
@@ -99,8 +67,8 @@ export function PortalNavMovil() {
             <NavIcon name={item.icon} />
             {item.label}
           </Link>
-        );
-      })}
+        ))}
+      </div>
     </nav>
   );
 }

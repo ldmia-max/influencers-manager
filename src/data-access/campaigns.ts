@@ -281,6 +281,8 @@ export async function getCampaignDetail(id: string) {
                 select: {
                   id: true,
                   username: true,
+                  // La foto de la tarjeta, la misma que en Perfiles.
+                  profilePicUrl: true,
                   platform: {
                     select: { id: true, name: true, displayName: true },
                   },
@@ -295,6 +297,7 @@ export async function getCampaignDetail(id: string) {
                   id: true,
                   username: true,
                   followers: true,
+                  profilePicUrl: true,
                   platform: true,
                 },
               },

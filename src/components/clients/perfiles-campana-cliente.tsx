@@ -1,6 +1,7 @@
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { IdentidadInfluencer } from "@/components/campaigns/identidad-influencer";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import {
   PROFILE_STATUS_COLORS,
@@ -47,6 +48,7 @@ export interface PerfilCliente {
     socialAccount: {
       username: string;
       followers: number | null;
+      profilePicUrl?: string | null;
       platform: { name: string; displayName: string };
     };
     services: FormatoCliente[];
@@ -179,12 +181,16 @@ export function PerfilesCampanaCliente({
             }`}
           >
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="font-medium text-gray-900">{cp.profile.name}</h3>
+              {/* Solo las cuentas contratadas: son las que la
+                  consulta del portal deja salir. */}
+              <IdentidadInfluencer
+                nombre={cp.profile.name}
+                cuentas={cp.platforms.map((cpp) => cpp.socialAccount)}
+              >
                 {cp.profile.city && (
                   <p className="text-xs text-gray-500">{cp.profile.city.name}</p>
                 )}
-              </div>
+              </IdentidadInfluencer>
               <div className="flex flex-col items-end gap-2">
                 {/* El importe de un retirado ya no cuenta para la
                     campana, asi que decirlo como "total" induciria a

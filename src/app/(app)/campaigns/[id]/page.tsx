@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getCampaignDetail } from "@/data-access/campaigns";
+import { IdentidadInfluencer } from "@/components/campaigns/identidad-influencer";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -775,23 +776,25 @@ export default async function CampaignDetailPage({ params }: PageProps) {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <h3 className="font-medium">{cp.profile.name}</h3>
-                            {cp.profile.city && (
-                              <p className="text-xs text-gray-500">
-                                {cp.profile.city.name}
-                              </p>
-                            )}
-                            <Badge variant="secondary" className="mt-1">
-                              {cp.profile.type === "INFLUENCER"
-                                ? "Influencer"
-                                : cp.profile.type === "UGC"
-                                ? "UGC"
-                                : "Ambos"}
-                            </Badge>
-                          </div>
-                        </div>
+                        {/* Todas sus redes, no solo las contratadas:
+                            el enlace es para conocer al creador. */}
+                        <IdentidadInfluencer
+                          nombre={cp.profile.name}
+                          cuentas={cp.profile.socialAccounts}
+                        >
+                          {cp.profile.city && (
+                            <p className="text-xs text-gray-500">
+                              {cp.profile.city.name}
+                            </p>
+                          )}
+                          <Badge variant="secondary" className="mt-1">
+                            {cp.profile.type === "INFLUENCER"
+                              ? "Influencer"
+                              : cp.profile.type === "UGC"
+                              ? "UGC"
+                              : "Ambos"}
+                          </Badge>
+                        </IdentidadInfluencer>
                         <div className="flex flex-col items-end gap-2">
                           <div className="text-right">
                             <p className="text-xs text-gray-500">

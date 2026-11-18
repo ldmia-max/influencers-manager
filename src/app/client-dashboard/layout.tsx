@@ -7,10 +7,7 @@ import {
   verificarSesionCliente,
 } from "@/lib/client-session";
 import { CerrarSesionCliente } from "@/components/clients/cerrar-sesion-cliente";
-import {
-  PortalSidebar,
-  PortalNavMovil,
-} from "@/components/clients/portal-sidebar";
+import { PortalMenuSuperior } from "@/components/clients/portal-sidebar";
 
 /**
  * El armazon entero: cabecera, menu y contenido.
@@ -55,12 +52,9 @@ async function Armazon({ children }: { children: React.ReactNode }) {
         <CerrarSesionCliente />
       </div>
 
-      <PortalNavMovil />
+      <PortalMenuSuperior />
 
-      <div className="flex flex-1">
-        <PortalSidebar />
-        <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
-      </div>
+      <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
     </>
   );
 }
