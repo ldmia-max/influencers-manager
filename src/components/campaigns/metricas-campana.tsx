@@ -256,6 +256,13 @@ const SERIES = [
   { clave: "reposteos" as const, nombre: "Reposteos", color: "#f97316", icono: Repeat2 },
 ];
 
+/** Las cifras con grafica de evolucion, en el orden de sus botones. */
+const EN_EVOLUCION: (typeof SERIES)[number]["clave"][] = [
+  "vistas",
+  "meGusta",
+  "comentarios",
+];
+
 /**
  * Una cifra agregada, o una raya cuando ninguna de las publicaciones que
  * la componen la publica.
@@ -318,6 +325,9 @@ export function MetricasCampana({
    * total, que es lo que de verdad vio la gente.
    */
   const [vista, setVista] = useState<"campana" | "extra" | "general">("general");
+  /** Que cifra dibuja la grafica de Evolucion. */
+  const [claveEvolucion, setClaveEvolucion] =
+    useState<(typeof SERIES)[number]["clave"]>("vistas");
   const hayExtra = publicaciones.some((p) => p.esExtra);
 
   /**
@@ -746,6 +756,23 @@ export function MetricasCampana({
     };
   })();
 
+  /**
+   * Las cifras que tienen grafica de evolucion: vistas, me gusta y
+   * comentarios. Compartidos y reposteos se quedan en sus casillas; el
+   * alcance ni siquiera tiene curva, porque no sale de las capturas.
+   *
+   * Solo las que alguna publicacion da: un boton que abre una linea
+   * plana en cero diria "nadie", cuando lo que pasa es que la red no lo
+   * publica.
+   */
+  const seriesDeEvolucion = datos.totales.filter(
+    (t) => EN_EVOLUCION.includes(t.clave) && t.disponible
+  );
+  // Vistas primero; si la campana no tiene, la primera que haya.
+  const serieEvolucion =
+    seriesDeEvolucion.find((s) => s.clave === claveEvolucion) ??
+    seriesDeEvolucion[0];
+
   const refrescar = async () => {
     setRefrescando(true);
     setError(null);
@@ -1027,28 +1054,50 @@ export function MetricasCampana({
               </p>
             )}
 
-            {datos.evolucion.length > 1 && (
+            {datos.evolucion.length > 1 && seriesDeEvolucion.length > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-700">Evolución</p>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-700">Evolución</p>
+                  {/* Una grafica cada vez: en una sola, las vistas van
+                      por millones y aplastaban contra el eje a los me
+                      gusta y comentarios, que quedaban como una raya. */}
+                  <div
+                    role="group"
+                    aria-label="Cifra de la evolución"
+                    className="inline-flex rounded-lg bg-gray-100 p-[3px] text-xs"
+                  >
+                    {seriesDeEvolucion.map((s) => (
+                      <button
+                        key={s.clave}
+                        type="button"
+                        aria-pressed={serieEvolucion.clave === s.clave}
+                        onClick={() => setClaveEvolucion(s.clave)}
+                        className={`inline-flex items-center gap-1 rounded-md px-3 py-1 font-medium transition-colors ${
+                          serieEvolucion.clave === s.clave
+                            ? "bg-marca text-white"
+                            : "text-gray-600 hover:bg-accent/10"
+                        }`}
+                      >
+                        <s.icono className="h-3.5 w-3.5" />
+                        {s.nombre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={datos.evolucion}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="dia" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={formatCompactNumber} />
                     <Tooltip formatter={(v) => formatNumber(Number(v ?? 0))} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    {datos.totales
-                      .filter((t) => t.disponible)
-                      .map((t) => (
-                        <Line
-                          key={t.clave}
-                          type="monotone"
-                          dataKey={t.nombre}
-                          stroke={t.color}
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      ))}
+                    <Line
+                      key={serieEvolucion.clave}
+                      type="monotone"
+                      dataKey={serieEvolucion.nombre}
+                      stroke={serieEvolucion.color}
+                      strokeWidth={2}
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
