@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
+import { Check, ChevronDown, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,8 +49,15 @@ export function InformeCampana({
   const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Cerrado al entrar: son cinco cuadros de texto y la mayoria de las
+  // veces se descarga sin tocarlos. Lo escrito vive en `textos`, asi que
+  // plegarlo no pierde nada.
+  const [analisisAbierto, setAnalisisAbierto] = useState(false);
 
   const efectivo = (k: ClaveAnalisis) => enServidor[k] ?? propuesta[k];
+  const editados = APARTADOS_ANALISIS.filter(
+    ({ clave }) => enServidor[clave] !== undefined,
+  ).length;
   const sinGuardar = APARTADOS_ANALISIS.some(
     ({ clave }) => textos[clave].trim() !== efectivo(clave),
   );
@@ -161,79 +168,103 @@ export function InformeCampana({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Análisis general</CardTitle>
-          <p className="text-sm text-gray-500">
-            La app propone cada párrafo con las cifras reales y sin
-            valoraciones. Corrígelo o añade la lectura de la campaña; lo
-            que no cambies se recalcula en cada descarga.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {APARTADOS_ANALISIS.map(({ clave, titulo }) => {
-            const propio = enServidor[clave] !== undefined;
-            return (
-              <div key={clave} className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <label
-                    htmlFor={`analisis-${clave}`}
-                    className="text-sm font-medium text-gray-900"
-                  >
-                    {titulo}
-                  </label>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={propio ? "text-marca" : "text-gray-400"}>
-                      {propio ? "Editado" : "Propuesta"}
-                    </span>
-                    {puedeEditar && textos[clave] !== propuesta[clave] && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900"
-                        title="Volver al texto propuesto con las cifras de hoy"
-                        onClick={() =>
-                          setTextos((t) => ({ ...t, [clave]: propuesta[clave] }))
-                        }
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Restablecer
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <Textarea
-                  id={`analisis-${clave}`}
-                  value={textos[clave]}
-                  disabled={!puedeEditar}
-                  maxLength={1500}
-                  rows={3}
-                  onChange={(e) =>
-                    setTextos((t) => ({ ...t, [clave]: e.target.value }))
-                  }
-                />
-              </div>
-            );
-          })}
-          {puedeEditar && (
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={guardar}
-                disabled={!sinGuardar || guardando}
-              >
-                {guardando ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="mr-2 h-4 w-4" />
-                )}
-                Guardar análisis
-              </Button>
-              {sinGuardar && (
-                <span className="text-xs text-amber-700">
+          <button
+            type="button"
+            className="flex w-full items-start justify-between gap-4 text-left"
+            aria-expanded={analisisAbierto}
+            aria-controls="analisis-general"
+            onClick={() => setAnalisisAbierto((a) => !a)}
+          >
+            <div>
+              <CardTitle className="text-lg">Análisis general</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                {analisisAbierto
+                  ? "La app propone cada párrafo con las cifras reales y sin valoraciones. Corrígelo o añade la lectura de la campaña; lo que no cambies se recalcula en cada descarga."
+                  : `${editados} de ${APARTADOS_ANALISIS.length} apartados editados; el resto sale de las cifras de hoy.`}
+              </p>
+              {/* Plegado tiene que seguir viendose: al descargar se
+                  guarda lo pendiente, y eso no puede pasar sin aviso. */}
+              {!analisisAbierto && sinGuardar && (
+                <p className="mt-1 text-xs text-amber-700">
                   Hay cambios sin guardar: se guardan al descargar.
-                </span>
+                </p>
               )}
             </div>
-          )}
-        </CardContent>
+            <ChevronDown
+              className={`mt-1 h-5 w-5 shrink-0 text-gray-400 transition-transform ${
+                analisisAbierto ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </CardHeader>
+        {analisisAbierto && (
+          <CardContent id="analisis-general" className="space-y-4">
+            {APARTADOS_ANALISIS.map(({ clave, titulo }) => {
+              const propio = enServidor[clave] !== undefined;
+              return (
+                <div key={clave} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor={`analisis-${clave}`}
+                      className="text-sm font-medium text-gray-900"
+                    >
+                      {titulo}
+                    </label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={propio ? "text-marca" : "text-gray-400"}>
+                        {propio ? "Editado" : "Propuesta"}
+                      </span>
+                      {puedeEditar && textos[clave] !== propuesta[clave] && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900"
+                          title="Volver al texto propuesto con las cifras de hoy"
+                          onClick={() =>
+                            setTextos((t) => ({ ...t, [clave]: propuesta[clave] }))
+                          }
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Restablecer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <Textarea
+                    id={`analisis-${clave}`}
+                    value={textos[clave]}
+                    disabled={!puedeEditar}
+                    maxLength={1500}
+                    rows={3}
+                    onChange={(e) =>
+                      setTextos((t) => ({ ...t, [clave]: e.target.value }))
+                    }
+                  />
+                </div>
+              );
+            })}
+            {puedeEditar && (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={guardar}
+                  disabled={!sinGuardar || guardando}
+                >
+                  {guardando ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="mr-2 h-4 w-4" />
+                  )}
+                  Guardar análisis
+                </Button>
+                {sinGuardar && (
+                  <span className="text-xs text-amber-700">
+                    Hay cambios sin guardar: se guardan al descargar.
+                  </span>
+                )}
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
     </div>
   );
