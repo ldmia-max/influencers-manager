@@ -161,6 +161,13 @@ export {
   DIAS_DE_SEGUIMIENTO,
 } from "./metricas";
 
+// --- Informe de resultados ---
+export {
+  datosDelInforme,
+  analisisGuardado,
+  guardarAnalisis,
+} from "./informes";
+
 // --- Campaign Approval ---
 export {
   getApprovalData,

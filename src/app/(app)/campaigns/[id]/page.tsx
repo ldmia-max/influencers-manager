@@ -74,6 +74,9 @@ import {
 import { historicoDeCampana } from "@/data-access/metricas";
 import { listarPagos } from "@/data-access/pagos";
 import { PagosCampana } from "@/components/campaigns/pagos-campana";
+import { InformeCampana } from "@/components/campaigns/informe-campana";
+import { analisisGuardado, datosDelInforme } from "@/data-access/informes";
+import { analisisPropuesto } from "@/lib/informe/calculos";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
 
 interface PageProps {
@@ -1165,6 +1168,72 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       ),
     });
   }
+
+  // El informe de resultados va de ultimo: se prepara cuando lo demas
+  // ya paso. La ficha es de la agencia —el portal del cliente es otra
+  // sesion y otra pagina—, asi que el cliente no llega a verla.
+  const datosInforme = await datosDelInforme(id);
+  const piezasDelInforme = datosInforme.influencers.flatMap((i) => i.piezas);
+  const conEnlace = piezasDelInforme.filter((pz) => pz.url).length;
+  const conPortada = piezasDelInforme.filter((pz) => pz.miniatura).length;
+  const hayInfluencers = datosInforme.influencers.length > 0;
+  pestanas.push({
+    valor: "informes",
+    etiqueta: "Informes",
+    contenido: (
+      <InformeCampana
+        campaignId={id}
+        propuesta={analisisPropuesto(datosInforme)}
+        guardado={await analisisGuardado(id)}
+        puedeEditar={puede(rol, "campanas", "actualizar")}
+        apartados={[
+          {
+            titulo: "Portada",
+            detalle: `${datosInforme.campana.nombre} · ${datosInforme.campana.periodo} · ${datosInforme.campana.cliente}`,
+            incluido: true,
+          },
+          {
+            titulo: "Objetivos de campaña",
+            detalle:
+              datosInforme.objetivos.length > 0
+                ? `Del brief del cliente: ${datosInforme.objetivos.map((o) => o.titulo.toLowerCase()).join(", ")}.`
+                : "La campaña no viene de un brief: no hay objetivos que poner y la diapositiva no sale.",
+            incluido: datosInforme.objetivos.length > 0,
+          },
+          {
+            titulo: "Resultados de la campaña",
+            detalle: datosInforme.fechaDeCorte
+              ? `Las cifras de Impacto del contenido (vista General), con corte al ${datosInforme.fechaDeCorte}.`
+              : "Todavía no hay mediciones: las cifras saldrán con raya.",
+            incluido: true,
+          },
+          {
+            titulo: "Resultados individuales",
+            detalle: hayInfluencers
+              ? `Una diapositiva por influencer (${datosInforme.influencers.length}). ${conPortada} de ${conEnlace} publicaciones con enlace tienen portada guardada; a las de YouTube y TikTok que no la tengan se les busca al descargar, y las de Instagram la toman en el refresco diario de métricas. En lugar de los comentarios destacados —la app no los guarda— va el detalle por publicación.`
+              : "No hay influencers aprobados ni publicaciones.",
+            incluido: hayInfluencers,
+          },
+          {
+            titulo: "Comparativo de influencers",
+            detalle: "Visualizaciones, alcance, likes, comentarios y valor de cada uno, con el mejor resultado resaltado.",
+            incluido: hayInfluencers,
+          },
+          {
+            titulo: "Análisis de inversión",
+            detalle: "Inversión total, costo por visualización y por interacción de cada influencer.",
+            incluido: hayInfluencers,
+          },
+          {
+            titulo: "Análisis general",
+            detalle: "Los cinco párrafos de abajo.",
+            incluido: true,
+          },
+          { titulo: "Cierre", detalle: "Muchas gracias.", incluido: true },
+        ]}
+      />
+    ),
+  });
 
   return (
     <div className="space-y-6">

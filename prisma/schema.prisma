@@ -77,6 +77,9 @@ model User {
 
   /// Influencers que aprobo o rechazo en nombre del cliente.
   decisionesPorAgencia CampaignProfile[] @relation("DecisionesPorAgencia")
+
+  /// Informes de campana cuyo analisis corrigio esta persona.
+  informesEditados InformeCampana[]
 }
 
 // ============ GENEROS ============
@@ -584,6 +587,9 @@ model Campaign {
   // Briefs que originaron esta campaña (no agrega columna a Campaign)
   briefs CampaignBrief[]
 
+  /// Lo que mercadeo corrigio a mano del informe de resultados.
+  informe InformeCampana?
+
   /// Contabilidad agrupa y filtra por periodo, y la lista de campañas
   /// ordena por él.
   @@index([anio, mes])
@@ -977,6 +983,15 @@ model CampaignEntrega {
   /// de la campana.
   cifrasAnotadasEn DateTime?
 
+  /// Portada de la publicacion, para el informe al cliente.
+  ///
+  /// Llega gratis en la misma respuesta de Apify que trae las metricas
+  /// —Instagram `displayUrl`, TikTok `videoMeta.coverUrl`, YouTube
+  /// `thumbnailUrl`— y se descarga a uploads la primera vez, porque las
+  /// URL de esos CDN caducan en horas o dias. Nula en las historias, que
+  /// no tienen enlace, y en lo publicado antes de que existiera.
+  miniaturaUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1284,4 +1299,27 @@ model CampaignEntregaMetrica {
   entregaId String
 
   @@index([entregaId, capturadoEn])
+}
+
+/// El texto del informe de resultados que no sale de las cifras.
+///
+/// Todo lo demas del informe se calcula al descargarlo, asi que siempre
+/// dice lo que hay hoy en la base. Solo el analisis general es prosa:
+/// la app propone cada parrafo con las cifras reales y mercadeo puede
+/// reescribirlo. Se guarda lo reescrito —y solo eso—: un apartado sin
+/// valor aqui sigue saliendo de la propuesta, que se recalcula con las
+/// cifras del dia.
+model InformeCampana {
+  id String @id @default(cuid())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String   @unique
+
+  /// { alcance?, visibilidad?, interaccion?, desempeno?, eficiencia? }
+  analisis Json
+
+  actualizadoPor   User?    @relation(fields: [actualizadoPorId], references: [id])
+  actualizadoPorId String?
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
 }

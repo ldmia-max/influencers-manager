@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { obtenerMetricasDePublicaciones, plataformaDeUrl } from "@/lib/apify";
+import { obtenerMetricasDePublicaciones, guardarImagenRemota, plataformaDeUrl } from "@/lib/apify";
 import { idDePublicacion } from "@/lib/social-handles";
 
 /**
@@ -86,6 +86,8 @@ export async function refrescarMetricas(
 
   let guardadas = 0;
   const resumen: Record<string, number> = {};
+  /** Portadas recien leidas, por entrega. */
+  const portadas = new Map<string, string>();
 
   for (const [plataforma, lista] of porPlataforma) {
     const metricas = await obtenerMetricasDePublicaciones(
@@ -101,6 +103,7 @@ export async function refrescarMetricas(
         const id = idDePublicacion(entrega.url);
         const m = (id ? metricas.get(id) : undefined) ?? metricas.get(entrega.url);
         if (!m) return null;
+        if (m.miniatura) portadas.set(entrega.id, m.miniatura);
         return {
           entregaId: entrega.id,
           vistas: m.vistas,
@@ -120,7 +123,38 @@ export async function refrescarMetricas(
     resumen[plataforma] = filas.length;
   }
 
+  await guardarPortadas(portadas);
+
   return { consultadas: entregas.length, guardadas, porPlataforma: resumen };
+}
+
+/**
+ * Descarga la portada de las publicaciones que aun no la tienen.
+ *
+ * Solo la primera vez: la portada de un post no cambia, y descargarla
+ * en cada refresco llenaria el disco de copias. Va despues de guardar
+ * las metricas y con sus errores tragados, porque una imagen que no
+ * baja no puede costar la medicion del dia.
+ */
+async function guardarPortadas(portadas: Map<string, string>) {
+  if (portadas.size === 0) return;
+  const sinPortada = await prisma.campaignEntrega.findMany({
+    where: { id: { in: [...portadas.keys()] }, miniaturaUrl: null },
+    select: { id: true },
+  });
+  for (const { id } of sinPortada) {
+    try {
+      const url = await guardarImagenRemota(portadas.get(id)!, "publicaciones", id);
+      if (url) {
+        await prisma.campaignEntrega.update({
+          where: { id },
+          data: { miniaturaUrl: url },
+        });
+      }
+    } catch (error) {
+      console.error(`No se pudo guardar la portada de ${id}:`, error);
+    }
+  }
 }
 
 /**

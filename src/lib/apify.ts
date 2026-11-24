@@ -48,6 +48,20 @@ async function downloadProfilePicture(
   imageUrl: string,
   username: string
 ): Promise<string | null> {
+  return guardarImagenRemota(imageUrl, "profiles", username);
+}
+
+/**
+ * Descarga una imagen a uploads (o a Vercel Blob, si hay token).
+ *
+ * Es lo mismo que hace la foto de perfil, en otra carpeta: tambien lo
+ * usan las portadas de las publicaciones, cuyas URL de CDN caducan.
+ */
+export async function guardarImagenRemota(
+  imageUrl: string,
+  carpeta: string,
+  nombreBase: string
+): Promise<string | null> {
   try {
     // Descargar la imagen
     const response = await fetch(imageUrl);
@@ -61,23 +75,24 @@ async function downloadProfilePicture(
     // Determinar extensión del archivo
     const contentType = response.headers.get("content-type");
     const ext = contentType?.includes("png") ? "png" : "jpg";
-    const nombre = `${username}_${Date.now()}.${ext}`;
+    const seguro = nombreBase.replace(/[^\w.-]/g, "_").slice(0, 80);
+    const nombre = `${seguro}_${Date.now()}.${ext}`;
 
     if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const blob = await put(`profiles/${nombre}`, buffer, {
+      const blob = await put(`${carpeta}/${nombre}`, buffer, {
         access: "public",
         contentType: contentType || "image/jpeg",
       });
       return blob.url;
     }
 
-    const destino = join(directorioUploads(), "profiles");
+    const destino = join(directorioUploads(), carpeta);
     await mkdir(destino, { recursive: true });
     await writeFile(join(destino, nombre), buffer);
 
-    return `${RUTA_PUBLICA_UPLOADS}/profiles/${nombre}`;
+    return `${RUTA_PUBLICA_UPLOADS}/${carpeta}/${nombre}`;
   } catch (error) {
-    console.error("Error downloading profile picture:", error);
+    console.error(`Error guardando imagen en ${carpeta}:`, error);
     return null;
   }
 }
@@ -700,6 +715,16 @@ export interface MetricasPublicacion {
   guardados: number | null;
   /** Solo TikTok: publicar el video en el perfil propio. */
   reposteos: number | null;
+  /**
+   * Portada de la publicacion, tal como la da el actor. Es una URL de
+   * CDN que caduca: quien la use tiene que descargarla, no guardarla.
+   */
+  miniatura: string | null;
+}
+
+/** Una URL de imagen, o null si el actor no trajo nada utilizable. */
+function urlDeImagen(valor: unknown): string | null {
+  return typeof valor === "string" && /^https?:\/\//.test(valor) ? valor : null;
 }
 
 /** De que red es un link, mirando su dominio. */
@@ -773,6 +798,9 @@ export async function obtenerMetricasDePublicaciones(
           compartidos: num(it.shareCount),
           guardados: num(it.collectCount),
           reposteos: num(it.repostCount),
+          miniatura: urlDeImagen(
+            (it.videoMeta as Record<string, unknown> | undefined)?.coverUrl
+          ),
         });
       }
       return mapa;
@@ -799,6 +827,7 @@ export async function obtenerMetricasDePublicaciones(
           compartidos: null,
           guardados: null,
           reposteos: null,
+          miniatura: urlDeImagen(it.displayUrl),
         });
       }
       return mapa;
@@ -824,6 +853,7 @@ export async function obtenerMetricasDePublicaciones(
           compartidos: null,
           guardados: null,
           reposteos: null,
+          miniatura: urlDeImagen(it.thumbnailUrl),
         });
       }
       return mapa;

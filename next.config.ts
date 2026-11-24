@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   // .next/standalone, para que la imagen de Docker no lleve node_modules
   // entero. Lo consume el Dockerfile del despliegue en Dokploy.
   output: "standalone",
-  serverExternalPackages: ["@prisma/client", "bcryptjs"],
+  // pptxgenjs y sharp (el informe en PowerPoint) se cargan tal cual
+  // desde node_modules: sharp trae binarios nativos y pptxgenjs decide
+  // en tiempo de ejecucion si esta en Node o en un navegador.
+  serverExternalPackages: ["@prisma/client", "bcryptjs", "pptxgenjs", "sharp"],
   experimental: {
     webpackMemoryOptimizations: true
   },
