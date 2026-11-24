@@ -34,10 +34,10 @@ const SIN_TIPO = "__sin__";
  * contratado, que documentos faltan y con que tipo de persona se
  * negocio. Lo que registra contabilidad se ve, pero no se toca.
  *
- * Tras guardar se recarga la pagina entera en vez de refrescar: el
- * estado, los impuestos, el plazo y el saldo son calculados y cambian
- * con cada dato que entra, y `router.refresh()` no repinta en la
- * compilacion de produccion.
+ * Tras guardar no se recarga la pagina: el estado, los impuestos, el
+ * plazo y el saldo son calculados, asi que se pinta el pago tal como lo
+ * devuelve el servidor ya recalculado. Recargar devolvia la ficha a la
+ * pestana General, y `router.refresh()` no repinta en produccion.
  */
 export function PagosCampana({
   pagos: pagosDelServidor,
@@ -109,10 +109,18 @@ export function PagosCampana({
     setOcupado(id);
     setError(null);
     try {
-      await apiPatch(`/api/pagos/${id}/documentos`, datos);
-      window.location.reload();
+      // El servidor devuelve el pago recalculado —plazo, reserva con el
+      // tipo nuevo, estado— y se pinta solo esta tabla: recargar la
+      // pagina devolvia la ficha a la pestana General.
+      const actualizado = await apiPatch<PagoVista>(
+        `/api/pagos/${id}/documentos`,
+        datos
+      );
+      actualizar(actualizado);
+      setEditando(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Algo falló");
+    } finally {
       setOcupado(null);
     }
   };
