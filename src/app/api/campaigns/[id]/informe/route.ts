@@ -17,9 +17,9 @@ interface RouteParams {
  * cifras de hoy. Es solo de la agencia: el portal del cliente tiene su
  * propia sesion y no llega a esta ruta.
  *
- * No consume Apify: las portadas salen de lo que ya guardo el refresco
- * diario, y si falta alguna se piden a YouTube o al oEmbed de TikTok,
- * que son gratuitos.
+ * No consume Apify: las portadas salen de lo que ya guardaron los
+ * refrescos de metricas; solo a YouTube se le pide la miniatura, que es
+ * publica y gratuita.
  */
 export async function GET(_req: Request, { params }: RouteParams) {
   try {

@@ -1210,7 +1210,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           {
             titulo: "Resultados individuales",
             detalle: hayInfluencers
-              ? `Una diapositiva por influencer (${datosInforme.influencers.length}). ${conPortada} de ${conEnlace} publicaciones con enlace tienen portada guardada; a las de YouTube y TikTok que no la tengan se les busca al descargar, y las de Instagram la toman en el refresco diario de métricas. En lugar de los comentarios destacados —la app no los guarda— va el detalle por publicación.`
+              ? `Una diapositiva por influencer (${datosInforme.influencers.length}). ${conPortada} de ${conEnlace} publicaciones con enlace tienen portada guardada; salen las de más visualizaciones. Instagram y TikTok la guardan al medirse con Apify —el refresco diario o «Actualizar métricas» en Impacto del contenido—; a YouTube se le busca al descargar. En lugar de los comentarios destacados —la app no los guarda— va el detalle por publicación.`
               : "No hay influencers aprobados ni publicaciones.",
             incluido: hayInfluencers,
           },

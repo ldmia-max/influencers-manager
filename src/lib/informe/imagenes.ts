@@ -122,31 +122,14 @@ export async function recorteRedondeado(
 /**
  * Una portada cuando el refresco de metricas no guardo ninguna.
  *
- * Solo por vias gratuitas y publicas: la miniatura de YouTube se
- * construye con el id del video, y TikTok la da en su oEmbed sin
- * credenciales. Instagram no tiene ninguna de las dos —su oEmbed pide
- * un token de Facebook—, asi que ahi solo hay portada si el refresco
- * diario la trajo.
+ * Solo YouTube tiene una gratuita y publica: su miniatura se construye
+ * con el id del video. TikTok la daba en su oEmbed (`thumbnail_url`) y
+ * dejo de darla —hoy solo devuelve el reproductor—, e Instagram la pide
+ * con un token de Facebook. En esas dos solo hay portada si un refresco
+ * de metricas con Apify la guardo.
  */
-export async function portadaDeRespaldo(url: string | null): Promise<string | null> {
-  if (!url) return null;
-  const red = redDeUrl(url);
-  if (red === "youtube") {
-    const id = idDePublicacion(url);
-    return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
-  }
-  if (red === "tiktok") {
-    try {
-      const r = await fetch(
-        `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`,
-        { signal: AbortSignal.timeout(ESPERA_MS) },
-      );
-      if (!r.ok) return null;
-      const json = (await r.json()) as { thumbnail_url?: unknown };
-      return typeof json.thumbnail_url === "string" ? json.thumbnail_url : null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+export function portadaDeRespaldo(url: string | null): string | null {
+  if (!url || redDeUrl(url) !== "youtube") return null;
+  const id = idDePublicacion(url);
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }

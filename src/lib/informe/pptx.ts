@@ -542,8 +542,18 @@ function individual(
     charSpacing: 3,
     align: "center",
   });
-  const portadas = i.piezas
-    .map((_, k) => r.portadas.get(`${i.campaignProfileId}:${k}`) ?? null)
+  // Lo mas destacado primero: por visualizaciones y, a igualdad o sin
+  // ellas —un carrusel no publica vistas—, por me gusta. `k` es la
+  // posicion original, que es con la que se guardo cada portada.
+  const destacadas = i.piezas
+    .map((pz, k) => ({ pz, k }))
+    .sort(
+      (a, b) =>
+        (b.pz.vistas ?? -1) - (a.pz.vistas ?? -1) ||
+        (b.pz.meGusta ?? -1) - (a.pz.meGusta ?? -1),
+    );
+  const portadas = destacadas
+    .map(({ k }) => r.portadas.get(`${i.campaignProfileId}:${k}`) ?? null)
     .filter((x): x is ImagenInforme => x !== null)
     .slice(0, 2);
   if (portadas.length === 1) {
@@ -569,7 +579,7 @@ function individual(
   // Enlaces: uno por publicacion con link, como "VIDEO REEL" de la
   // plantilla. Las historias no tienen link y no se nombran aqui: estan
   // en la tabla de la derecha.
-  const enlaces = i.piezas.filter((pz) => pz.url).slice(0, 4);
+  const enlaces = destacadas.map(({ pz }) => pz).filter((pz) => pz.url).slice(0, 4);
   enlaces.forEach((pz, k) => {
     const col = enlaces.length > 2 ? k % 2 : 0;
     const fila = enlaces.length > 2 ? Math.floor(k / 2) : k;
@@ -611,7 +621,7 @@ function individual(
     color: GRIS,
     charSpacing: 3,
   });
-  const piezas = i.piezas.slice(0, 9);
+  const piezas = destacadas.map(({ pz }) => pz).slice(0, 9);
   const cabecera = ["Publicación", "Vistas", "Alcance", "Likes", "Coment."];
   const anchos = [262, 98, 98, 90, 92];
   const yTabla = 236;
@@ -1014,7 +1024,7 @@ async function cargarRecursos(d: DatosInforme): Promise<Recursos> {
     d.influencers.flatMap((i) => [
       cargarImagen(i.foto, 600).then((img) => fotos.set(i.campaignProfileId, img)),
       ...i.piezas.map(async (pz, k) => {
-        const origen = pz.miniatura ?? (await portadaDeRespaldo(pz.url));
+        const origen = pz.miniatura ?? portadaDeRespaldo(pz.url);
         portadas.set(`${i.campaignProfileId}:${k}`, await cargarImagen(origen, 700));
       }),
     ]),
