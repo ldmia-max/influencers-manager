@@ -361,7 +361,20 @@ export function PagosCampana({
                             pagado={p.estado === "PAGADO" && !p.loPagaElCliente}
                           />
                         </div>
-                        {p.documento && (
+                        {/* Pagado, lo que se viene a buscar es cuando se
+                            pago; el documento de la DIAN es cosa de
+                            contabilidad y sigue en su pantalla. La fecha
+                            se guarda a mediodia UTC, asi que se lee en
+                            UTC para que servidor y navegador den el
+                            mismo dia. */}
+                        {p.estado === "PAGADO" && p.abonos.length > 0 ? (
+                          <p className="mt-0.5 text-[11px] text-gray-500">
+                            pagado el{" "}
+                            {new Date(
+                              p.abonos[p.abonos.length - 1].fecha
+                            ).toLocaleDateString("es-CO", { timeZone: "UTC" })}
+                          </p>
+                        ) : p.documento && (
                           <p className="mt-0.5 text-[11px] text-gray-500">
                             doc. {p.documento}
                           </p>
