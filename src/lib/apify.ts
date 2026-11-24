@@ -757,6 +757,19 @@ const num = (v: unknown): number | null =>
  * vez de guardarse como ceros que falsearian el historico.
  */
 /**
+ * Si el actor devolvio un aviso en vez de la publicacion.
+ *
+ * Con un post borrado o privado los actores no omiten la fila: devuelven
+ * `{ error, errorCode, url }`. Como trae la URL, pasaba por medicion y se
+ * guardaba una captura con todas las cifras vacias que, por ser la mas
+ * reciente, tapaba la anterior: un TikTok de 6,1 millones de vistas
+ * quedaba en raya en Impacto y en el informe.
+ */
+function noSeLeyo(it: Record<string, unknown>): boolean {
+  return Boolean(it.error || it.errorCode);
+}
+
+/**
  * Guarda la medicion bajo su URL Y bajo su identificador, para que quien
  * la busque la encuentre venga como venga escrito el enlace.
  */
@@ -788,6 +801,7 @@ export async function obtenerMetricasDePublicaciones(
       const { items } = await client.dataset(run.defaultDatasetId).listItems();
       for (const bruto of items) {
         const it = bruto as Record<string, unknown>;
+        if (noSeLeyo(it)) continue;
         const url = String(it.webVideoUrl || it.url || "");
         if (!url) continue;
         indexar(mapa, url, {
@@ -816,6 +830,7 @@ export async function obtenerMetricasDePublicaciones(
       const { items } = await client.dataset(run.defaultDatasetId).listItems();
       for (const bruto of items) {
         const it = bruto as Record<string, unknown>;
+        if (noSeLeyo(it)) continue;
         const url = String(it.url || it.inputUrl || "");
         if (!url) continue;
         indexar(mapa, url, {
@@ -843,6 +858,7 @@ export async function obtenerMetricasDePublicaciones(
       const { items } = await client.dataset(run.defaultDatasetId).listItems();
       for (const bruto of items) {
         const it = bruto as Record<string, unknown>;
+        if (noSeLeyo(it)) continue;
         const url = String(it.url || "");
         if (!url) continue;
         indexar(mapa, url, {
