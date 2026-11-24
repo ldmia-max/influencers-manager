@@ -1,5 +1,5 @@
 import { sendEmail, type ResultadoEmail } from "./resend";
-import { avisoDePagoTemplate } from "./templates";
+import { avisoDePagoTemplate, pagoRealizadoTemplate } from "./templates";
 import { periodoLegible } from "@/lib/campaign-utils";
 import type { PagoVista } from "@/data-access/pagos";
 
@@ -47,6 +47,51 @@ export async function notifyAvisoDePago(params: {
       ...pago.otros.map((o) => ({ etiqueta: "Otro", nombre: o.nombre })),
     ],
     enviadoPor: params.enviadoPor,
+    url: `${baseUrl}/pagos`,
+  });
+
+  return sendEmail({ to: params.destino, ...template });
+}
+
+/**
+ * A donde va el aviso de que un influencer ya quedo pagado.
+ *
+ * Variable de entorno por la misma razon que el aviso de documentos:
+ * cambiar quien lo recibe es editar la variable y reiniciar.
+ */
+export function destinoDelPagoRealizado(): string | null {
+  return process.env.CORREO_PAGO_REALIZADO?.trim() || null;
+}
+
+/**
+ * Avisa de que contabilidad pago a un influencer.
+ *
+ * Devuelve el resultado en vez de lanzar: el pago ya esta guardado
+ * cuando esto corre, y un correo caido no debe hacer creer que el pago
+ * fallo. Quien llama decide como contarlo.
+ */
+export async function notifyPagoRealizado(params: {
+  destino: string;
+  pago: PagoVista;
+  valorPagado: number;
+  fechaPago: Date;
+  registradoPor: string;
+}): Promise<ResultadoEmail> {
+  const { pago } = params;
+  const [anio, mes] = pago.mesCampana.split("-").map(Number);
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+  const template = pagoRealizadoTemplate({
+    influencer: pago.influencer,
+    nombreCompleto: pago.nombreCompleto,
+    documentoIdentidad: pago.documentoIdentidad,
+    campana: pago.campana,
+    cliente: pago.cliente,
+    periodo: periodoLegible(anio, mes),
+    valorPagado: params.valorPagado,
+    fechaPago: params.fechaPago.toISOString(),
+    documentoDian: pago.documento,
+    registradoPor: params.registradoPor,
     url: `${baseUrl}/pagos`,
   });
 

@@ -116,6 +116,9 @@ export const ACCIONES = {
   /// Aviso a contabilidad de que los papeles estan y se puede pagar. La
   /// tabla solo guarda el ultimo; aqui queda cada envio y quien pulso.
   avisoDePagoEnviado: "pago.aviso_enviado",
+  /// Correo de que un influencer quedo pagado. Lo dispara el pago, no
+  /// un boton: queda aqui para saber que salio y a donde.
+  pagoRealizadoNotificado: "pago.pago_notificado",
   /// Aprobar en nombre del cliente un gasto que el no ha visto.
   influencerAprobadoPorAgencia: "campaign.influencer_approved_by_agency",
   /// Rechazar en nombre del cliente, y decidir un formato suyo. Misma

@@ -575,3 +575,62 @@ export function avisoDePagoTemplate(params: {
 
   return { subject, html };
 }
+
+// =============================================================================
+// Template 9: Aviso de que contabilidad pago a un influencer
+// =============================================================================
+
+/**
+ * "Se le pago a X".
+ *
+ * Va a un buzon de la agencia: lleva el valor girado y el documento de
+ * la DIAN, que es lo que quien lo recibe necesita para cuadrar sin
+ * abrir la aplicacion.
+ */
+export function pagoRealizadoTemplate(params: {
+  influencer: string;
+  nombreCompleto: string | null;
+  documentoIdentidad: string | null;
+  campana: string;
+  cliente: string;
+  periodo: string;
+  valorPagado: number;
+  fechaPago: string;
+  documentoDian: string | null;
+  registradoPor: string;
+  url: string;
+}): { subject: string; html: string } {
+  const subject = `Pago realizado: ${params.influencer} · ${params.campana}`;
+  const e = escaparHtml;
+  const fila = (etiqueta: string, valor: string) => `<tr>
+    <td style="padding:6px 12px 6px 0;font-size:13px;color:#71717a;white-space:nowrap;vertical-align:top;">${etiqueta}</td>
+    <td style="padding:6px 0;font-size:13px;color:#18181b;">${valor}</td>
+  </tr>`;
+  const vacio = `<span style="color:#a1a1aa;">sin registrar</span>`;
+
+  const titular = params.nombreCompleto
+    ? `${e(params.nombreCompleto)}${params.documentoIdentidad ? ` · ${e(params.documentoIdentidad)}` : ""}`
+    : vacio;
+
+  const html = baseLayout(`
+    <h2 style="margin:0 0 16px;font-size:18px;color:#18181b;">Pago realizado</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#3f3f46;line-height:1.6;">
+      Contabilidad registró el pago a <strong>${e(params.influencer)}</strong>
+      por la campaña <strong>${e(params.campana)}</strong>.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      ${fila("Influencer", e(params.influencer))}
+      ${fila("A nombre de", titular)}
+      ${fila("Campaña", e(params.campana))}
+      ${fila("Cliente", e(params.cliente))}
+      ${fila("Periodo", e(params.periodo))}
+      ${fila("Valor pagado", `<strong>$${Math.round(params.valorPagado).toLocaleString("es-CO")}</strong>`)}
+      ${fila("Fecha de pago", new Date(params.fechaPago).toLocaleDateString("es-CO", { timeZone: "UTC" }))}
+      ${fila("Documento DIAN", params.documentoDian ? e(params.documentoDian) : vacio)}
+    </table>
+    ${ctaButton("Ver pagos", params.url)}
+    <p style="margin:0;font-size:12px;color:#71717a;">Pago registrado por ${e(params.registradoPor)}.</p>
+  `);
+
+  return { subject, html };
+}

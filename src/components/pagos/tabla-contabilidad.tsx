@@ -212,7 +212,17 @@ function Fila({
     setGuardando(true);
     onError(null);
     try {
-      await accion();
+      const resultado = await accion();
+      // El pago quedo guardado; si el aviso por correo no salio, se dice
+      // antes de recargar para que nadie crea que el pago fallo ni que
+      // el aviso llego.
+      const email = (resultado as { email?: { sent: boolean; error?: string } } | undefined)
+        ?.email;
+      if (email && !email.sent) {
+        window.alert(
+          `El pago quedó registrado, pero no se pudo enviar el correo de aviso: ${email.error ?? "error desconocido"}.`
+        );
+      }
       window.location.reload();
     } catch (e) {
       onError(e instanceof Error ? e.message : "Algo falló");
@@ -669,7 +679,7 @@ function Fila({
                         valorPagadoNum > 0 &&
                         !borrador.loPagaElCliente
                       ) {
-                        await apiPost(
+                        return apiPost(
                           `/api/pagos/${p.campaignProfileId}/abonos`,
                           {
                             fecha: borrador.fechaPago,
