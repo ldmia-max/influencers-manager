@@ -818,9 +818,13 @@ export async function registrarAbono(
       "No se puede pagar todavía: faltan documentos obligatorios (cuenta de cobro, certificado bancario, contrato y RUT)."
     );
   }
-  if (datos.valor > actual.saldo + 0.5) {
+  // Contabilidad paga siempre completo: lo girado es el saldo, que ya es
+  // el valor a pagar mas o menos el ajuste. Ni mas, ni menos —un pago a
+  // medias dejaria un saldo que nadie va a volver a pagar—. Se tolera un
+  // peso por el redondeo de la pantalla.
+  if (Math.abs(datos.valor - actual.saldo) > 1) {
     throw new ValidationError(
-      `El valor supera lo que falta por pagar ($${Math.round(actual.saldo).toLocaleString("es-CO")}).`
+      `El pago debe ser por el valor a pagar con su ajuste: $${Math.round(actual.saldo).toLocaleString("es-CO")}.`
     );
   }
 

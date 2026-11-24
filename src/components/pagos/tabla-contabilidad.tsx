@@ -199,7 +199,7 @@ function Fila({
     motivoAjuste: "",
     loPagaElCliente: false,
   });
-  const [abono, setAbono] = useState({ fecha: "", valor: "", observacion: "" });
+  const [abono, setAbono] = useState({ fecha: "", observacion: "" });
   /** El comprobante ya subido, listo para ir con el pago. */
   const [comprobante, setComprobante] = useState<{ url: string; nombre: string } | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -458,7 +458,6 @@ function Fila({
                   onClick={() => {
                     setAbono({
                       fecha: new Date().toISOString().slice(0, 10),
-                      valor: String(Math.round(p.saldo)),
                       observacion: "",
                     });
                     setComprobante(null);
@@ -706,16 +705,29 @@ function Fila({
                   className="h-7 w-36 text-xs"
                 />
               </Campo>
-              <Campo etiqueta="Valor pagado">
-                <Input
-                  inputMode="numeric"
-                  value={abono.valor}
-                  onChange={(e) =>
-                    setAbono((a) => ({ ...a, valor: e.target.value }))
-                  }
-                  className="h-7 w-32 text-xs"
-                />
-              </Campo>
+              {/* No se escribe: contabilidad paga siempre completo, asi
+                  que lo pagado es el valor a pagar con su ajuste, que es
+                  el saldo. Dejarlo editable solo servia para equivocarse
+                  de cifra. El servidor tambien lo exige. */}
+              <div className="space-y-1">
+                <span className="block text-[11px] text-gray-500">
+                  Valor pagado
+                </span>
+                <p className="flex h-7 items-center text-sm font-semibold tabular-nums text-gray-900">
+                  ${formatNumber(Math.round(p.saldo))}
+                </p>
+              </div>
+              <p className="max-w-[16rem] pb-1 text-[11px] text-gray-500">
+                {i
+                  ? `Valor a pagar $${formatNumber(Math.round(i.valorAPagar))}`
+                  : "Valor a pagar"}
+                {p.ajuste !== 0 &&
+                  ` ${p.ajuste > 0 ? "+" : "−"} ajuste $${formatNumber(Math.round(Math.abs(p.ajuste)))}${
+                    p.motivoAjuste ? ` (${p.motivoAjuste})` : ""
+                  }`}
+                {p.abonado > 0 &&
+                  ` − ya pagado $${formatNumber(Math.round(p.abonado))}`}
+              </p>
               <Campo etiqueta="Observación">
                 <Input
                   value={abono.observacion}
@@ -775,7 +787,7 @@ function Fila({
                     subiendo ||
                     !comprobante ||
                     !abono.fecha ||
-                    !abono.valor.trim()
+                    p.saldo <= 0
                   }
                   title={
                     comprobante
@@ -786,7 +798,7 @@ function Fila({
                     correr(() =>
                       apiPost(`/api/pagos/${p.campaignProfileId}/abonos`, {
                         fecha: abono.fecha,
-                        valor: Number(abono.valor),
+                        valor: Math.round(p.saldo),
                         observacion: abono.observacion.trim() || null,
                         comprobante,
                       }),
