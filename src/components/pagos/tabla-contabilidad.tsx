@@ -232,6 +232,14 @@ function Fila({
   const pagado = p.estado === "PAGADO";
   // Sin los cuatro obligatorios no se gira; el servidor lo vuelve a mirar.
   const documentosCompletos = documentosObligatoriosCompletos(p);
+  // El registro de contabilidad esta hecho cuando tiene los datos de la
+  // DIAN y como factura: sin ellos no se sabe que se paga ni contra que.
+  const registroHecho = !!(
+    p.documento?.trim() &&
+    p.fechaDocumento &&
+    p.tipoPersona
+  );
+  const puedePagar = documentosCompletos && registroHecho;
 
   const correr = async (accion: () => Promise<unknown>) => {
     setGuardando(true);
@@ -447,13 +455,13 @@ function Fila({
                   type="button"
                   size="sm"
                   className="h-7 px-2 text-xs"
-                  disabled={!p.tipoPersona || !documentosCompletos}
+                  disabled={!puedePagar}
                   title={
                     !documentosCompletos
                       ? "Faltan documentos obligatorios: cuenta de cobro, certificado bancario, contrato y RUT"
-                      : p.tipoPersona
-                        ? "Anotar lo que se le giró"
-                        : "Primero registra cómo factura: de eso sale el valor a pagar"
+                      : !registroHecho
+                        ? "Primero haz el registro: documento DIAN, fecha del documento y cómo factura"
+                        : "Anotar el pago"
                   }
                   onClick={() => {
                     setAbono({

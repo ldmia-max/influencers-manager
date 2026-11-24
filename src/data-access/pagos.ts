@@ -818,6 +818,13 @@ export async function registrarAbono(
       "No se puede pagar todavía: faltan documentos obligatorios (cuenta de cobro, certificado bancario, contrato y RUT)."
     );
   }
+  // Y el registro de contabilidad hecho: el documento de la DIAN y su
+  // fecha. Es lo que habilita el boton Pagar; aqui se vuelve a mirar.
+  if (!actual.loPagaElCliente && (!actual.documento?.trim() || !actual.fechaDocumento)) {
+    throw new ValidationError(
+      "No se puede pagar todavía: primero haz el registro con el documento DIAN y su fecha."
+    );
+  }
   // Contabilidad paga siempre completo: lo girado es el saldo, que ya es
   // el valor a pagar mas o menos el ajuste. Ni mas, ni menos —un pago a
   // medias dejaria un saldo que nadie va a volver a pagar—. Se tolera un
