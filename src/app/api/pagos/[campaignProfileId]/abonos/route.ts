@@ -37,7 +37,12 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     const pago = await registrarAbono(
       campaignProfileId,
-      { fecha: body.fecha, valor: body.valor, observacion: body.observacion },
+      {
+        fecha: body.fecha,
+        valor: body.valor,
+        observacion: body.observacion,
+        comprobante: body.comprobante ?? null,
+      },
       sesion.userId
     );
 

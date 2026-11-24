@@ -80,4 +80,6 @@ export const abonoSchema = z.object({
     .number({ message: "Escribe un número" })
     .positive("El valor debe ser mayor que cero"),
   observacion: z.string().max(300).nullish(),
+  /** El comprobante de la transferencia, ya subido a /api/pagos/upload. */
+  comprobante: adjunto.nullish(),
 });

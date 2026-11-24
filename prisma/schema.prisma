@@ -1171,6 +1171,13 @@ model AbonoPago {
   valor       Decimal  @db.Decimal(12, 2)
   observacion String?
 
+  /// El comprobante de la transferencia que sube contabilidad al pagar.
+  ///
+  /// Va en el pago y no en PagoInfluencer: es la prueba de ESTE giro.
+  /// Nulo en los pagos anotados antes de que existiera.
+  comprobanteUrl    String?
+  comprobanteNombre String?
+
   /// Quien lo anoto. Un pago es dinero: conviene saberlo.
   registradoPor   User?   @relation(fields: [registradoPorId], references: [id])
   registradoPorId String?

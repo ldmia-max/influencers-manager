@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, FileText, Loader2, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -203,6 +203,34 @@ function Fila({
     valorTocado: false,
   });
   const [abono, setAbono] = useState({ fecha: "", valor: "", observacion: "" });
+  /** El comprobante ya subido, listo para ir con el pago. */
+  const [comprobante, setComprobante] = useState<{ url: string; nombre: string } | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+
+  /**
+   * Sube el archivo en cuanto se elige, antes de anotar el pago: asi el
+   * boton de anotar solo manda la referencia y, si la subida falla, se
+   * sabe antes de dar el pago por hecho.
+   */
+  const subirComprobante = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+    setSubiendo(true);
+    onError(null);
+    try {
+      const form = new FormData();
+      form.append("archivo", archivo);
+      const res = await fetch("/api/pagos/upload", { method: "POST", body: form });
+      const datos = await res.json();
+      if (!res.ok) throw new Error(datos.error ?? "No se pudo subir el comprobante");
+      setComprobante({ url: datos.url, nombre: datos.nombre });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "No se pudo subir el comprobante");
+    } finally {
+      setSubiendo(false);
+    }
+  };
 
   const pagado = p.estado === "PAGADO";
   // Sin los cuatro obligatorios no se gira; el servidor lo vuelve a mirar.
@@ -460,6 +488,7 @@ function Fila({
                       valor: String(Math.round(p.saldo)),
                       observacion: "",
                     });
+                    setComprobante(null);
                     setAbonando(true);
                   }}
                 >
@@ -482,6 +511,18 @@ function Fila({
                 {formatNumber(Math.round(a.valor))}
                 {a.observacion ? ` · ${a.observacion}` : ""}
                 {a.registradoPor ? ` · ${a.registradoPor}` : ""}
+                {a.comprobante && (
+                  <a
+                    href={a.comprobante.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Comprobante: ${a.comprobante.nombre}`}
+                    className="ml-1 inline-flex items-center gap-0.5 text-violet-700 hover:underline"
+                  >
+                    <FileText className="h-3 w-3" />
+                    comprobante
+                  </a>
+                )}
                 {puedeRegistrar && (
                   <button
                     type="button"
@@ -748,17 +789,60 @@ function Fila({
                   className="h-7 w-56 text-xs"
                 />
               </Campo>
+              <div className="space-y-1">
+                <span className="block text-[11px] text-gray-500">
+                  Comprobante de pago
+                </span>
+                <div className="flex h-7 items-center gap-2">
+                  {comprobante && (
+                    <a
+                      href={comprobante.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex max-w-[14rem] items-center gap-1 truncate text-xs text-violet-700 hover:underline"
+                      title={comprobante.nombre}
+                    >
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{comprobante.nombre}</span>
+                    </a>
+                  )}
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-7 cursor-pointer px-2 text-xs"
+                  >
+                    <label>
+                      {subiendo ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Paperclip className="mr-1 h-3 w-3" />
+                      )}
+                      {comprobante ? "Reemplazar" : "Subir comprobante"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        disabled={subiendo || guardando}
+                        onChange={subirComprobante}
+                      />
+                    </label>
+                  </Button>
+                </div>
+              </div>
               <div className="flex items-center gap-1 pb-1">
                 <Button
                   size="sm"
                   className="h-7 text-xs"
-                  disabled={guardando || !abono.fecha || !abono.valor.trim()}
+                  disabled={
+                    guardando || subiendo || !abono.fecha || !abono.valor.trim()
+                  }
                   onClick={() =>
                     correr(() =>
                       apiPost(`/api/pagos/${p.campaignProfileId}/abonos`, {
                         fecha: abono.fecha,
                         valor: Number(abono.valor),
                         observacion: abono.observacion.trim() || null,
+                        comprobante,
                       }),
                     )
                   }

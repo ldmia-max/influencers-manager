@@ -104,6 +104,8 @@ const SELECCION = {
           fecha: true,
           valor: true,
           observacion: true,
+          comprobanteUrl: true,
+          comprobanteNombre: true,
           registradoPor: { select: { name: true } },
         },
       },
@@ -120,6 +122,8 @@ export interface AbonoVista {
   fecha: string;
   valor: number;
   observacion: string | null;
+  /** El comprobante de la transferencia. Nulo en pagos antiguos. */
+  comprobante: { url: string; nombre: string } | null;
   registradoPor: string | null;
 }
 
@@ -267,6 +271,9 @@ function aVista(cp: Fila): PagoVista {
     fecha: a.fecha.toISOString(),
     valor: Number(a.valor),
     observacion: a.observacion,
+    comprobante: a.comprobanteUrl
+      ? { url: a.comprobanteUrl, nombre: a.comprobanteNombre ?? "" }
+      : null,
     registradoPor: a.registradoPor?.name ?? null,
   }));
   const abonado = abonos.reduce((s, a) => s + a.valor, 0);
@@ -759,7 +766,12 @@ export async function registrarPagoEnContabilidad(
 /** Un abono contra el pago. El saldo baja con cada uno. */
 export async function registrarAbono(
   campaignProfileId: string,
-  datos: { fecha: Date; valor: number; observacion?: string | null },
+  datos: {
+    fecha: Date;
+    valor: number;
+    observacion?: string | null;
+    comprobante?: { url: string; nombre: string } | null;
+  },
   usuarioId: string
 ) {
   await asegurarPago(campaignProfileId);
@@ -810,6 +822,8 @@ export async function registrarAbono(
       fecha: datos.fecha,
       valor: datos.valor,
       observacion: datos.observacion?.trim() || null,
+      comprobanteUrl: datos.comprobante?.url ?? null,
+      comprobanteNombre: datos.comprobante?.nombre ?? null,
       registradoPorId: usuarioId,
     },
   });
