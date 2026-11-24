@@ -1050,9 +1050,8 @@ model PagoInfluencer {
 
   /// El RUT, que es lo que decide si factura como natural o juridica.
   ///
-  /// Llega con la cuenta de cobro, y es opcional: contabilidad puede
-  /// registrar el pago sin el. No se pide cuando el perfil ya lo tiene
-  /// verificado de una campana anterior.
+  /// Obligatorio: sin el no se paga. Se pide en cada campana, aunque el
+  /// perfil ya lo tenga verificado de una anterior.
   rutUrl    String?
   rutNombre String?
 

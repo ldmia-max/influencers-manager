@@ -6,7 +6,7 @@ import { ZONA_AGENCIA } from "@/lib/fechas-agencia";
 /**
  * El boton que avisa a contabilidad de que se puede pagar.
  *
- * Apagado hasta que estan los tres documentos obligatorios. Se puede
+ * Apagado hasta que estan los cuatro documentos obligatorios. Se puede
  * pulsar las veces que haga falta: si el correo no llega, se vuelve a
  * mandar, y la fecha de "Envió" se mueve con cada envio que sale bien.
  */
@@ -17,7 +17,7 @@ export function BotonAvisoDePago({
   yaEnviado,
   onEnviar,
 }: {
-  /** Cuenta de cobro, certificado y contrato subidos. */
+  /** Cuenta de cobro, certificado, contrato y RUT subidos. */
   completo: boolean;
   puedeAvisar: boolean;
   enviando: boolean;
@@ -27,7 +27,7 @@ export function BotonAvisoDePago({
   const titulo = !puedeAvisar
     ? "No tienes permiso para avisar a contabilidad"
     : !completo
-      ? "Faltan documentos obligatorios: cuenta de cobro, certificado bancario y contrato"
+      ? "Faltan documentos obligatorios: cuenta de cobro, certificado bancario, contrato y RUT"
       : yaEnviado
         ? "Volver a avisar a contabilidad de que se puede pagar"
         : "Avisar a contabilidad de que se puede pagar";

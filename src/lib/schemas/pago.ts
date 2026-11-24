@@ -27,9 +27,9 @@ const dia = z.preprocess(
  * Lo que aporta mercadeo: los documentos, la fecha desde la que corre el
  * plazo y el tipo de persona que se pactó al negociar.
  *
- * Imprescindibles son tres: la cuenta de cobro, el certificado bancario
- * y el contrato. El RUT y la ARL son opcionales —ayudan a confirmar cómo
- * factura—, así que su ausencia no frena el registro.
+ * Imprescindibles son cuatro: la cuenta de cobro, el certificado
+ * bancario, el contrato y el RUT. La ARL es opcional. Ninguno se exige
+ * aquí —se suben de uno en uno—: lo que frenan es el pago.
  *
  * `null` retira un adjunto o deja el tipo en "todavía no se sabe";
  * ausente lo deja como estaba.

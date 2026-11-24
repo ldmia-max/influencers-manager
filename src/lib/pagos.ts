@@ -186,6 +186,7 @@ export interface DatosDePago {
   cuentaCobroUrl: string | null;
   certificadoUrl: string | null;
   contratoUrl: string | null;
+  rutUrl: string | null;
   documento: string | null;
   loPagaElCliente: boolean;
   /** Cuanto falta por pagar. */
@@ -210,14 +211,13 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
   // le pide cuenta de cobro a nadie, solo espera la confirmacion.
   if (pago.loPagaElCliente) return "REGISTRADO";
 
-  // Imprescindibles son tres: la cuenta de cobro, el certificado
-  // bancario y el contrato. El RUT y la ARL ayudan a confirmar como
-  // factura, y "otros" es lo que haga falta archivar, pero ninguno de
-  // los tres frena nada.
+  // Imprescindibles son cuatro: la cuenta de cobro, el certificado
+  // bancario, el contrato y el RUT. La ARL y "otros" son lo que haga
+  // falta archivar, pero no frenan nada.
   //
-  // El contrato se sumo despues, asi que los pagos antiguos que lo
-  // tenian todo menos ese papel volvieron a "Faltan documentos". Es lo
-  // correcto: eran pagos sin contrato y nadie lo estaba viendo.
+  // El contrato y luego el RUT se sumaron despues, asi que los pagos
+  // que lo tenian todo menos ese papel volvieron a "Faltan documentos".
+  // Es lo correcto: eran pagos sin ese papel y nadie lo estaba viendo.
   if (documentosObligatoriosCompletos(pago)) {
     return "DOCUMENTOS_RECIBIDOS";
   }
@@ -225,8 +225,13 @@ export function estadoDePago(pago: DatosDePago | null): EstadoPago {
 }
 
 /**
- * Si estan los tres papeles sin los que no se paga: cuenta de cobro,
- * certificado bancario y contrato.
+ * Si estan los cuatro papeles sin los que no se paga: cuenta de cobro,
+ * certificado bancario, contrato y RUT.
+ *
+ * El RUT se pide en cada campana aunque el perfil ya lo tenga
+ * verificado de una anterior: es lo que decidio la agencia, porque el
+ * RUT cambia —responsabilidades, regimen— y contabilidad paga contra el
+ * que tiene en la mano para ESE pago.
  *
  * Una sola regla para el estado del pago y para el boton que avisa a
  * contabilidad: si fueran dos, un dia se podria avisar de un pago que la
@@ -236,8 +241,14 @@ export function documentosObligatoriosCompletos(pago: {
   cuentaCobroUrl: string | null;
   certificadoUrl: string | null;
   contratoUrl: string | null;
+  rutUrl: string | null;
 }): boolean {
-  return !!(pago.cuentaCobroUrl && pago.certificadoUrl && pago.contratoUrl);
+  return !!(
+    pago.cuentaCobroUrl &&
+    pago.certificadoUrl &&
+    pago.contratoUrl &&
+    pago.rutUrl
+  );
 }
 
 export interface Plazo {

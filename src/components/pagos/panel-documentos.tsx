@@ -20,7 +20,7 @@ const HUECOS: { clave: Hueco; etiqueta: string; obligatorio: boolean }[] = [
   { clave: "cuentaCobro", etiqueta: "Cuenta de cobro", obligatorio: true },
   { clave: "certificado", etiqueta: "Certificado bancario", obligatorio: true },
   { clave: "contrato", etiqueta: "Contrato", obligatorio: true },
-  { clave: "rut", etiqueta: "RUT", obligatorio: false },
+  { clave: "rut", etiqueta: "RUT", obligatorio: true },
   { clave: "arl", etiqueta: "ARL", obligatorio: false },
 ];
 
@@ -33,9 +33,9 @@ function archivoDe(p: PagoVista, clave: Hueco) {
  * Cuantos de los seis hay: los cinco huecos con nombre, y "Otros", que
  * cuenta uno si tiene al menos un papel.
  *
- * `completo` mira solo los tres que frenan el pago —cuenta de cobro,
- * certificado y contrato—: 3/6 con esos tres esta listo para pagar,
- * 5/6 sin contrato no.
+ * `completo` mira solo los cuatro que frenan el pago —cuenta de cobro,
+ * certificado, contrato y RUT—: 4/6 con esos cuatro esta listo para
+ * pagar, 5/6 sin RUT no.
  */
 export function conteoDeDocumentos(p: PagoVista) {
   const presentes =
@@ -106,8 +106,8 @@ export function PanelDocumentos({
         onClick={() => setAbierto(true)}
         title={
           completo
-            ? "Están los tres obligatorios. Clic para ver los documentos."
-            : "Falta la cuenta de cobro, el certificado o el contrato. Clic para verlos."
+            ? "Están los cuatro obligatorios. Clic para ver los documentos."
+            : "Falta la cuenta de cobro, el certificado, el contrato o el RUT. Clic para verlos."
         }
         className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold tabular-nums transition-colors ${
           completo
@@ -138,7 +138,6 @@ export function PanelDocumentos({
             <ul className="divide-y rounded-lg border">
               {HUECOS.map((h) => {
                 const archivo = archivoDe(p, h.clave);
-                const rutVerificado = h.clave === "rut" && !archivo && p.tipoVerificado;
                 return (
                   <li key={h.clave} className="flex items-center gap-3 p-3">
                     <div className="min-w-0 flex-1">
@@ -160,11 +159,7 @@ export function PanelDocumentos({
                         }`}
                         title={archivo?.nombre}
                       >
-                        {archivo
-                          ? archivo.nombre || "Archivo subido"
-                          : rutVerificado
-                            ? "Ya verificado en otra campaña"
-                            : "Sin subir"}
+                        {archivo ? archivo.nombre || "Archivo subido" : "Sin subir"}
                       </p>
                     </div>
                     <Acciones

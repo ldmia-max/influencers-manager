@@ -310,6 +310,7 @@ function aVista(cp: Fila): PagoVista {
             cuentaCobroUrl: pago.cuentaCobroUrl,
             certificadoUrl: pago.certificadoUrl,
             contratoUrl: pago.contratoUrl,
+            rutUrl: pago.rutUrl,
             documento: pago.documento,
             loPagaElCliente: pago.loPagaElCliente,
             saldo,
@@ -483,7 +484,7 @@ export async function pagoListoParaAvisar(
   const pago = await obtenerPago(campaignProfileId);
   if (!documentosObligatoriosCompletos(pago)) {
     throw new ValidationError(
-      "Faltan documentos obligatorios: hacen falta la cuenta de cobro, el certificado bancario y el contrato."
+      "Faltan documentos obligatorios: hacen falta la cuenta de cobro, el certificado bancario, el contrato y el RUT."
     );
   }
   return pago;
@@ -537,7 +538,7 @@ async function asegurarPago(campaignProfileId: string) {
 }
 
 /**
- * Lo que aporta mercadeo: los tres documentos, la fecha de la cuenta de
+ * Lo que aporta mercadeo: los documentos, la fecha de la cuenta de
  * cobro y el tipo de persona que se pacto al negociar.
  */
 export async function guardarDocumentacionDePago(
@@ -786,6 +787,15 @@ export async function registrarAbono(
   if (!actual.tipoPersona) {
     throw new ValidationError(
       "Antes de anotar el pago confirma cómo factura (natural o jurídica): de eso salen el IVA y la retención."
+    );
+  }
+  // Sin los cuatro papeles no se gira: es la misma regla que pone el
+  // estado en "Faltan documentos", comprobada aqui porque el boton se
+  // puede saltar con una llamada directa. Lo que paga el cliente no
+  // pasa por aqui: no se le pide documentacion.
+  if (!actual.loPagaElCliente && !documentosObligatoriosCompletos(actual)) {
+    throw new ValidationError(
+      "No se puede pagar todavía: faltan documentos obligatorios (cuenta de cobro, certificado bancario, contrato y RUT)."
     );
   }
   if (datos.valor > actual.saldo + 0.5) {

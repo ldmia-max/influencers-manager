@@ -13,7 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
-import { calcularImpuestos, type TipoPersona } from "@/lib/pagos";
+import {
+  calcularImpuestos,
+  documentosObligatoriosCompletos,
+  type TipoPersona,
+} from "@/lib/pagos";
 import type { PagoVista } from "@/data-access/pagos";
 import { apiDelete, apiPatch, apiPost } from "@/services/api";
 import { Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
@@ -201,6 +205,8 @@ function Fila({
   const [abono, setAbono] = useState({ fecha: "", valor: "", observacion: "" });
 
   const pagado = p.estado === "PAGADO";
+  // Sin los cuatro obligatorios no se gira; el servidor lo vuelve a mirar.
+  const documentosCompletos = documentosObligatoriosCompletos(p);
 
   const correr = async (accion: () => Promise<unknown>) => {
     setGuardando(true);
@@ -430,11 +436,13 @@ function Fila({
                   type="button"
                   size="sm"
                   className="h-7 px-2 text-xs"
-                  disabled={!p.tipoPersona}
+                  disabled={!p.tipoPersona || !documentosCompletos}
                   title={
-                    p.tipoPersona
-                      ? "Anotar lo que se le giró"
-                      : "Primero registra cómo factura: de eso sale el valor a pagar"
+                    !documentosCompletos
+                      ? "Faltan documentos obligatorios: cuenta de cobro, certificado bancario, contrato y RUT"
+                      : p.tipoPersona
+                        ? "Anotar lo que se le giró"
+                        : "Primero registra cómo factura: de eso sale el valor a pagar"
                   }
                   onClick={() => {
                     setAbono({
