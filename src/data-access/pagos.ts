@@ -779,6 +779,14 @@ export async function registrarAbono(
   if (!Number.isFinite(datos.valor) || datos.valor <= 0) {
     throw new ValidationError("El valor del abono debe ser mayor que cero");
   }
+  // Sin comprobante no hay pago: es la prueba de que el dinero salio, y
+  // el boton ya lo exige; se comprueba aqui para que no se lo salte una
+  // llamada directa.
+  if (!datos.comprobante?.url) {
+    throw new ValidationError(
+      "Debes subir el comprobante de pago para poder guardar el pago."
+    );
+  }
 
   // El pago tiene que existir: se abona contra algo registrado, no
   // contra un influencer del que todavia no se sabe nada.

@@ -771,7 +771,16 @@ function Fila({
                   size="sm"
                   className="h-7 text-xs"
                   disabled={
-                    guardando || subiendo || !abono.fecha || !abono.valor.trim()
+                    guardando ||
+                    subiendo ||
+                    !comprobante ||
+                    !abono.fecha ||
+                    !abono.valor.trim()
+                  }
+                  title={
+                    comprobante
+                      ? undefined
+                      : "Sube el comprobante de pago para poder guardar el pago"
                   }
                   onClick={() =>
                     correr(() =>
@@ -802,6 +811,13 @@ function Fila({
                 </Button>
               </div>
             </div>
+            {/* Sin comprobante no se guarda: es la prueba de que el dinero
+                salio. El servidor tambien lo exige. */}
+            {!comprobante && (
+              <p className="mt-2 text-[11px] font-medium text-amber-700">
+                Debes subir el comprobante de pago para poder guardar el pago.
+              </p>
+            )}
           </td>
         </tr>
       )}
