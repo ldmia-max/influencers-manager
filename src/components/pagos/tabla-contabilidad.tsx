@@ -68,12 +68,15 @@ export function TablaPagos({
   puedeEditarDocumentos,
   conCampana = false,
   conTotales = true,
+  onActualizado,
 }: {
   pagos: PagoVista[];
   puedeRegistrar: boolean;
   puedeEditarDocumentos: boolean;
   conCampana?: boolean;
   conTotales?: boolean;
+  /** Recibe el pago que devuelve el servidor al tocar sus documentos. */
+  onActualizado?: (pago: PagoVista) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const columnas = COLUMNAS.filter(
@@ -113,6 +116,7 @@ export function TablaPagos({
                 conCampana={conCampana}
                 ancho={ancho}
                 onError={setError}
+                onActualizado={onActualizado}
               />
             ))}
           </tbody>
@@ -179,6 +183,7 @@ function Fila({
   conCampana,
   ancho,
   onError,
+  onActualizado,
 }: {
   pago: PagoVista;
   puedeRegistrar: boolean;
@@ -186,6 +191,7 @@ function Fila({
   conCampana: boolean;
   ancho: number;
   onError: (e: string | null) => void;
+  onActualizado?: (pago: PagoVista) => void;
 }) {
   const [editando, setEditando] = useState(false);
   const [abonando, setAbonando] = useState(false);
@@ -431,7 +437,11 @@ function Fila({
         </td>
 
         <td className="px-2 py-2 text-center">
-          <PanelDocumentos pago={p} puedeEditar={puedeEditarDocumentos} />
+          <PanelDocumentos
+            pago={p}
+            puedeEditar={puedeEditarDocumentos}
+            onActualizado={onActualizado}
+          />
         </td>
         <td className="px-2 py-2">
           <EstadoBadge estado={p.estado} loPagaElCliente={p.loPagaElCliente} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
@@ -94,7 +94,41 @@ export function VistaPagos({
     );
   };
 
-  const props = { puedeRegistrar, puedeEditarDocumentos };
+  // Lo que devolvio el servidor al subir o quitar un documento, pintado
+  // encima de lo que trajo la pagina. Recargar cerraba la campana
+  // desplegada y la barra lateral a mitad de subir papeles; y
+  // `router.refresh()` no repinta en produccion. Vive aqui y no en cada
+  // tabla para que las tres pestanas vean el mismo pago.
+  //
+  // Basta con la fila: los documentos no mueven el dinero, asi que los
+  // totales de la cabecera y de cada campana siguen siendo ciertos.
+  const [actualizados, setActualizados] = useState<Record<string, PagoVista>>({});
+  // Datos nuevos del servidor (otro filtro, una recarga) ya traen lo
+  // ultimo: la capa se descarta para no tapar algo mas reciente.
+  const [deServidor, setDeServidor] = useState(pagos);
+  if (deServidor !== pagos) {
+    setDeServidor(pagos);
+    setActualizados({});
+  }
+  const onActualizado = useCallback(
+    (p: PagoVista) =>
+      setActualizados((a) => ({ ...a, [p.campaignProfileId]: p })),
+    [],
+  );
+  const pagosVista = useMemo(
+    () => pagos.map((p) => actualizados[p.campaignProfileId] ?? p),
+    [pagos, actualizados],
+  );
+  const gruposVista = useMemo(
+    () =>
+      grupos.map((g) => ({
+        ...g,
+        pagos: g.pagos.map((p) => actualizados[p.campaignProfileId] ?? p),
+      })),
+    [grupos, actualizados],
+  );
+
+  const props = { puedeRegistrar, puedeEditarDocumentos, onActualizado };
 
   return (
     <Tabs value={vista} onValueChange={cambiar} className="gap-4">
@@ -124,13 +158,13 @@ export function VistaPagos({
       ) : (
         <>
           <TabsContent value="influencers">
-            <PestanaInfluencers pagos={pagos} {...props} />
+            <PestanaInfluencers pagos={pagosVista} {...props} />
           </TabsContent>
           <TabsContent value="campanas">
-            <PestanaCampanas grupos={grupos} {...props} />
+            <PestanaCampanas grupos={gruposVista} {...props} />
           </TabsContent>
           <TabsContent value="meses">
-            <PestanaMeses grupos={grupos} mesActual={mesActual} {...props} />
+            <PestanaMeses grupos={gruposVista} mesActual={mesActual} {...props} />
           </TabsContent>
         </>
       )}
@@ -141,6 +175,7 @@ export function VistaPagos({
 interface Permisos {
   puedeRegistrar: boolean;
   puedeEditarDocumentos: boolean;
+  onActualizado: (pago: PagoVista) => void;
 }
 
 function PestanaInfluencers({

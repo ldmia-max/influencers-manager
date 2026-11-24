@@ -67,9 +67,8 @@ async function subirArchivo(archivo: File): Promise<{ url: string; nombre: strin
  * General y esta barra sigue abierta para subir el siguiente papel.
  * `router.refresh()` no sirve aqui porque no repinta en produccion.
  *
- * Sin `onActualizado` se recarga la pagina entera, que es lo que sigue
- * haciendo /pagos: alli los totales de cada grupo y de la cabecera
- * salen del servidor y repintarlos a mano seria adivinar.
+ * Lo usan Campana › Pagos y /pagos. Sin `onActualizado` se recarga la
+ * pagina entera, como ultimo recurso.
  */
 export function PanelDocumentos({
   pago: p,
