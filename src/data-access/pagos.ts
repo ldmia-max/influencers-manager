@@ -489,6 +489,13 @@ export async function pagoListoParaAvisar(
   campaignProfileId: string
 ): Promise<PagoVista> {
   const pago = await obtenerPago(campaignProfileId);
+  // Ya pagado no se avisa: el correo dice "se puede proceder con el
+  // pago", y recibirlo de algo ya girado invita a pagarlo dos veces.
+  if (pago.estado === "PAGADO") {
+    throw new ValidationError(
+      "Este influencer ya está pagado: no hace falta avisar a contabilidad."
+    );
+  }
   if (!documentosObligatoriosCompletos(pago)) {
     throw new ValidationError(
       "Faltan documentos obligatorios: hacen falta la cuenta de cobro, el certificado bancario, el contrato y el RUT."

@@ -12,6 +12,7 @@ import { ZONA_AGENCIA } from "@/lib/fechas-agencia";
  */
 export function BotonAvisoDePago({
   completo,
+  pagado = false,
   puedeAvisar,
   enviando,
   yaEnviado,
@@ -19,12 +20,19 @@ export function BotonAvisoDePago({
 }: {
   /** Cuenta de cobro, certificado, contrato y RUT subidos. */
   completo: boolean;
+  /**
+   * Ya se le pago: avisar de que "se puede pagar" no tiene sentido, y
+   * mandaria a contabilidad a pagar dos veces lo mismo.
+   */
+  pagado?: boolean;
   puedeAvisar: boolean;
   enviando: boolean;
   yaEnviado: boolean;
   onEnviar: () => void;
 }) {
-  const titulo = !puedeAvisar
+  const titulo = pagado
+    ? "Ya está pagado: no hace falta avisar a contabilidad"
+    : !puedeAvisar
     ? "No tienes permiso para avisar a contabilidad"
     : !completo
       ? "Faltan documentos obligatorios: cuenta de cobro, certificado bancario, contrato y RUT"
@@ -37,7 +45,7 @@ export function BotonAvisoDePago({
       type="button"
       title={titulo}
       aria-label={titulo}
-      disabled={!completo || !puedeAvisar || enviando}
+      disabled={pagado || !completo || !puedeAvisar || enviando}
       onClick={onEnviar}
       className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-marca/40 text-marca transition-colors hover:bg-marca hover:text-white disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300 disabled:hover:bg-transparent"
     >

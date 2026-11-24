@@ -291,6 +291,7 @@ export function PagosCampana({
                       <td className="px-2 py-2 text-center">
                         <BotonAvisoDePago
                           completo={documentosObligatoriosCompletos(p)}
+                          pagado={p.estado === "PAGADO"}
                           puedeAvisar={puedeAvisar}
                           enviando={avisando === p.campaignProfileId}
                           yaEnviado={
