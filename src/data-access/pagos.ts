@@ -690,6 +690,15 @@ export async function registrarPagoEnContabilidad(
 ) {
   const cp = await asegurarPago(campaignProfileId);
 
+  // Pagado, el registro queda cerrado: cambiar el ajuste o el tipo
+  // despues recalcularia el saldo y un influencer ya pagado volveria a
+  // deber. Para corregir, primero se quita el pago.
+  if ((await obtenerPago(campaignProfileId)).estado === "PAGADO") {
+    throw new ValidationError(
+      "Este influencer ya está pagado: para cambiar el registro, quita primero el pago."
+    );
+  }
+
   const pago = await prisma.pagoInfluencer.findUnique({
     where: { campaignProfileId },
     select: {
