@@ -198,9 +198,6 @@ function Fila({
     ajuste: "",
     motivoAjuste: "",
     loPagaElCliente: false,
-    fechaPago: "",
-    valorPagado: "",
-    valorTocado: false,
   });
   const [abono, setAbono] = useState({ fecha: "", valor: "", observacion: "" });
   /** El comprobante ya subido, listo para ir con el pago. */
@@ -267,49 +264,25 @@ function Fila({
       ajuste: p.ajuste ? String(p.ajuste) : "",
       motivoAjuste: p.motivoAjuste ?? "",
       loPagaElCliente: p.loPagaElCliente,
-      fechaPago: "",
-      valorPagado: "",
-      valorTocado: false,
     });
     setEditando(true);
   };
 
-  // Lo que falta girar con lo que dice el formulario ahora mismo: el
-  // valor a pagar del tipo elegido, mas o menos el ajuste, menos lo ya
-  // pagado. Sin tipo no hay cifra: el IVA y la retencion dependen de el.
+  // El valor a pagar con lo que dice el formulario ahora mismo: el del
+  // tipo elegido, mas o menos el ajuste. Solo se muestra: registrar ya no
+  // paga, eso lo hace el boton Pagar. Sin tipo no hay cifra: el IVA y la
+  // retencion dependen de el.
   const ajusteBorrador = Number(borrador.ajuste.trim() || 0);
-  const debidoBorrador =
+  const valorAPagarBorrador =
     borrador.tipo === SIN_TIPO || !Number.isFinite(ajusteBorrador)
       ? null
       : Math.max(
           Math.round(
             calcularImpuestos(p.base, borrador.tipo as TipoPersona)
-              .valorAPagar +
-              ajusteBorrador -
-              p.abonado,
+              .valorAPagar + ajusteBorrador,
           ),
           0,
         );
-  // Mientras nadie lo escriba a mano, el valor sigue al calculo: cambiar
-  // el tipo o el ajuste lo recalcula.
-  const valorPagado = borrador.valorTocado
-    ? borrador.valorPagado
-    : borrador.fechaPago && debidoBorrador
-      ? String(debidoBorrador)
-      : "";
-  const valorPagadoNum = Number(valorPagado.trim() || 0);
-  const errorPago =
-    !borrador.fechaPago && !valorPagado.trim()
-      ? null
-      : debidoBorrador === null
-        ? "Elige cómo factura para calcular el valor a pagar."
-        : !borrador.fechaPago
-          ? "Falta la fecha de pago."
-          : !Number.isFinite(valorPagadoNum) || valorPagadoNum <= 0
-            ? "El valor pagado debe ser mayor que cero."
-            : valorPagadoNum > debidoBorrador
-              ? `No puede superar lo que falta por pagar ($${formatNumber(debidoBorrador)}).`
-              : null;
 
   const i = p.impuestos;
 
@@ -639,54 +612,34 @@ function Fila({
               </label>
             </div>
 
-            {/* El pago, en el mismo gesto que el registro: el valor sale
-                solo del tipo y del ajuste, y se puede corregir a mano
-                para un pago parcial. */}
-            {!pagado && !borrador.loPagaElCliente && (
+            {/* Lo que se le pagara, segun el tipo y el ajuste elegidos.
+                Solo se lee: la fecha y el valor pagado se anotan con el
+                boton Pagar, que es el unico que registra el pago. */}
+            {!borrador.loPagaElCliente && (
               <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
-                <Campo etiqueta="Fecha de pago">
-                  <Input
-                    type="date"
-                    value={borrador.fechaPago}
-                    onChange={(e) =>
-                      setBorrador((b) => ({ ...b, fechaPago: e.target.value }))
-                    }
-                    className="h-7 w-36 text-xs"
-                  />
-                </Campo>
-                <Campo etiqueta="Valor pagado">
-                  <Input
-                    inputMode="numeric"
-                    placeholder={debidoBorrador ? String(debidoBorrador) : "0"}
-                    value={valorPagado}
-                    onChange={(e) =>
-                      setBorrador((b) => ({
-                        ...b,
-                        valorPagado: e.target.value.replace(/\D/g, ""),
-                        valorTocado: true,
-                      }))
-                    }
-                    className="h-7 w-32 text-xs"
-                  />
-                </Campo>
-                <p className="pb-1.5 text-[11px] text-gray-500">
-                  {debidoBorrador === null
+                <div className="space-y-1">
+                  <span className="block text-[11px] text-gray-500">
+                    Valor a pagar
+                  </span>
+                  <p className="text-sm font-semibold tabular-nums text-gray-900">
+                    {valorAPagarBorrador === null
+                      ? "—"
+                      : `$${formatNumber(valorAPagarBorrador)}`}
+                  </p>
+                </div>
+                <p className="pb-0.5 text-[11px] text-gray-500">
+                  {valorAPagarBorrador === null
                     ? "Elige cómo factura para calcular el valor."
-                    : `Falta por pagar: $${formatNumber(debidoBorrador)} (${
+                    : `${
                         borrador.tipo === "NATURAL"
-                          ? "natural: sin IVA, 10% de retención"
-                          : "jurídica: IVA 19%, 11% de retención"
+                          ? "Natural: sin IVA, 10% de retención"
+                          : "Jurídica: IVA 19%, 11% de retención"
                       }${
                         ajusteBorrador
                           ? `, ajuste ${ajusteBorrador > 0 ? "+" : "−"}$${formatNumber(Math.abs(ajusteBorrador))}`
                           : ""
-                      }${p.abonado ? `, ya pagado $${formatNumber(Math.round(p.abonado))}` : ""})`}
+                      }. El pago se anota con el botón Pagar.`}
                 </p>
-                {errorPago && (
-                  <p className="pb-1.5 text-[11px] font-medium text-red-600">
-                    {errorPago}
-                  </p>
-                )}
               </div>
             )}
 
@@ -695,10 +648,10 @@ function Fila({
                 <Button
                   size="sm"
                   className="h-7 text-xs"
-                  disabled={guardando || !!errorPago}
+                  disabled={guardando}
                   onClick={() =>
-                    correr(async () => {
-                      await apiPatch(
+                    correr(() =>
+                      apiPatch(
                         `/api/pagos/${p.campaignProfileId}/registro`,
                         {
                           documento: borrador.documento.trim() || null,
@@ -712,24 +665,8 @@ function Fila({
                           motivoAjuste: borrador.motivoAjuste.trim() || null,
                           loPagaElCliente: borrador.loPagaElCliente,
                         },
-                      );
-                      // Despues del registro: el servidor mide el saldo
-                      // con el tipo y el ajuste recien guardados.
-                      if (
-                        borrador.fechaPago &&
-                        valorPagadoNum > 0 &&
-                        !borrador.loPagaElCliente
-                      ) {
-                        return apiPost(
-                          `/api/pagos/${p.campaignProfileId}/abonos`,
-                          {
-                            fecha: borrador.fechaPago,
-                            valor: valorPagadoNum,
-                            observacion: null,
-                          },
-                        );
-                      }
-                    })
+                      ),
+                    )
                   }
                 >
                   {guardando ? (
@@ -769,7 +706,7 @@ function Fila({
                   className="h-7 w-36 text-xs"
                 />
               </Campo>
-              <Campo etiqueta="Valor">
+              <Campo etiqueta="Valor pagado">
                 <Input
                   inputMode="numeric"
                   value={abono.valor}
