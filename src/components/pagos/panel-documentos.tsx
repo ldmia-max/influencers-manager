@@ -61,16 +61,24 @@ async function subirArchivo(archivo: File): Promise<{ url: string; nombre: strin
  * pantalla. En la fila queda el contador; aqui se ven, se descargan, se
  * suben y se lee o corrige el comentario de mercadeo.
  *
- * Tras cada cambio se recarga la pagina, como en el resto de pagos: el
- * estado del pago es calculado y router.refresh() no repinta en la
- * compilacion de produccion.
+ * Cada ruta devuelve el pago ya recalculado —estado, contador, si se
+ * puede avisar—, y con `onActualizado` se le entrega al padre para que
+ * lo pinte sin recargar: la pagina no parpadea, la pestana no vuelve a
+ * General y esta barra sigue abierta para subir el siguiente papel.
+ * `router.refresh()` no sirve aqui porque no repinta en produccion.
+ *
+ * Sin `onActualizado` se recarga la pagina entera, que es lo que sigue
+ * haciendo /pagos: alli los totales de cada grupo y de la cabecera
+ * salen del servidor y repintarlos a mano seria adivinar.
  */
 export function PanelDocumentos({
   pago: p,
   puedeEditar,
+  onActualizado,
 }: {
   pago: PagoVista;
   puedeEditar: boolean;
+  onActualizado?: (pago: PagoVista) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -80,19 +88,24 @@ export function PanelDocumentos({
   const { presentes, total, completo } = conteoDeDocumentos(p);
   const base = `/api/pagos/${p.campaignProfileId}/documentos`;
 
-  const correr = async (clave: string, accion: () => Promise<unknown>) => {
+  const correr = async (clave: string, accion: () => Promise<PagoVista>) => {
     setOcupado(clave);
     setError(null);
     try {
-      await accion();
-      window.location.reload();
+      const actualizado = await accion();
+      if (!onActualizado) {
+        window.location.reload();
+        return;
+      }
+      onActualizado(actualizado);
+      setOcupado(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Algo falló");
       setOcupado(null);
     }
   };
 
-  const elegir = (clave: string, alElegir: (doc: { url: string; nombre: string }) => Promise<unknown>) =>
+  const elegir = (clave: string, alElegir: (doc: { url: string; nombre: string }) => Promise<PagoVista>) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const archivo = e.target.files?.[0];
       e.target.value = "";
@@ -166,7 +179,9 @@ export function PanelDocumentos({
                       archivo={archivo}
                       ocupado={ocupado === h.clave}
                       puedeSubir={puedeEditar}
-                      onElegir={elegir(h.clave, (doc) => apiPatch(base, { [h.clave]: doc }))}
+                      onElegir={elegir(h.clave, (doc) =>
+                        apiPatch<PagoVista>(base, { [h.clave]: doc })
+                      )}
                     />
                   </li>
                 );
@@ -190,7 +205,9 @@ export function PanelDocumentos({
                         className="h-7 w-7 text-gray-400 hover:text-red-600"
                         title="Quitar este documento"
                         disabled={ocupado !== null}
-                        onClick={() => correr(d.id, () => apiDelete(`${base}/otros/${d.id}`))}
+                        onClick={() =>
+                          correr(d.id, () => apiDelete<PagoVista>(`${base}/otros/${d.id}`))
+                        }
                       >
                         {ocupado === d.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -213,7 +230,9 @@ export function PanelDocumentos({
                       type="file"
                       className="hidden"
                       disabled={ocupado !== null}
-                      onChange={elegir("otros", (doc) => apiPost(`${base}/otros`, doc))}
+                      onChange={elegir("otros", (doc) =>
+                        apiPost<PagoVista>(`${base}/otros`, doc)
+                      )}
                     />
                   </label>
                 )}
@@ -239,7 +258,9 @@ export function PanelDocumentos({
                     }
                     onClick={() =>
                       correr("comentario", () =>
-                        apiPatch(base, { observaciones: comentario.trim() || null })
+                        apiPatch<PagoVista>(base, {
+                          observaciones: comentario.trim() || null,
+                        })
                       )
                     }
                   >

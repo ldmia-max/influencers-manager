@@ -40,7 +40,7 @@ const SIN_TIPO = "__sin__";
  * compilacion de produccion.
  */
 export function PagosCampana({
-  pagos,
+  pagos: pagosDelServidor,
   puedeEditar,
   puedeAvisar = puedeEditar,
 }: {
@@ -53,6 +53,23 @@ export function PagosCampana({
    */
   puedeAvisar?: boolean;
 }) {
+  /**
+   * Los pagos que cambiaron en esta visita, tal como los devolvio el
+   * servidor. Se pintan encima de los de la carga: subir un documento ya
+   * no recarga la pagina —que devolvia la ficha a General y cerraba la
+   * barra lateral— y `router.refresh()` no repinta en produccion.
+   *
+   * Son la respuesta del servidor, no una suposicion: estado, contador
+   * y totales salen ya recalculados. Una recarga los descarta, y con
+   * ella llegan los mismos valores desde la base.
+   */
+  const [actualizados, setActualizados] = useState<Record<string, PagoVista>>({});
+  const pagos = pagosDelServidor.map(
+    (p) => actualizados[p.campaignProfileId] ?? p
+  );
+  const actualizar = (p: PagoVista) =>
+    setActualizados((a) => ({ ...a, [p.campaignProfileId]: p }));
+
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState({
     fecha: "",
@@ -256,7 +273,11 @@ export function PagosCampana({
                         )}
                       </td>
                       <td className="px-2 py-2 text-center">
-                        <PanelDocumentos pago={p} puedeEditar={puedeEditar} />
+                        <PanelDocumentos
+                          pago={p}
+                          puedeEditar={puedeEditar}
+                          onActualizado={actualizar}
+                        />
                       </td>
                       <td className="px-2 py-2 text-center">
                         <BotonAvisoDePago
