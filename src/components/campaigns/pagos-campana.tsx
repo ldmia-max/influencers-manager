@@ -20,6 +20,7 @@ import type { PagoVista } from "@/data-access/pagos";
 import { apiPatch, apiPost } from "@/services/api";
 import { Dinero, EstadoBadge, Vencimiento } from "@/components/pagos/piezas";
 import { PanelDocumentos } from "@/components/pagos/panel-documentos";
+import { ComprobanteDePago } from "@/components/pagos/comprobante-de-pago";
 import {
   BotonAvisoDePago,
   FechaAvisoDePago,
@@ -349,10 +350,16 @@ export function PagosCampana({
                         />
                       </td>
                       <td className="px-2 py-2">
-                        <EstadoBadge
-                          estado={p.estado}
-                          loPagaElCliente={p.loPagaElCliente}
-                        />
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <EstadoBadge
+                            estado={p.estado}
+                            loPagaElCliente={p.loPagaElCliente}
+                          />
+                          <ComprobanteDePago
+                            abonos={p.abonos}
+                            pagado={p.estado === "PAGADO" && !p.loPagaElCliente}
+                          />
+                        </div>
                         {p.documento && (
                           <p className="mt-0.5 text-[11px] text-gray-500">
                             doc. {p.documento}
