@@ -742,8 +742,11 @@ export function plataformaDeUrl(url: string): string | null {
   return null;
 }
 
+// Negativo es "no disponible", no una cifra: Instagram devuelve
+// likesCount = -1 cuando el creador oculta los me gusta, y se guardaba
+// tal cual, restando de los totales.
 const num = (v: unknown): number | null =>
-  typeof v === "number" && Number.isFinite(v) ? v : null;
+  typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
 
 /**
  * Lee las metricas de varias publicaciones de la MISMA red.

@@ -77,6 +77,7 @@ import { PagosCampana } from "@/components/campaigns/pagos-campana";
 import { InformeCampana } from "@/components/campaigns/informe-campana";
 import { analisisGuardado, datosDelInforme } from "@/data-access/informes";
 import { analisisPropuesto } from "@/lib/informe/calculos";
+import { rellenarCapturas } from "@/lib/impacto";
 import { getAllProfilesForEditor } from "@/data-access/profiles";
 
 interface PageProps {
@@ -249,8 +250,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // dos secciones no puedan dar cifras distintas de lo mismo. Sumar
   // todas las capturas contaria varias veces la misma publicacion:
   // las metricas son acumuladas, no incrementos.
+  // Con los huecos rellenos, como Impacto: una lectura vacia no borra
+  // lo ya conseguido.
   const ultimaPorEntrega = new Map<string, (typeof capturas)[number]>();
-  for (const c of capturas) {
+  for (const c of rellenarCapturas(capturas)) {
     const previa = ultimaPorEntrega.get(c.entregaId);
     if (!previa || c.capturadoEn > previa.capturadoEn) {
       ultimaPorEntrega.set(c.entregaId, c);

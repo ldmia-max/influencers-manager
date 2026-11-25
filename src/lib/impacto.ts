@@ -145,6 +145,59 @@ export function interaccionesDe(c: {
   );
 }
 
+/** Las cifras de una captura que pueden faltar en una lectura. */
+const CIFRAS_DE_CAPTURA = [
+  "vistas",
+  "meGusta",
+  "comentarios",
+  "compartidos",
+  "guardados",
+  "reposteos",
+  "interacciones",
+] as const;
+
+/**
+ * Las capturas con cada hueco relleno con el ultimo valor conocido de
+ * esa misma publicacion.
+ *
+ * Las cifras son acumuladas: una publicacion no pierde vistas de un dia
+ * para otro. Pero una lectura puede llegar vacia —un post que se hizo
+ * privado, uno que Apify a veces no puede abrir por "sensible" o
+ * "restringido"— y todo lo que toma la ultima captura la contaba como
+ * cero. En produccion eso hundia la curva de Evolucion en escalones y
+ * picos que no existieron: el dia en que un video dejaba de leerse, sus
+ * vistas salian del total.
+ *
+ * Un hueco no es un dato, es la falta de uno: se rellena con lo ultimo
+ * que si se supo. Lo que nunca se supo —un carrusel no publica vistas—
+ * sigue en null, porque no hay nada anterior que arrastrar. Un valor
+ * negativo tampoco es dato: Instagram da `likesCount = -1` cuando el
+ * creador oculta los me gusta, y se guardaba como -1.
+ *
+ * Arreglarlo aqui, al leer, y no borrando las capturas vacias deja bien
+ * tambien las que ya estan en la base, sin tocarlas.
+ */
+export function rellenarCapturas<T extends CapturaMetrica>(capturas: T[]): T[] {
+  const ordenadas = [...capturas].sort((a, b) =>
+    a.capturadoEn < b.capturadoEn ? -1 : a.capturadoEn > b.capturadoEn ? 1 : 0,
+  );
+  const conocido = new Map<string, Partial<Record<(typeof CIFRAS_DE_CAPTURA)[number], number>>>();
+  return ordenadas.map((c) => {
+    const previo = conocido.get(c.entregaId) ?? {};
+    const relleno = { ...c };
+    for (const clave of CIFRAS_DE_CAPTURA) {
+      const valor = c[clave];
+      if (typeof valor === "number" && valor >= 0) {
+        previo[clave] = valor;
+      } else {
+        relleno[clave] = previo[clave] ?? null;
+      }
+    }
+    conocido.set(c.entregaId, previo);
+    return relleno;
+  });
+}
+
 /**
  * Las piezas de la vista elegida, con lo medido y lo anotado fundidos.
  *
@@ -160,7 +213,9 @@ export function fundirPiezas(
   const extraPorEntrega = new Map(
     publicaciones.map((pub) => [pub.entregaId, pub.esExtra])
   );
-  const capturasDeLaVista = capturas.filter((c) =>
+  // Con los huecos rellenos antes de nada: la ultima captura de cada
+  // publicacion y la curva de Evolucion salen de aqui.
+  const capturasDeLaVista = rellenarCapturas(capturas).filter((c) =>
     entra(extraPorEntrega.get(c.entregaId) ?? false)
   );
 
