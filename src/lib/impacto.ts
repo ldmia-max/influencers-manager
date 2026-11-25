@@ -181,8 +181,9 @@ export function rellenarCapturas<T extends CapturaMetrica>(capturas: T[]): T[] {
   const ordenadas = [...capturas].sort((a, b) =>
     a.capturadoEn < b.capturadoEn ? -1 : a.capturadoEn > b.capturadoEn ? 1 : 0,
   );
-  const conocido = new Map<string, Partial<Record<(typeof CIFRAS_DE_CAPTURA)[number], number>>>();
-  return ordenadas.map((c) => {
+  type Cifras = Partial<Record<(typeof CIFRAS_DE_CAPTURA)[number], number>>;
+  const conocido = new Map<string, Cifras>();
+  const rellenas = ordenadas.map((c) => {
     const previo = conocido.get(c.entregaId) ?? {};
     const relleno = { ...c };
     for (const clave of CIFRAS_DE_CAPTURA) {
@@ -196,6 +197,33 @@ export function rellenarCapturas<T extends CapturaMetrica>(capturas: T[]): T[] {
     conocido.set(c.entregaId, previo);
     return relleno;
   });
+
+  // Una lectura que una posterior de la misma publicacion desmiente no
+  // se cree. Si un video tenia 147.400 vistas el 30/10 no puede tener
+  // 22.900 el 31/10: las cifras solo suben. En produccion Apify devolvio
+  // asi, dias sueltos, cifras infladas de un TikTok entre lecturas
+  // normales —los comentarios seguian una sola serie continua, era el
+  // mismo video— y la curva dibujaba picos de un dia que no existieron.
+  // Se recorre hacia atras y cada cifra se topa con la menor que se leyo
+  // despues; la ultima lectura no cambia nunca, asi que los totales de
+  // hoy son los mismos.
+  const minimoPosterior = new Map<string, Cifras>();
+  for (let i = rellenas.length - 1; i >= 0; i--) {
+    const c = rellenas[i];
+    const minimo = minimoPosterior.get(c.entregaId) ?? {};
+    for (const clave of CIFRAS_DE_CAPTURA) {
+      const valor = c[clave];
+      if (typeof valor !== "number") continue;
+      const tope = minimo[clave];
+      if (tope !== undefined && valor > tope) {
+        c[clave] = tope;
+      } else {
+        minimo[clave] = valor;
+      }
+    }
+    minimoPosterior.set(c.entregaId, minimo);
+  }
+  return rellenas;
 }
 
 /**
