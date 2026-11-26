@@ -60,7 +60,7 @@ export default async function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
               <Megaphone className="h-4 w-4" />
-              Campañas Activas
+              En proceso
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
-              Borradores
+              Abiertas
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -80,18 +80,18 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Campañas Activas */}
+      {/* En proceso */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5" />
-            Campañas Activas
+            En proceso
           </CardTitle>
         </CardHeader>
         <CardContent>
           {activeCampaigns.length === 0 ? (
             <p className="text-gray-500 text-center py-4">
-              No hay campañas activas.
+              No hay campañas en proceso.
             </p>
           ) : (
             <div className="space-y-3">
@@ -124,18 +124,18 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Borradores */}
+      {/* Abiertas */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5" />
-            Borradores
+            Abiertas
           </CardTitle>
         </CardHeader>
         <CardContent>
           {draftCampaigns.length === 0 ? (
             <p className="text-gray-500 text-center py-4">
-              No hay borradores.{" "}
+              No hay campañas abiertas.{" "}
               <Link href="/campaigns/new" className="text-blue-600 hover:underline">
                 Crea tu primera campaña
               </Link>
