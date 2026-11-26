@@ -21,6 +21,9 @@ interface PaginationProps {
   totalPages: number;
   pageSize: number;
   total: number;
+  /** Tamanos que ofrece el selector. Una rejilla de tarjetas necesita
+   *  multiplos de sus columnas, o la ultima fila queda a medias. */
+  pageSizeOptions?: number[];
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -30,6 +33,7 @@ export function Pagination({
   totalPages,
   pageSize,
   total,
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
 }: PaginationProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -117,7 +121,7 @@ export function Pagination({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
+              {pageSizeOptions.map((size) => (
                 <SelectItem key={size} value={size.toString()}>
                   {size}
                 </SelectItem>

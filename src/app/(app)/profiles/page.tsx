@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { ProfileFilters } from "@/components/filters/profile-filters";
 import { Pagination } from "@/components/ui/pagination";
+
 import {
   getCachedProfiles,
   getCachedPlatforms,
@@ -20,6 +21,10 @@ import type { ProfileType } from "@prisma/client";
 import { ProfileDetailSheet } from "@/components/profiles/profile-detail-sheet";
 import { ProfileCardWithCart } from "@/components/profiles/profile-card-with-cart";
 import type { ProfileWithServices } from "@/models/campaign";
+
+
+// Multiplos de 12: la rejilla de tarjetas tiene 2, 3 o 4 columnas.
+const TAMANOS_DE_PAGINA = [12, 24, 48, 96];
 
 interface SearchParams {
   search?: string;
@@ -57,7 +62,8 @@ export default async function ProfilesPage({
   const minEngagement = params.minEngagement ? parseFloat(params.minEngagement) : undefined;
   const maxEngagement = params.maxEngagement ? parseFloat(params.maxEngagement) : undefined;
   const page = params.page ? parseInt(params.page) : 1;
-  const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
+  // Con 10 la ultima fila de la rejilla quedaba a medias.
+  const pageSize = params.pageSize ? parseInt(params.pageSize) : TAMANOS_DE_PAGINA[0];
 
   const isAdmin = session?.user.role === "ADMIN";
   const userId = session?.user.id || "";
@@ -192,6 +198,7 @@ export default async function ProfilesPage({
                   totalPages={totalPages}
                   pageSize={pageSize}
                   total={total}
+                  pageSizeOptions={TAMANOS_DE_PAGINA}
                 />
               )}
             </CardContent>
